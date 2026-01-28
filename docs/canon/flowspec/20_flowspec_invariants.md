@@ -361,6 +361,63 @@ Audit Cross-Flow Dependency evaluations. Verify that source Flow is always withi
 
 ---
 
+### INV-022: Actionability Constraints Evaluated at Task Start Only
+
+**Statement:**  
+Actionability Constraints (including Cross-Flow Dependencies) MUST be evaluated when determining if a Task can be STARTED. Once a Task is started, Actionability Constraints MUST NOT be re-checked to block Outcome recording.
+
+**Rationale:**  
+A human who has started work on a Task has invested effort. Blocking Outcome recording due to later constraint changes (e.g., a Cross-Flow Dependency becoming unsatisfied) would orphan their work and create an unrecoverable state. Constraints gate the START of work, not the completion of work.
+
+**Violation Example:**  
+User starts Task T1 when Cross-Flow Dependency is satisfied. While working, the source Flow is rolled back (edge case). User attempts to record Outcome on T1, but system blocks because the dependency is now unsatisfied.
+
+**Detection Idea:**  
+Review Outcome recording logic. If any Actionability Constraint evaluation occurs at recording time (rather than start time), the invariant is violated.
+
+---
+
+### INV-023: Fan-Out Failure Preserves Outcome Truth but Blocks Flow
+
+**Statement:**  
+If fan-out instantiation fails, the recorded Outcome MUST remain valid and persisted (Truth is preserved). However, the triggering Flow MUST enter a BLOCKED state and cannot progress further.
+
+**Rationale:**  
+Outcomes are human-recorded Truth and MUST NOT be rolled back. However, fan-out represents a required coordination action. Allowing the parent Flow to proceed without successful fan-out creates orphaned downstream work and broken coordination. The Flow is blocked, but Truth is preserved.
+
+**v2 Behavior:**  
+- Outcome is recorded and preserved (no rollback)
+- Triggering Flow enters BLOCKED state
+- Failure is logged with context
+- No automatic or manual retry mechanism in v2
+
+**Violation Example:**  
+User records Outcome `SIGNED` on Task S3.1. Fan-out rule triggers but Finance Workflow has no Published version. System rolls back the `SIGNED` Outcome. ← VIOLATION (Truth must be preserved)
+
+**Correct Behavior:**  
+User records Outcome `SIGNED` on Task S3.1. Fan-out fails. Outcome remains recorded. Flow enters BLOCKED state with visible failure reason.
+
+**Detection Idea:**  
+Simulate fan-out failure. Verify: (1) Outcome remains recorded, (2) Flow status is BLOCKED, (3) failure is logged. Any Outcome rollback OR silent progression indicates violation.
+
+---
+
+### INV-024: Gate Key is Node-Level
+
+**Statement:**  
+Gates MUST be keyed by `(nodeId, outcomeName)`. Within a Node, Tasks MUST NOT define conflicting routing targets for the same outcome name.
+
+**Rationale:**  
+Node-level routing maintains graph simplicity and comprehension. Task-level routing would create combinatorial complexity and fragment the visual graph model.
+
+**Violation Example:**  
+Node N1 contains Task T1 (Outcome `APPROVED` → N2) and Task T2 (Outcome `APPROVED` → N3). The same outcome name routes to different Nodes, creating ambiguity.
+
+**Detection Idea:**  
+During Workflow validation, group all Task Outcomes by (nodeId, outcomeName). If any group has conflicting target Nodes, fail validation.
+
+---
+
 ## 3. Invariant Index
 
 | ID | Short Name | Category |
@@ -386,6 +443,9 @@ Audit Cross-Flow Dependency evaluations. Verify that source Flow is always withi
 | INV-019 | FlowSpec Evaluates Actionability | Boundaries |
 | INV-020 | Flow Start ≠ Actionability | Cross-Flow |
 | INV-021 | Cross-Flow Scoped to Flow Group | Cross-Flow |
+| INV-022 | Actionability at Start Only | Execution |
+| INV-023 | Fan-Out Failure ≠ Outcome Rollback | Fan-Out |
+| INV-024 | Gate Key is Node-Level | Gates |
 
 ---
 

@@ -119,16 +119,36 @@ Flow (Instance)
 
 ### 5.2 Node Semantics
 
-#### 5.2.1 Node Started
+#### 5.2.1 Node Activation (Truth Event)
+
+**Definition:** A Node becomes "active" when it is routed to by a Gate or is designated as an Entry Node at Flow start.
+
+**NodeActivated Event (CANONICAL Truth Shape):**
+```
+{
+  flowId: string,      // The Flow instance
+  nodeId: string,      // The Node being activated
+  activatedAt: string  // ISO 8601 timestamp
+}
+```
+
+**Rules:**
+1. A NodeActivated event MUST be recorded in Truth when:
+   - A Flow is created and Entry Node(s) are activated, OR
+   - A Gate routes to a Node (including re-activation in cycles)
+2. NodeActivated events are Truth — they are persisted and immutable.
+3. The set of "currently active Nodes" is Derived State computed from NodeActivated events + flow completion status.
+
+#### 5.2.2 Node Started (Derived State)
 
 **Definition:** A Node is "started" when at least one of its Tasks has been started.
 
 **Rules:**
-1. A Node becomes active when routed to by a Gate (or is an Entry Node).
-2. A Node is "started" (derived) when its first Task is started.
-3. Node "started" is Derived State, not Truth.
+1. A Node is "started" (derived) when its first Task is started.
+2. Node "started" is Derived State, computed from Task start timestamps.
+3. Node "started" is distinct from Node "active" — a Node may be active (routed to) but not yet started (no Task work begun).
 
-#### 5.2.2 Node Done
+#### 5.2.3 Node Done
 
 **Definition:** A Node is "done" when its completion rule is satisfied.
 
@@ -217,6 +237,23 @@ Flow (Instance)
 4. A Gate MAY route to one Node (linear progression).
 5. A Gate MAY route to multiple Nodes (fan-out).
 6. A Gate MAY route to a previously visited Node (cycle/loop).
+
+#### 5.5.2.1 Gate Key Semantics (CANONICAL)
+
+**Rule:** Gates are keyed by `(nodeId, outcomeName)` — routing operates at the Node level.
+
+**Constraints:**
+1. Within a single Node, Tasks MUST NOT define conflicting routing intent for the same outcome name.
+2. If multiple Tasks in a Node share an outcome name (e.g., `APPROVED`), all routes for that outcome name MUST resolve to the same target Node(s).
+3. The Builder MUST enforce this constraint at validation time.
+4. Builder API routes use `sourceNodeId` — this is canonical and MUST NOT change to `sourceTaskId`.
+
+**Rationale:**
+- Routing at Node-level maintains graph simplicity.
+- Task-level routing would fragment graph comprehension and create combinatorial complexity.
+- Outcome names are scoped to the Node for routing purposes.
+
+**Validation Error:** "Conflicting routes for outcome '{outcomeName}' in Node '{nodeId}': Tasks define different target Nodes."
 
 #### 5.5.3 Gate Evaluation
 
@@ -386,6 +423,42 @@ FlowSpec exposes the following conceptual integration surfaces to external domai
 4. Both Flows start; their Entry Node Tasks become Actionable per their own constraints.
 
 **Rule:** Fan-out is defined in the Builder. No domain "triggers" another. FlowSpec evaluates rules and instantiates Flows.
+
+#### 10.3.1 Fan-Out Target Version Resolution (CANONICAL)
+
+**Rule:** Fan-out MUST resolve target Workflow to the **Latest Published** version at evaluation time.
+
+**Constraints:**
+1. When a fan-out rule triggers, the Engine MUST instantiate Flows from the Latest Published version of each target Workflow.
+2. Version pinning (specifying an exact version in fan-out rules) is NOT supported in v1.
+3. If no Published version exists for a target Workflow, fan-out for that target MUST fail (logged as error).
+4. Fan-out version resolution is evaluated at the moment the triggering Outcome is recorded.
+
+**Rationale:**
+- Latest Published ensures new Flows benefit from workflow improvements.
+- Version pinning adds complexity and versioning entanglement not required for v1.
+- Explicit "no version pinning" prevents scope creep.
+
+#### 10.3.2 Fan-Out Failure Behavior (CANONICAL)
+
+**Rule:** Fan-out is an integral part of Outcome recording. If fan-out fails, the triggering Flow is BLOCKED.
+
+**v2 Semantics:**
+1. Fan-out instantiation is attempted as part of Outcome recording.
+2. If fan-out succeeds, the Outcome is recorded and the triggering Flow proceeds.
+3. If fan-out fails, the Outcome is still recorded (Truth is preserved), but the triggering Flow enters a BLOCKED state.
+4. Fan-out failure MUST be logged as a system event with sufficient context (triggering Flow, Outcome, target Workflow, error reason).
+5. The BLOCKED state is visible and terminal for v2 — no automatic retry, no manual retry surface.
+
+**Rationale:**
+- Fan-out represents a required downstream action. Proceeding without it creates orphaned coordination.
+- The Outcome is Truth and remains recorded (not rolled back), but the Flow cannot progress until the failure is resolved outside the system.
+- Retry mechanisms are explicitly deferred from v2 to avoid complexity.
+
+**v2 Explicit Deferral:**
+- Automatic retry of failed fan-outs: DEFERRED
+- Manual retry surface (UI/API): DEFERRED
+- Background retry jobs: DEFERRED
 
 ---
 

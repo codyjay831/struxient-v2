@@ -103,6 +103,39 @@ This document defines ALL terms used within the FlowSpec system. Every term MUST
 
 ---
 
+### 2.3.3 Scope (Flow Group Scope)
+
+**Definition:** A Scope is the canonical identifier for the unit of work that a Flow Group represents. Scope is the binding key for Flow Group membership.
+
+**Canonical Shape:**
+```
+{
+  type: string,   // e.g., "job", "project", "engagement"
+  id: string      // unique identifier within the type
+}
+```
+
+**Rules:**
+1. Flow creation MUST provide a `scope` parameter with both `type` and `id`.
+2. A Flow Group is uniquely identified by its Scope — there is exactly one Flow Group per unique Scope (1:1 relationship).
+3. If a `flowGroupId` is provided during Flow creation, the Engine MUST verify it matches the existing Flow Group for that Scope, or reject the request.
+4. `flowGroupId` is a hint for optimization; Scope is authoritative.
+
+**Clarification:**
+- Scope defines WHAT the work is for (the business entity).
+- Flow Group defines HOW multiple Flows are grouped together.
+- The Engine enforces Scope → Flow Group 1:1 invariant.
+
+**Example:**
+```
+scope: { type: "job", id: "job-12345" }
+→ All Flows for job-12345 share the same Flow Group
+```
+
+**Anti-pattern:** Providing `flowGroupId` without verifying Scope match. The Engine MUST reject mismatches.
+
+---
+
 ### 2.4 Node
 
 **Definition:** A Node is a named container within a Workflow that groups one or more Tasks. Nodes define started/done semantics for the grouped Tasks.
@@ -370,6 +403,7 @@ The following terms are PROHIBITED in FlowSpec documentation and implementation 
 | Evidence | 2.6 |
 | Flow | 2.3 |
 | Flow Group | 2.3.2 |
+| Scope (Flow Group Scope) | 2.3.3 |
 | Flow Start vs Task Actionability | 2.3.1 |
 | FlowSpec | 2.1 |
 | Gate | 2.8 |

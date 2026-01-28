@@ -297,17 +297,17 @@ Idempotency keys prevent duplicate operations when network issues cause retries.
 
 ---
 
-## 9. Permissions (High-Level)
+## 9. Authorization (High-Level)
 
-**Note:** Detailed role/permission systems are out-of-scope. High-level concepts only.
+**Note:** v2 implements tenant-only authorization. Per-user assignment is explicitly out of scope.
 
-| Permission | Description |
-|------------|-------------|
-| View Tasks | User can see Actionable Tasks assigned to them |
-| Complete Tasks | User can submit Outcomes for Tasks assigned to them |
-| Attach Evidence | User can upload Evidence to Tasks assigned to them |
+| Access | Description |
+|--------|-------------|
+| View Tasks | Authenticated user can see all Actionable Tasks within their tenant |
+| Complete Tasks | Authenticated user can submit Outcomes for any Actionable Task within their tenant |
+| Attach Evidence | Authenticated user can upload Evidence to any Actionable Task within their tenant |
 
-**Rule:** FlowSpec enforces permissions. Work Station passes authentication context; FlowSpec decides access.
+**Rule:** Authorization is tenant-scoped only. All authenticated members of a tenant see all tenant Actionable Tasks. There is no per-user, per-task, or per-role filtering in v2. Identity is used for attribution (who did this), not authorization (can they do this).
 
 ---
 

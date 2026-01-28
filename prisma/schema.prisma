@@ -1,5 +1,4 @@
 // Struxient Prisma Schema
-// Bootstrap schema — minimal model to verify migrations work
 
 generator client {
   provider = "prisma-client-js"
@@ -11,9 +10,51 @@ datasource db {
 }
 
 // Minimal model to verify migration pipeline
-// This will be replaced with actual business models later
 model HealthCheck {
   id        String   @id @default(cuid())
   status    String   @default("ok")
   checkedAt DateTime @default(now())
+}
+
+// =============================================================================
+// TENANT & MEMBERSHIP
+// =============================================================================
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members CompanyMember[]
+}
+
+/// Membership role within a company
+enum MemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  WORKER
+}
+
+/// Links a user (Clerk ID) to a company with a role and capability overrides
+model CompanyMember {
+  id        String     @id @default(cuid())
+  companyId String
+  userId    String     // Clerk user ID
+  role      MemberRole @default(WORKER)
+
+  /// Capability overrides: { allow: string[], deny: string[] }
+  /// Member-level allow/deny override role defaults.
+  /// Deny always wins over allow.
+  capabilities Json @default("{\"allow\":[],\"deny\":[]}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
+  @@index([companyId])
 }

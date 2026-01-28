@@ -78,7 +78,56 @@ This document maps every Builder feature to its UI location, UI control, API rou
 | Configure Evidence Schema | Side Panel (Task) | Form / modal | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/evidence-schema` PUT | `{ schema: {...} }` → `{ task }` | Valid JSON schema | Authenticated user |
 | Remove Evidence Requirement | Side Panel (Task) | Toggle off | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}` PATCH | `{ evidenceRequired: false }` → `{ task }` | None | Authenticated user |
 
-### 2.7 Validation & Publishing
+### 2.7 Cross-Flow Dependencies
+
+| Feature | UI Location | UI Control | API Route | Request/Response (Conceptual) | Validation | Permissions |
+|---------|-------------|------------|-----------|-------------------------------|------------|-------------|
+| Add Cross-Flow Dependency | Side Panel (Task) | "Add Dependency" button | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies` POST | `{ sourceWorkflowId, sourceTaskPath, requiredOutcome }` → `{ dependency }` | Source Workflow Published, Task exists, Outcome valid | Authenticated user |
+| List Cross-Flow Dependencies | Side Panel (Task) | Dependency list | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies` GET | `{}` → `{ dependencies: [...] }` | None | Authenticated user |
+| Delete Cross-Flow Dependency | Side Panel (Task) | Delete button | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies/{depId}` DELETE | `{}` → `{ success }` | Workflow is Draft | Authenticated user |
+
+**Cross-Flow Dependency Request Shape:**
+```json
+{
+  "sourceWorkflowId": "string",  // Target workflow to depend on
+  "sourceTaskPath": "string",    // "nodeId.taskId" identifier
+  "requiredOutcome": "string"    // Outcome that must be recorded
+}
+```
+
+**Validation Rules (at Publish time):**
+- Source Workflow must exist and be Published
+- Source Task must exist in Source Workflow
+- Required Outcome must be a defined Outcome on Source Task
+- Circular dependencies flagged as errors (may cause deadlock)
+
+**Note:** Cross-Flow Dependencies are authored in Draft, but become executable constraints only at Publish time. They are scoped to FlowGroup at runtime evaluation.
+
+### 2.8 Fan-Out Rules
+
+| Feature | UI Location | UI Control | API Route | Request/Response (Conceptual) | Validation | Permissions |
+|---------|-------------|------------|-----------|-------------------------------|------------|-------------|
+| Add Fan-Out Rule | Side Panel (Node/Gate) | "Add Fan-Out" button | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules` POST | `{ sourceNodeId, triggerOutcome, targetWorkflowId }` → `{ rule }` | Target Workflow Published, Outcome valid | Authenticated user |
+| List Fan-Out Rules | Workflow Settings / Node panel | Rule list | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules` GET | `{}` → `{ rules: [...] }` | None | Authenticated user |
+| Delete Fan-Out Rule | Side Panel | Delete button | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules/{ruleId}` DELETE | `{}` → `{ success }` | Workflow is Draft | Authenticated user |
+
+**Fan-Out Rule Request Shape:**
+```json
+{
+  "sourceNodeId": "string",      // Node whose outcome triggers fan-out
+  "triggerOutcome": "string",    // Outcome name that triggers instantiation
+  "targetWorkflowId": "string"   // Workflow to instantiate
+}
+```
+
+**Validation Rules (at Publish time):**
+- Target Workflow must exist and be Published
+- Trigger Outcome must be a valid outcome name in the source Node
+- No unbounded fan-out patterns (same outcome cannot trigger same workflow recursively without limit)
+
+**Note:** Fan-Out Rules are authored in Draft, but become executable only at Publish time. Fan-out target resolution uses Latest Published version at runtime. Fan-out failure BLOCKS the parent Flow (v2 behavior).
+
+### 2.9 Validation & Publishing
 
 | Feature | UI Location | UI Control | API Route | Request/Response (Conceptual) | Validation | Permissions |
 |---------|-------------|------------|-----------|-------------------------------|------------|-------------|
@@ -136,7 +185,23 @@ The following routes MUST be implemented for the Builder to function:
 | PATCH | `PLACEHOLDER:/api/flowspec/workflows/{id}/gates/{gateId}` | Update gate |
 | DELETE | `PLACEHOLDER:/api/flowspec/workflows/{id}/gates/{gateId}` | Delete gate |
 
-### 3.6 Lifecycle
+### 3.6 Cross-Flow Dependency CRUD
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies` | Add dependency |
+| GET | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies` | List dependencies |
+| DELETE | `PLACEHOLDER:/api/flowspec/workflows/{id}/nodes/{nodeId}/tasks/{taskId}/cross-flow-dependencies/{depId}` | Delete dependency |
+
+### 3.7 Fan-Out Rule CRUD
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules` | Add fan-out rule |
+| GET | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules` | List fan-out rules |
+| DELETE | `PLACEHOLDER:/api/flowspec/workflows/{id}/fan-out-rules/{ruleId}` | Delete fan-out rule |
+
+### 3.8 Lifecycle
 
 | Method | Route | Purpose |
 |--------|-------|---------|
