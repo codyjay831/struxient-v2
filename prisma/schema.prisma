@@ -1,0 +1,19 @@
+// Struxient Prisma Schema
+// Bootstrap schema — minimal model to verify migrations work
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Minimal model to verify migration pipeline
+// This will be replaced with actual business models later
+model HealthCheck {
+  id        String   @id @default(cuid())
+  status    String   @default("ok")
+  checkedAt DateTime @default(now())
+}
