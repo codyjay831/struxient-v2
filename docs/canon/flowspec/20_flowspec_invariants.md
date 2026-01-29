@@ -434,6 +434,54 @@ During Workflow validation, for each Task where `evidenceRequired === true`, ver
 
 ---
 
+### INV-026: Structural Edits in DRAFT Only
+
+**Statement:**  
+Structural modifications (Nodes, Tasks, Outcomes, Gates) MUST ONLY be permitted when a Workflow is in the `DRAFT` state.
+
+**Rationale:**  
+Allowing structural changes in `VALIDATED` or `PUBLISHED` states would bypass validation integrity and version immutability. `VALIDATED` workflows have been certified as sound; any change requires re-certification.
+
+**Violation Example:**  
+A user patches a Gate's `targetNodeId` on a Workflow that is currently in `PUBLISHED` state.
+
+**Detection Idea:**  
+In the persistence layer gateway, assert `workflow.status === 'DRAFT'` for all structural mutation operations.
+
+---
+
+### INV-027: Template Library Immutability
+
+**Statement:**  
+WorkflowTemplate records MUST be immutable. Updates MUST be performed by inserting a new row with an incremented version.
+
+**Rationale:**  
+Templates serve as canonical sources for tenant workflows. In-place edits would destroy the record of what a tenant originally imported and prevent predictable version tracking.
+
+**Violation Example:**  
+An admin updates the `definition` of `WorkflowTemplate` version 1 to fix a typo.
+
+**Detection Idea:**  
+Implement write-protection on the `WorkflowTemplate` table at the DB or ORM level.
+
+---
+
+### INV-028: Provenance is Write-Once
+
+**Statement:**  
+Workflow provenance fields (`templateId`, `templateVersion`, etc.) MUST be set exactly once during template import and MUST NOT be modified thereafter.
+
+**Rationale:**  
+Provenance is a historical record of origin. If a tenant modifies these fields, the audit trail linking the workflow back to the Snapshot Library is broken.
+
+**Violation Example:**  
+A user updates a Workflow's `templateId` to point to a different template after it was already imported.
+
+**Detection Idea:**  
+In the persistence gateway, exclude provenance fields from the update path for Workflows.
+
+---
+
 ## 3. Invariant Index
 
 | ID | Short Name | Category |
@@ -463,6 +511,9 @@ During Workflow validation, for each Task where `evidenceRequired === true`, ver
 | INV-023 | Fan-Out Failure ≠ Outcome Rollback | Fan-Out |
 | INV-024 | Gate Key is Node-Level | Gates |
 | INV-025 | Evidence Schema Required When Evidence Required | Evidence |
+| INV-026 | Structural Edits in DRAFT Only | Lifecycle |
+| INV-027 | Template Library Immutability | Templates |
+| INV-028 | Provenance is Write-Once | Templates |
 
 ---
 

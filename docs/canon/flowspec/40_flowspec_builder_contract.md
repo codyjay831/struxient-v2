@@ -511,13 +511,13 @@ The following statements must be true for the Builder to be considered complete.
 
 ### 11.2 Editing
 
-- [ ] Users can create, edit, delete Nodes.
-- [ ] Users can create, edit, delete Tasks.
-- [ ] Users can define and remove Outcomes.
-- [ ] Users can create and modify Gate routes.
-- [ ] Users can set Evidence requirements.
-- [ ] Users can mark/unmark Entry Nodes.
-- [ ] Users can set Node completion rules.
+- [ ] Users can create, edit, delete Nodes (Draft only).
+- [ ] Users can create, edit, delete Tasks (Draft only).
+- [ ] Users can define and remove Outcomes (Draft only).
+- [ ] Users can create and modify Gate routes (Draft only).
+- [ ] Users can set Evidence requirements (Draft only).
+- [ ] Users can mark/unmark Entry Nodes (Draft only).
+- [ ] Users can set Node completion rules (Draft only).
 
 ### 11.3 Validation
 
@@ -534,14 +534,16 @@ The following statements must be true for the Builder to be considered complete.
 - [ ] Missing Entry Node is flagged.
 - [ ] Destructive operations have confirmations.
 
-### 11.5 Versioning
+### 11.5 Versioning & Templates
 
 - [ ] Drafts can be saved and edited.
 - [ ] Validation transitions Draft to Validated.
-- [ ] Validated ↔ Draft
+- [ ] Validated ↔ Draft (Revert to Draft path for editing).
 - [ ] Publish transitions Validated to Published.
 - [ ] Published versions are immutable.
 - [ ] Users can view previous versions.
+- [ ] Users can list available templates in the Library.
+- [ ] Users can import a template into a new Draft workflow.
 
 ### 11.6 Non-Functional
 
@@ -550,6 +552,19 @@ The following statements must be true for the Builder to be considered complete.
 - [ ] Theme switch is seamless.
 - [ ] Performance is acceptable at 100+ Nodes.
 - [ ] All features are keyboard-accessible.
+
+---
+
+## 12. Template Library Integration
+
+### 12.1 Library View
+1. The Builder MUST provide a view of the **Snapshot Library** (available `WorkflowTemplate` records).
+2. Templates MUST be displayed with name, version, tradeKey, category, and tags.
+
+### 12.2 Import Action
+1. Importing a template MUST create a new Workflow in **Draft** state.
+2. The import process MUST regenerate all internal IDs to ensure uniqueness within the tenant workspace.
+3. Provenance fields (`templateId`, `templateVersion`) MUST be populated at import and locked (INV-028).
 
 ---
 

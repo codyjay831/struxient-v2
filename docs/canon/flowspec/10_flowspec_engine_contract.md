@@ -371,8 +371,8 @@ All Evidence Schemas MUST have a `type` field. Additional fields depend on the t
 
 | State | Editable | Executable | Description |
 |-------|----------|------------|-------------|
-| Draft | Yes | No | Work in progress. May be incomplete or invalid. |
-| Validated | No* | No | Passed all validation. Ready to publish. |
+| Draft | Yes | No | Work in progress. May be incomplete or invalid. All structural edits (Nodes, Tasks, Outcomes, Gates) are allowed. |
+| Validated | No* | No | Passed all validation. Ready to publish. Structural edits are locked. |
 | Published | No | Yes | Immutable. Flows can be created. |
 
 *Validated can revert to Draft for edits.
@@ -385,6 +385,10 @@ Validated → Draft (via Edit action — reverts for changes; UI: "Return to Dra
 Validated → Published (via Publish action)
 Published → (terminal, no transitions out)
 ```
+
+**Structural Edit Rule:** Structural changes (adding/removing/renaming Nodes, Tasks, Outcomes; creating/updating/deleting Gates) are EXCLUSIVELY permitted in the **Draft** state. If a Workflow is Validated, it MUST be reverted to Draft before any structural mutation is performed.
+
+---
 
 ### 7.3 Versioning
 
@@ -599,6 +603,31 @@ Cross-Flow Gating allows Tasks in one Flow to wait for Outcomes in another Flow 
 2. No time-dependent routing (unless time is recorded as Truth).
 3. No external state influencing routing decisions.
 4. Derived State is reproducible and auditable.
+
+---
+
+## 13. Workflow Templates & Snapshot Library
+
+### 13.1 Template Nature
+**Workflow Templates** are system-global blueprints stored in the **Snapshot Library**. They are non-executing and exist solely to be imported into tenant workspaces.
+
+### 13.2 Template Definition (Snapshot)
+1. A Template's `definition` field contains a `WorkflowSnapshot` JSON object.
+2. This snapshot MUST conform to the canonical `WorkflowSnapshot` schema (see `src/lib/flowspec/templates/schema.ts`).
+3. The snapshot represents a complete, stand-alone workflow structure.
+
+### 13.3 Import & Cloning Mechanics
+1. **Cloning:** Importing a template creates a new tenant-owned Workflow record in **Draft** state.
+2. **ID Regeneration:** All internal entity IDs (Nodes, Tasks, Outcomes, Gates) within the snapshot MUST be regenerated as fresh unique identifiers (e.g., CUIDs) during import to ensure tenant-level uniqueness.
+3. **Execution Boundary:** The engine NEVER executes a Template directly. It only executes tenant Workflows derived from Templates.
+
+### 13.4 Provenance Lock
+1. Workflows created from templates MUST store immutable provenance: `templateId`, `templateVersion`, `importedAt`, and `importedBy`.
+2. These fields MUST NOT be updated after the initial creation (Write-Once).
+
+### 13.5 Template Immutability
+1. WorkflowTemplates are immutable once created.
+2. Updating a template requires inserting a new row with an incremented `version` number.
 
 ---
 

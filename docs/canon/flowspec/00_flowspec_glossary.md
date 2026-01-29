@@ -42,12 +42,38 @@ This document defines ALL terms used within the FlowSpec system. Every term MUST
 - A Workflow is a SPECIFICATION (blueprint), not an execution.
 - A Workflow defines what CAN happen, not what IS happening.
 - Workflows are versioned and immutable once Published.
+- **Source:** Workflows are created either from scratch (New Workflow) or imported from the **Template Library**.
+- **Provenance:** Workflows imported from templates retain immutable references to their source `templateId` and `templateVersion`.
 - Synonym in context: "Workflow Definition", "Workflow Spec"
 
 **Lifecycle States:**
-1. **Draft** — editable, not executable
-2. **Validated** — passed all validation checks, not yet executable
-3. **Published** — immutable, executable
+1. **Draft** — editable, not executable. All structural changes (Nodes, Tasks, Outcomes, Gates) occur here.
+2. **Validated** — passed all validation checks, not yet executable. Structural edits are locked.
+3. **Published** — immutable, executable.
+
+---
+
+### 2.2.1 Workflow Template
+
+**Definition:** A Workflow Template is a system-defined, non-executing blueprint used as a starting point for creating tenant-owned Workflows.
+
+**Clarification:**
+- Templates exist in the **Template Library** (`WorkflowTemplate` table).
+- Templates contain a complete `WorkflowSnapshot` JSON structure.
+- Templates are global and do not belong to a specific tenant (Company).
+- Importing a template clones its structure into a new tenant-owned Workflow in **Draft** state.
+- Templates are immutable; updates require a new version row.
+
+---
+
+### 2.2.2 Provenance
+
+**Definition:** Provenance is the record of a Workflow's origin when created from the Template Library.
+
+**Clarification:**
+- Provenance includes `templateId`, `templateVersion`, `importedAt`, and `importedBy`.
+- Provenance fields are **write-once**; they are set at the moment of import and MUST NOT be modified thereafter.
+- Provenance enables tracking which version of a system blueprint a tenant's workflow originated from.
 
 ---
 

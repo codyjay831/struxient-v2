@@ -21,6 +21,7 @@ import {
   LinkIcon,
   GitBranchIcon,
   CircleStopIcon,
+  PlusIcon,
 } from "lucide-react";
 
 interface Outcome {
@@ -80,6 +81,17 @@ function findGate(gates: Gate[], nodeId: string, outcomeName: string): Gate | un
   );
 }
 
+// Helper to get unique outcome names for a node
+function getUniqueNodeOutcomes(node: Node): string[] {
+  const outcomes = new Set<string>();
+  for (const task of node.tasks) {
+    for (const outcome of task.outcomes) {
+      outcomes.add(outcome.name);
+    }
+  }
+  return Array.from(outcomes).sort();
+}
+
 export function RoutingEditor({
   workflowId,
   nodes,
@@ -101,6 +113,19 @@ export function RoutingEditor({
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // State for manual gate creation
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addGateData, setAddGateData] = useState<{
+    sourceNodeId: string;
+    outcomeName: string;
+    targetNodeId: string | null;
+  }>({
+    sourceNodeId: "",
+    outcomeName: "",
+    targetNodeId: null,
+  });
+  const [addError, setAddError] = useState<string | null>(null);
 
   // Get node name by ID
   const getNodeName = (nodeId: string | null): string => {
@@ -208,17 +233,38 @@ export function RoutingEditor({
               <GitBranchIcon className="size-4" />
               Routing Editor
             </CardTitle>
-            <div className="flex items-center gap-3 text-sm">
-              <span className="flex items-center gap-1 text-green-600">
-                <LinkIcon className="size-3" />
-                {routedCount} routed
-              </span>
-              {orphanedCount > 0 && (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <Link2OffIcon className="size-3" />
-                  {orphanedCount} orphaned
-                </span>
+            <div className="flex items-center gap-3">
+              {isEditable && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setAddGateData({
+                      sourceNodeId: nodes[0]?.id || "",
+                      outcomeName: "",
+                      targetNodeId: null,
+                    });
+                    setAddError(null);
+                    setIsAddDialogOpen(true);
+                  }}
+                  className="h-8 gap-1"
+                >
+                  <PlusIcon className="size-3.5" />
+                  Add Gate
+                </Button>
               )}
+              <div className="flex items-center gap-3 text-sm">
+                <span className="flex items-center gap-1 text-green-600">
+                  <LinkIcon className="size-3" />
+                  {routedCount} routed
+                </span>
+                {orphanedCount > 0 && (
+                  <span className="flex items-center gap-1 text-amber-600">
+                    <Link2OffIcon className="size-3" />
+                    {orphanedCount} orphaned
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -234,157 +280,176 @@ export function RoutingEditor({
             <p className="text-sm text-muted-foreground text-center py-4">
               No nodes in this workflow. Add nodes to define routing.
             </p>
-          ) : totalOutcomes === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No outcomes defined. Add outcomes to tasks to define routing.
-            </p>
           ) : (
             <div className="space-y-6">
               {nodes.map((node) => {
-                const outcomes = getNodeOutcomes(node);
-                if (outcomes.length === 0) return null;
+                const uniqueOutcomes = getUniqueNodeOutcomes(node);
+                const nodeRoutedCount = uniqueOutcomes.filter(o => !!findGate(gates, node.id, o)).length;
+                const nodeTotalCount = uniqueOutcomes.length;
 
                 return (
-                  <div key={node.id} className="space-y-2">
+                  <div key={node.id} className="space-y-3">
                     {/* Node Header */}
-                    <h3 className="font-medium text-sm border-b pb-1">
-                      {node.name}
-                    </h3>
+                    <div className="flex items-center justify-between border-b pb-1">
+                      <h3 className="font-semibold text-sm">
+                        {node.name}
+                      </h3>
+                      {nodeTotalCount > 0 && (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Coverage: {nodeRoutedCount} / {nodeTotalCount}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Outcomes Table */}
-                    <div className="space-y-1">
-                      {outcomes.map(({ taskId, taskName, outcomeName }) => {
-                        const gate = findGate(gates, node.id, outcomeName);
-                        const isRouted = !!gate;
-                        const rowKey = `${node.id}:${taskId}:${outcomeName}`;
-                        const loadingKey = `${node.id}:${outcomeName}`;
-                        const isCurrentLoading = isLoading === loadingKey;
+                    <div className="space-y-2">
+                      {nodeTotalCount === 0 ? (
+                        <p className="text-xs text-muted-foreground italic py-1">
+                          No outcomes defined for this node.
+                        </p>
+                      ) : (
+                        uniqueOutcomes.map((outcomeName) => {
+                          const gate = findGate(gates, node.id, outcomeName);
+                          const isRouted = !!gate;
+                          const rowKey = `${node.id}:${outcomeName}`;
+                          const loadingKey = `${node.id}:${outcomeName}`;
+                          const isCurrentLoading = isLoading === loadingKey;
 
-                        // Check if this row should be highlighted
-                        const isHighlightedByGate = highlightGateId && gate?.id === highlightGateId;
-                        const isHighlightedByOutcome =
-                          highlightOutcome?.nodeId === node.id &&
-                          highlightOutcome?.outcomeName === outcomeName;
-                        const isHighlighted = isHighlightedByGate || isHighlightedByOutcome;
+                          // Check if this row should be highlighted
+                          const isHighlightedByGate = highlightGateId && gate?.id === highlightGateId;
+                          const isHighlightedByOutcome =
+                            highlightOutcome?.nodeId === node.id &&
+                            highlightOutcome?.outcomeName === outcomeName;
+                          const isHighlighted = isHighlightedByGate || isHighlightedByOutcome;
 
-                        return (
-                          <div
-                            key={rowKey}
-                            className={`flex items-center gap-2 p-2 rounded-md border bg-muted/30 transition-all ${
-                              isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""
-                            }`}
-                          >
-                            {/* Source info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm truncate">
-                                  {outcomeName}
-                                </span>
+                          return (
+                            <div
+                              key={rowKey}
+                              className={`flex items-center gap-4 p-2 rounded-md border transition-all ${
+                                isRouted 
+                                  ? "bg-muted/30 border-border" 
+                                  : "bg-amber-50/50 border-amber-200/50 dark:bg-amber-900/10 dark:border-amber-900/30"
+                              } ${
+                                isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""
+                              }`}
+                            >
+                              {/* Status Badge */}
+                              <div className="shrink-0 w-24">
                                 {isRouted ? (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                    <LinkIcon className="size-3" />
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    <LinkIcon className="size-2.5" />
+                                    Routed
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                    <Link2OffIcon className="size-3" />
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                    <Link2OffIcon className="size-2.5" />
+                                    Missing
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-muted-foreground">
-                                from {taskName}
-                              </span>
-                            </div>
 
-                            {/* Arrow */}
-                            <ArrowRightIcon className="size-4 text-muted-foreground shrink-0" />
+                              {/* Outcome name */}
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-sm truncate">
+                                  {outcomeName}
+                                </span>
+                              </div>
 
-                            {/* Target selector */}
-                            <div className="w-48 shrink-0">
-                              <select
-                                value={gate?.targetNodeId ?? "__terminal__"}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  const targetId =
-                                    value === "__terminal__"
-                                      ? null
-                                      : value === "__none__"
-                                      ? undefined
-                                      : value;
+                              {/* Arrow */}
+                              <ArrowRightIcon className="size-4 text-muted-foreground shrink-0" />
 
-                                  if (targetId === undefined) {
-                                    // User selected "No route" - need to delete existing gate
-                                    if (gate) {
-                                      setDeleteTarget({
-                                        gate,
-                                        nodeName: node.name,
-                                        outcomeName,
-                                      });
+                              {/* Target selector or display */}
+                              <div className="w-56 shrink-0 flex items-center gap-2">
+                                <select
+                                  value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    const targetId =
+                                      value === "__terminal__"
+                                        ? null
+                                        : value === "__none__"
+                                        ? undefined
+                                        : value;
+
+                                    if (targetId === undefined) {
+                                      // User selected "No route" - need to delete existing gate
+                                      if (gate) {
+                                        setDeleteTarget({
+                                          gate,
+                                          nodeName: node.name,
+                                          outcomeName,
+                                        });
+                                      }
+                                    } else {
+                                      handleSetRoute(node.id, outcomeName, targetId, gate);
                                     }
-                                  } else {
-                                    handleSetRoute(node.id, outcomeName, targetId, gate);
-                                  }
-                                }}
-                                disabled={!isEditable || isCurrentLoading}
-                                className="w-full h-8 rounded-md border border-input bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {!isRouted && (
-                                  <option value="__none__">Select target...</option>
+                                  }}
+                                  disabled={!isEditable || isCurrentLoading}
+                                  className={`w-full h-8 rounded-md border px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                                    !isRouted 
+                                      ? "border-amber-200 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-transparent" 
+                                      : "border-input bg-background"
+                                  }`}
+                                >
+                                  {!isRouted && (
+                                    <option value="__none__">Select target...</option>
+                                  )}
+                                  <option value="__terminal__">
+                                    (Terminal) - End flow
+                                  </option>
+                                  {nodes
+                                    .filter((n) => n.id !== node.id) // Can't route to self
+                                    .map((targetNode) => (
+                                      <option key={targetNode.id} value={targetNode.id}>
+                                        {targetNode.name}
+                                      </option>
+                                    ))}
+                                </select>
+
+                                {/* Loading indicator */}
+                                {isCurrentLoading && (
+                                  <Loader2Icon className="size-4 animate-spin text-muted-foreground shrink-0" />
                                 )}
-                                <option value="__terminal__">
-                                  (Terminal) - End flow
-                                </option>
-                                {nodes
-                                  .filter((n) => n.id !== node.id) // Can't route to self
-                                  .map((targetNode) => (
-                                    <option key={targetNode.id} value={targetNode.id}>
-                                      {targetNode.name}
-                                    </option>
-                                  ))}
-                              </select>
+
+                                {/* Delete button for routed outcomes */}
+                                {isRouted && isEditable && !isCurrentLoading && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon-xs"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          setDeleteTarget({
+                                            gate: gate!,
+                                            nodeName: node.name,
+                                            outcomeName,
+                                          })
+                                        }
+                                        className="text-muted-foreground hover:text-destructive shrink-0"
+                                      >
+                                        <TrashIcon className="size-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Delete route</TooltipContent>
+                                  </Tooltip>
+                                )}
+
+                                {/* Terminal indicator */}
+                                {gate?.targetNodeId === null && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <CircleStopIcon className="size-4 text-muted-foreground shrink-0" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Terminal route - flow ends here
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
                             </div>
-
-                            {/* Loading indicator */}
-                            {isCurrentLoading && (
-                              <Loader2Icon className="size-4 animate-spin text-muted-foreground shrink-0" />
-                            )}
-
-                            {/* Delete button for routed outcomes */}
-                            {isRouted && isEditable && !isCurrentLoading && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon-xs"
-                                    variant="ghost"
-                                    onClick={() =>
-                                      setDeleteTarget({
-                                        gate: gate!,
-                                        nodeName: node.name,
-                                        outcomeName,
-                                      })
-                                    }
-                                    className="text-muted-foreground hover:text-destructive shrink-0"
-                                  >
-                                    <TrashIcon className="size-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete route</TooltipContent>
-                              </Tooltip>
-                            )}
-
-                            {/* Terminal indicator */}
-                            {gate?.targetNodeId === null && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <CircleStopIcon className="size-4 text-muted-foreground shrink-0" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Terminal route - flow ends here
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 );
@@ -434,6 +499,181 @@ export function RoutingEditor({
               >
                 {isDeleting && <Loader2Icon className="size-4 animate-spin" />}
                 Delete Route
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Gate Dialog */}
+        <Dialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => !open && setIsAddDialogOpen(false)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Gate</DialogTitle>
+              <DialogDescription>
+                Create a new routing rule by connecting a node's outcome to a target node.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {addError && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                  <AlertCircleIcon className="size-4" />
+                  {addError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Source Node</label>
+                <select
+                  value={addGateData.sourceNodeId}
+                  onChange={(e) => {
+                    const nodeId = e.target.value;
+                    const node = nodes.find((n) => n.id === nodeId);
+                    const outcomes = node ? getNodeOutcomes(node) : [];
+                    setAddGateData({
+                      ...addGateData,
+                      sourceNodeId: nodeId,
+                      outcomeName: outcomes[0]?.outcomeName || "",
+                    });
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="" disabled>Select source node...</option>
+                  {nodes.map((node) => (
+                    <option key={node.id} value={node.id}>
+                      {node.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Outcome Name</label>
+                <select
+                  value={addGateData.outcomeName}
+                  onChange={(e) =>
+                    setAddGateData({ ...addGateData, outcomeName: e.target.value })
+                  }
+                  disabled={!addGateData.sourceNodeId}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  {!addGateData.sourceNodeId ? (
+                    <option value="">Select a source node first</option>
+                  ) : (
+                    <>
+                      {(() => {
+                        const node = nodes.find((n) => n.id === addGateData.sourceNodeId);
+                        const outcomes = node ? getNodeOutcomes(node) : [];
+                        if (outcomes.length === 0) {
+                          return <option value="">No outcomes defined for this node</option>;
+                        }
+                        return (
+                          <>
+                            <option value="" disabled>Select outcome...</option>
+                            {Array.from(new Set(outcomes.map((o) => o.outcomeName))).map(
+                              (name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              )
+                            )}
+                          </>
+                        );
+                      })()}
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Target Node</label>
+                <select
+                  value={addGateData.targetNodeId ?? "__terminal__"}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setAddGateData({
+                      ...addGateData,
+                      targetNodeId: value === "__terminal__" ? null : value,
+                    });
+                  }}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="__terminal__">(Terminal) - End flow</option>
+                  {nodes
+                    .filter((n) => n.id !== addGateData.sourceNodeId)
+                    .map((node) => (
+                      <option key={node.id} value={node.id}>
+                        {node.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddDialogOpen(false)}
+                disabled={!!isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!addGateData.sourceNodeId || !addGateData.outcomeName) {
+                    setAddError("Please select both a source node and an outcome.");
+                    return;
+                  }
+
+                  // Check if gate already exists locally to avoid unnecessary API call for known issues
+                  const exists = gates.find(
+                    (g) =>
+                      g.sourceNodeId === addGateData.sourceNodeId &&
+                      g.outcomeName === addGateData.outcomeName
+                  );
+                  if (exists) {
+                    setAddError(`A route for outcome "${addGateData.outcomeName}" already exists in this node.`);
+                    return;
+                  }
+
+                  setAddError(null);
+                  const key = `${addGateData.sourceNodeId}:${addGateData.outcomeName}`;
+                  setIsLoading(key);
+
+                  try {
+                    const response = await fetch(
+                      `/api/flowspec/workflows/${workflowId}/gates`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          sourceNodeId: addGateData.sourceNodeId,
+                          outcomeName: addGateData.outcomeName,
+                          targetNodeId: addGateData.targetNodeId,
+                        }),
+                      }
+                    );
+
+                    if (!response.ok) {
+                      const data = await response.json();
+                      throw new Error(data.error?.message || "Failed to create gate");
+                    }
+
+                    setIsAddDialogOpen(false);
+                    onRoutingUpdated();
+                  } catch (err) {
+                    setAddError(err instanceof Error ? err.message : "Failed to create gate");
+                  } finally {
+                    setIsLoading(null);
+                  }
+                }}
+                disabled={!!isLoading || !addGateData.sourceNodeId || !addGateData.outcomeName}
+              >
+                {isLoading && <Loader2Icon className="size-4 animate-spin" />}
+                Create Gate
               </Button>
             </DialogFooter>
           </DialogContent>

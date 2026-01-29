@@ -67,14 +67,16 @@ A simple linear workflow where each Task completes and routes to the next Node i
 
 ### 2.4 Gate Routing Table
 
-| Source Node | Source Task | Outcome | Target Node |
-|-------------|-------------|---------|-------------|
-| N1 | T1.1 | SUBMITTED | N2 |
-| N2 | T2.1 | APPROVED | N3 |
-| N2 | T2.1 | REJECTED | N4 |
-| N3 | T3.1 | APPROVED | N4 |
-| N3 | T3.1 | REJECTED | N4 |
-| N4 | T4.1 | ARCHIVED | (Terminal) |
+*Tasks emit outcomes; gates route node-level outcomes (INV-024).*
+
+| Source Node | Outcome | Target Node |
+|-------------|---------|-------------|
+| N1 | SUBMITTED | N2 |
+| N2 | APPROVED | N3 |
+| N2 | REJECTED | N4 |
+| N3 | APPROVED | N4 |
+| N3 | REJECTED | N4 |
+| N4 | ARCHIVED | (Terminal) |
 
 ### 2.5 Started/Done Semantics
 
@@ -156,13 +158,15 @@ A workflow containing a cycle that routes back to a previous Node when remediati
 
 ### 3.4 Gate Routing Table
 
-| Source Node | Source Task | Outcome | Target Node |
-|-------------|-------------|---------|-------------|
-| N1 | T1.1 | SUBMITTED | N2 |
-| N2 | T2.1 | PASS | N4 |
-| N2 | T2.1 | FAIL | N3 |
-| N3 | T3.1 | REWORK_COMPLETE | N2 |
-| N4 | T4.1 | ACCEPTED | (Terminal) |
+*Tasks emit outcomes; gates route node-level outcomes (INV-024).*
+
+| Source Node | Outcome | Target Node |
+|-------------|---------|-------------|
+| N1 | SUBMITTED | N2 |
+| N2 | PASS | N4 |
+| N2 | FAIL | N3 |
+| N3 | REWORK_COMPLETE | N2 |
+| N4 | ACCEPTED | (Terminal) |
 
 **Note:** The route from N3 back to N2 creates a cycle (remediation loop).
 
@@ -273,15 +277,17 @@ A workflow where execution pauses to wait for an external event (e.g., third-par
 
 ### 4.4 Gate Routing Table
 
-| Source Node | Source Task | Outcome | Target Node |
-|-------------|-------------|---------|-------------|
-| N1 | T1.1 | REQUEST_SENT | N2 |
-| N2 | T2.1 | RESPONSE_RECEIVED | N3 |
-| N2 | T2.1 | TIMEOUT | N4 |
-| N3 | T3.1 | VERIFIED | N4 |
-| N3 | T3.1 | REJECTED | N4 |
-| N3 | T3.1 | RETRY | N1 |
-| N4 | T4.1 | COMPLETED | (Terminal) |
+*Tasks emit outcomes; gates route node-level outcomes (INV-024).*
+
+| Source Node | Outcome | Target Node |
+|-------------|---------|-------------|
+| N1 | REQUEST_SENT | N2 |
+| N2 | RESPONSE_RECEIVED | N3 |
+| N2 | TIMEOUT | N4 |
+| N3 | VERIFIED | N4 |
+| N3 | REJECTED | N4 |
+| N3 | RETRY | N1 |
+| N4 | COMPLETED | (Terminal) |
 
 **Note:** 
 - N2 represents a "waiting" state. The Task is Actionable but cannot record an Outcome until the external event occurs.
@@ -370,10 +376,12 @@ A pattern where multiple Flows execute in parallel for the same job, with Cross-
 
 **Gate Routing:**
 
-| Source | Outcome | Target |
+*Tasks emit outcomes; gates route node-level outcomes.*
+
+| Source Node | Outcome | Target |
 |--------|---------|--------|
-| S3.1 | SIGNED | (Terminal + Fan-Out Rule) |
-| S3.1 | DECLINED | (Terminal) |
+| S3 | SIGNED | (Terminal + Fan-Out Rule) |
+| S3 | DECLINED | (Terminal) |
 
 **Fan-Out Rule (authored in Builder):**  
 On S3.1 = SIGNED → Instantiate Finance Flow AND Execution Flow into same Flow Group.
@@ -396,12 +404,14 @@ On S3.1 = SIGNED → Instantiate Finance Flow AND Execution Flow into same Flow 
 
 **Gate Routing:**
 
-| Source | Outcome | Target |
+*Tasks emit outcomes; gates route node-level outcomes.*
+
+| Source Node | Outcome | Target |
 |--------|---------|--------|
-| F1.1 | DEPOSIT_COLLECTED | F2 |
-| F1.1 | DEPOSIT_FAILED | (Terminal - Failed) |
-| F2.1 | BALANCE_COLLECTED | (Terminal - Success) |
-| F2.1 | BALANCE_FAILED | (Terminal - Failed) |
+| F1 | DEPOSIT_COLLECTED | F2 |
+| F1 | DEPOSIT_FAILED | (Terminal - Failed) |
+| F2 | BALANCE_COLLECTED | (Terminal - Success) |
+| F2 | BALANCE_FAILED | (Terminal - Failed) |
 
 ### 5.5 Execution Flow
 
@@ -423,12 +433,14 @@ On S3.1 = SIGNED → Instantiate Finance Flow AND Execution Flow into same Flow 
 
 **Gate Routing:**
 
-| Source | Outcome | Target |
+*Tasks emit outcomes; gates route node-level outcomes.*
+
+| Source Node | Outcome | Target |
 |--------|---------|--------|
-| E1.1 | SCHEDULED | E2 |
-| E2.1 | WORK_COMPLETE | E3 |
-| E2.1 | WORK_FAILED | E1 (reschedule loop) |
-| E3.1 | INSTALLATION_COMPLETE | (Terminal) |
+| E1 | SCHEDULED | E2 |
+| E2 | WORK_COMPLETE | E3 |
+| E2 | WORK_FAILED | E1 (reschedule loop) |
+| E3 | INSTALLATION_COMPLETE | (Terminal) |
 
 ### 5.6 Cross-Flow Dependency Summary
 

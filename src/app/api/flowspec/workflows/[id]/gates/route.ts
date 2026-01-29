@@ -33,9 +33,14 @@ export async function POST(request: NextRequest, { params }: Props) {
 
     await verifyTenantOwnership(workflow.companyId);
 
-    // INV-011: Published Immutable
-    if (workflow.status === WorkflowStatus.PUBLISHED) {
-      return apiError("PUBLISHED_IMMUTABLE", "Published workflows cannot be modified", null, 403);
+    // INV-011: Mutations allowed only in DRAFT state
+    if (workflow.status !== WorkflowStatus.DRAFT) {
+      return apiError(
+        "WORKFLOW_NOT_EDITABLE",
+        `Workflow is in ${workflow.status} state and cannot be modified. Revert to Draft to edit.`,
+        null,
+        403
+      );
     }
 
     if (!sourceNodeId || !outcomeName) {
