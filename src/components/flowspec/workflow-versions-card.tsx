@@ -23,7 +23,9 @@ import {
   HistoryIcon,
   GitBranchIcon,
   AlertCircleIcon,
+  EyeIcon,
 } from "lucide-react";
+import { ViewVersionDialog } from "./view-version-dialog";
 
 export interface WorkflowVersion {
   id: string;
@@ -54,6 +56,15 @@ export function WorkflowVersionsCard({
   const [selectedVersion, setSelectedVersion] = useState<WorkflowVersion | null>(null);
   const [isBranching, setIsBranching] = useState(false);
   const [branchError, setBranchError] = useState<string | null>(null);
+
+  // View dialog state
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedVersionForView, setSelectedVersionForView] = useState<WorkflowVersion | null>(null);
+
+  const handleViewClick = (version: WorkflowVersion) => {
+    setSelectedVersionForView(version);
+    setViewDialogOpen(true);
+  };
 
   const handleBranchClick = (version: WorkflowVersion) => {
     setSelectedVersion(version);
@@ -151,21 +162,39 @@ export function WorkflowVersionsCard({
                       Published {formatDate(version.publishedAt)}
                     </div>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleBranchClick(version)}
-                      >
-                        <GitBranchIcon className="size-3.5" />
-                        Branch
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Create a new Draft from this version
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="flex items-center gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewClick(version)}
+                        >
+                          <EyeIcon className="size-3.5" />
+                          View
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        View read-only snapshot
+                      </TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleBranchClick(version)}
+                        >
+                          <GitBranchIcon className="size-3.5" />
+                          Branch
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Create a new Draft from this version
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               ))}
             </div>
@@ -204,6 +233,14 @@ export function WorkflowVersionsCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* View Version Dialog */}
+      <ViewVersionDialog
+        workflowId={workflowId}
+        versionId={selectedVersionForView?.id || null}
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+      />
     </>
   );
 }

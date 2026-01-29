@@ -12,3 +12,4 @@ export { EvidenceSchemaEditor } from "./evidence-schema-editor";
 export { CrossFlowDepsEditor } from "./cross-flow-deps-editor";
 export { FanOutRulesEditor } from "./fan-out-rules-editor";
 export { WorkflowVersionsCard, type WorkflowVersion } from "./workflow-versions-card";
+export { ViewVersionDialog } from "./view-version-dialog";
