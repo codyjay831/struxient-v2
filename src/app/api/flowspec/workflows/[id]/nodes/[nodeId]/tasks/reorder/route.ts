@@ -1,0 +1,76 @@
+/**
+ * Task API - Reorder
+ *
+ * Canon Source: 50_flowspec_builder_ui_api_map.md §3.3
+ */
+
+import { prisma } from "@/lib/prisma";
+import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
+import { apiSuccess, apiError } from "@/lib/api-utils";
+import { NextRequest } from "next/server";
+import { WorkflowStatus } from "@prisma/client";
+
+export const dynamic = "force-dynamic";
+
+type Props = {
+  params: Promise<{ id: string; nodeId: string }>;
+};
+
+/**
+ * Reorder Tasks within a Node.
+ */
+export async function PATCH(request: NextRequest, { params }: Props) {
+  try {
+    const { id: workflowId, nodeId } = await params;
+    const body = await request.json();
+    const { order } = body; // Array of task IDs in desired order
+
+    if (!Array.isArray(order)) {
+      return apiError("INVALID_INPUT", "Order must be an array of task IDs");
+    }
+
+    const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
+
+    if (!workflow) {
+      return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
+    }
+
+    await verifyTenantOwnership(workflow.companyId);
+
+    // INV-011: Published Immutable
+    if (workflow.status === WorkflowStatus.PUBLISHED) {
+      return apiError("PUBLISHED_IMMUTABLE", "Published workflows cannot be modified", null, 403);
+    }
+
+    // Verify all tasks belong to the node
+    const tasks = await prisma.task.findMany({
+      where: { nodeId },
+    });
+    const taskIds = new Set(tasks.map((t) => t.id));
+
+    for (const id of order) {
+      if (!taskIds.has(id)) {
+        return apiError("TASK_NOT_FOUND", `Task ${id} does not belong to node ${nodeId}`);
+      }
+    }
+
+    // Perform updates in a transaction
+    await prisma.$transaction(
+      order.map((taskId, index) =>
+        prisma.task.update({
+          where: { id: taskId },
+          data: { displayOrder: index },
+        })
+      )
+    );
+
+    const updatedTasks = await prisma.task.findMany({
+      where: { nodeId },
+      orderBy: { displayOrder: "asc" },
+    });
+
+    return apiSuccess({ tasks: updatedTasks });
+  } catch (error) {
+    return tenantErrorResponse(error);
+  }
+}

@@ -6,6 +6,8 @@
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
+- [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md)
+- [42_flowspec_builder_screen_api_matrix.md](./42_flowspec_builder_screen_api_matrix.md)
 - [50_flowspec_builder_ui_api_map.md](./50_flowspec_builder_ui_api_map.md)
 
 ---
@@ -15,6 +17,41 @@
 This document defines the behavioral contract for the FlowSpec Builder. The Builder is a first-class product surface for creating, editing, and managing Workflow specifications.
 
 **Rule:** All Builder implementations MUST conform to this contract.
+
+---
+
+## 1.1 Implementation Phases
+
+The Builder contract supports two valid implementation approaches that may be delivered in phases:
+
+| Phase | Implementation | Document | Description |
+|-------|---------------|----------|-------------|
+| **Phase 1** | Structured Builder | [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md) | Lists + panels interface. Full API coverage. No canvas. |
+| **Phase 2** | Visual Graph Builder | This document (§3, §5.5) | Canvas-based drag-and-drop graph editing. |
+
+**Phasing Rules:**
+1. Phase 1 (Structured Builder) is a VALID, COMPLETE implementation that satisfies all functional requirements.
+2. Phase 2 (Visual Graph) is an ENHANCEMENT, not a prerequisite.
+3. Both phases MUST enforce all invariants identically.
+4. Phase 1 MUST expose 100% of FlowSpec capabilities through structured UI.
+5. Phase 2 requirements (§3, §5.5) are DEFERRED, not removed.
+
+**Explicit Deferral (Phase 2):**
+- §3 (Visual Graph Editing) — DEFERRED to Phase 2
+- §5.1 (Drag and Move on canvas) — DEFERRED to Phase 2
+- §5.5 (Canvas Interaction Contract) — DEFERRED to Phase 2
+- §9.1.1 (Graph Readability Requirements) — DEFERRED to Phase 2
+- §11.1 (Visual Graph Acceptance) — DEFERRED to Phase 2
+
+**Phase 1 Deliverables:**
+- Workflow List view
+- Node management via structured panels
+- Task/Outcome editing via forms
+- Gate routing via table-based editor
+- Validation results display
+- Publish/Version management
+
+See [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md) for Phase 1 canonical specification.
 
 ---
 
@@ -220,6 +257,63 @@ This section defines canvas interaction semantics. These interactions are purely
 
 ---
 
+## 5.6 Structured Builder Interaction Contract (Phase 1)
+
+This section defines interaction semantics for the Structured Builder (Phase 1). These rules apply when canvas-based editing is not yet implemented.
+
+### 5.6.1 List-Based Display
+
+**Requirements:**
+1. Nodes are displayed as items in a list or card grid, NOT on a spatial canvas.
+2. List order MAY be alphabetical, creation order, or user-defined display order.
+3. List order MUST NOT imply execution sequence or priority.
+4. Visual hierarchy (indentation, grouping) MUST NOT encode execution semantics.
+
+### 5.6.2 Drag in Structured Mode
+
+**Definition:** In Structured Builder, "drag" means REORDER within a list, NOT spatial positioning.
+
+**Requirements:**
+1. Dragging a Node in the Node list changes its display order only.
+2. Dragging a Task in the Task list changes its `displayOrder` only.
+3. Drag-reorder MUST NOT affect Gate routing or execution order.
+4. Drag-reorder MAY be persisted for user convenience (purely visual preference).
+
+**Explicit Prohibition:**
+> Dragging to reorder MUST NOT be interpreted as changing workflow execution.
+> Execution order is determined by Gates and Outcomes only.
+
+### 5.6.3 Selection in Structured Mode
+
+**Requirements:**
+1. Clicking a Node in the list opens its detail panel (Tasks, Completion Rule).
+2. Clicking a Task in the list opens its detail panel (Outcomes, Evidence, Dependencies).
+3. Selection MUST be visual only — it MUST NOT affect Workflow data.
+4. Only one entity may be selected at a time (no multi-select required in Phase 1).
+
+### 5.6.4 Routing in Structured Mode
+
+**Requirements:**
+1. Gate routing is managed via a table-based Routing Editor, NOT visual edge drawing.
+2. The Routing Editor lists all Outcomes and their target Nodes.
+3. Users select target Nodes from a dropdown/autocomplete.
+4. `null` target (terminal) is an explicit option labeled "Terminal" or "(End Flow)".
+5. Orphaned Outcomes (no route) are highlighted as validation errors.
+
+### 5.6.5 Invariant Preservation
+
+> **⚠️ Critical Boundary:**
+> All invariants (INV-001 through INV-024) apply equally to Structured Builder.
+> The absence of a canvas does NOT relax any invariant.
+
+Specifically:
+- INV-012 (Graph-First Execution) — List order does NOT determine execution.
+- INV-004 (No Stage-Implied Readiness) — Display order does NOT imply readiness.
+- INV-003 (Gates Route Only) — Routing is explicit via Routing Editor.
+- INV-008 (All Outcomes Routed) — Routing Editor enforces this visually.
+
+---
+
 ## 6. Error States and Recovery
 
 ### 6.1 Validation Errors
@@ -391,16 +485,29 @@ Validation checks (see [10_flowspec_engine_contract.md](./10_flowspec_engine_con
 
 ## 11. Acceptance Checklist
 
-The following statements must be true for the Builder to be considered complete:
+The following statements must be true for the Builder to be considered complete.
 
-### 11.1 Visual Graph
+**Note:** Phase 1 (Structured Builder) and Phase 2 (Visual Graph) have separate acceptance criteria. Phase 1 is COMPLETE when §11.1A + §11.2-11.6 pass. Phase 2 is COMPLETE when §11.1B is additionally satisfied.
+
+### 11.1A Structured Builder (Phase 1)
+
+- [ ] Workflows display as a list/grid with name, status, and last updated.
+- [ ] Clicking a Workflow opens its detail view with Node list.
+- [ ] Nodes display as a list with name, Entry indicator, and Task count.
+- [ ] Clicking a Node opens its detail panel with Tasks.
+- [ ] Routing Editor shows all Outcomes and their target Nodes in table format.
+- [ ] Entry Nodes are visually marked (badge/icon in list).
+- [ ] Terminal routes are explicitly shown as "(Terminal)" in Routing Editor.
+- [ ] Validation errors display in a dedicated panel with clickable navigation.
+
+### 11.1B Visual Graph (Phase 2 — DEFERRED)
 
 - [ ] Workflows display as visual node graphs.
 - [ ] Edges show Outcome-based routing.
 - [ ] Nodes can be dragged and repositioned.
 - [ ] Edges follow Nodes dynamically during drag.
-- [ ] Entry Nodes are visually distinct.
-- [ ] Terminal paths are visually distinct.
+- [ ] Entry Nodes are visually distinct on canvas.
+- [ ] Terminal paths are visually distinct on canvas.
 
 ### 11.2 Editing
 

@@ -26,7 +26,9 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members CompanyMember[]
+  members    CompanyMember[]
+  workflows  Workflow[]
+  flowGroups FlowGroup[]
 }
 
 /// Membership role within a company
@@ -57,4 +59,339 @@ model CompanyMember {
   @@unique([companyId, userId])
   @@index([userId])
   @@index([companyId])
+}
+
+// =============================================================================
+// FLOWSPEC: WORKFLOW SPECIFICATION (DESIGN-TIME)
+// Canon: 10_flowspec_engine_contract.md, 00_flowspec_glossary.md
+// =============================================================================
+
+/// Workflow specification (design-time blueprint)
+/// A Workflow is a versioned, immutable graph specification that describes
+/// the structure, tasks, outcomes, and routing rules for a type of work.
+model Workflow {
+  id               String         @id @default(cuid())
+  name             String
+  description      String?
+  status           WorkflowStatus @default(DRAFT)
+  version          Int            @default(1)
+  isNonTerminating Boolean        @default(false)
+  companyId        String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  publishedAt      DateTime?
+
+  nodes       Node[]
+  gates       Gate[]
+  versions    WorkflowVersion[]
+  flows       Flow[]
+  fanOutRules FanOutRule[]
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name, version])
+  @@index([companyId])
+}
+
+/// Workflow lifecycle states
+/// Draft: Editable, not executable
+/// Validated: Passed validation, ready to publish
+/// Published: Immutable, executable
+enum WorkflowStatus {
+  DRAFT
+  VALIDATED
+  PUBLISHED
+}
+
+/// Immutable published version snapshot
+/// Created when a Workflow is published. Contains complete workflow structure
+/// at publish time. Flows are bound to a specific version at creation.
+/// INV-010: Flow bound to version, INV-011: Published workflows are immutable
+model WorkflowVersion {
+  id          String   @id @default(cuid())
+  workflowId  String
+  version     Int
+  snapshot    Json     // Complete workflow structure at publish time
+  publishedAt DateTime @default(now())
+  publishedBy String   // User ID who published
+
+  workflow Workflow @relation(fields: [workflowId], references: [id])
+  flows    Flow[]
+
+  @@unique([workflowId, version])
+}
+
+/// Node container within a Workflow
+/// A Node is a named container that groups one or more Tasks.
+/// Nodes define started/done semantics for the grouped Tasks.
+model Node {
+  id             String         @id @default(cuid())
+  workflowId     String
+  name           String
+  isEntry        Boolean        @default(false)
+  completionRule CompletionRule @default(ALL_TASKS_DONE)
+  specificTasks  String[]       // For SPECIFIC_TASKS_DONE rule - list of Task IDs
+  position       Json?          // { x: number, y: number } for Builder UI
+
+  workflow      Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  outboundGates Gate[]   @relation("SourceNode")
+  inboundGates  Gate[]   @relation("TargetNode")
+
+  @@unique([workflowId, name])
+}
+
+/// Node completion rules
+/// ALL_TASKS_DONE: Node is done when ALL Tasks have recorded Outcomes
+/// ANY_TASK_DONE: Node is done when ANY Task has recorded an Outcome
+/// SPECIFIC_TASKS_DONE: Node is done when specified subset of Tasks have recorded Outcomes
+enum CompletionRule {
+  ALL_TASKS_DONE
+  ANY_TASK_DONE
+  SPECIFIC_TASKS_DONE
+}
+
+/// Task definition within a Node
+/// A Task is the atomic unit of work. All execution happens at the Task level.
+/// Tasks have explicit, enumerated Outcomes.
+/// INV-001: No work outside Tasks
+model Task {
+  id               String  @id @default(cuid())
+  nodeId           String
+  name             String
+  instructions     String?
+  evidenceRequired Boolean @default(false)
+  evidenceSchema   Json?   // Schema for required evidence validation
+  displayOrder     Int     @default(0)
+
+  node                  Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  outcomes              Outcome[]
+  crossFlowDependencies CrossFlowDependency[]
+
+  @@unique([nodeId, name])
+}
+
+/// Outcome definition for a Task
+/// Outcomes are explicit, enumerated results of completing a Task.
+/// INV-002: Explicit outcomes only - no inferred or freeform outcomes
+model Outcome {
+  id     String @id @default(cuid())
+  taskId String
+  name   String // e.g., "APPROVED", "REJECTED", "NEEDS_REVISION"
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, name])
+}
+
+/// Gate routing rule
+/// Gates route execution to the next Node(s) based on Outcomes.
+/// Gates are keyed by (nodeId, outcomeName) - routing operates at Node level.
+/// INV-003: Gates route only, INV-024: Gate key is Node-level
+model Gate {
+  id           String  @id @default(cuid())
+  workflowId   String
+  sourceNodeId String
+  outcomeName  String  // Routes by outcome name at Node level
+  targetNodeId String? // null = terminal path (no further routing)
+
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  sourceNode Node     @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode Node?    @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: SetNull)
+
+  @@unique([workflowId, sourceNodeId, outcomeName])
+}
+
+/// Cross-flow dependency definition
+/// Allows Tasks in one Flow to wait for Outcomes in another Flow
+/// before becoming Actionable.
+/// INV-017: Cross-flow dependencies are user-authored
+/// INV-021: Scoped to Flow Group only
+model CrossFlowDependency {
+  id               String @id @default(cuid())
+  taskId           String
+  sourceWorkflowId String
+  sourceTaskPath   String // "nodeId.taskId" or similar identifier
+  requiredOutcome  String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+/// Fan-out rule stored in Workflow specification
+/// Defines when completing a Node with a specific outcome should
+/// trigger instantiation of other workflows.
+/// NOTE: No targetVersion field - v2 always resolves to Latest Published (§10.3.1)
+model FanOutRule {
+  id               String @id @default(cuid())
+  workflowId       String
+  sourceNodeId     String
+  triggerOutcome   String
+  targetWorkflowId String
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+// =============================================================================
+// FLOWSPEC: FLOW EXECUTION (RUNTIME)
+// Canon: 10_flowspec_engine_contract.md §10, 00_flowspec_glossary.md §2.3
+// =============================================================================
+
+/// Flow Group - groups related flows executing for the same unit of work
+/// Flow Groups are bound by Scope (1:1 relationship).
+/// INV-021: Cross-flow dependencies scoped to Flow Group
+model FlowGroup {
+  id        String   @id @default(cuid())
+  scopeType String   // "job", "project", etc.
+  scopeId   String   // Unique ID within scope type
+  companyId String
+  createdAt DateTime @default(now())
+
+  flows   Flow[]
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, scopeType, scopeId])
+}
+
+/// Flow instance (runtime execution)
+/// A Flow is a live execution instance of a Workflow.
+/// INV-010: Flow bound to Workflow version at creation time
+model Flow {
+  id                String     @id @default(cuid())
+  workflowId        String
+  workflowVersionId String
+  flowGroupId       String
+  status            FlowStatus @default(ACTIVE)
+  createdAt         DateTime   @default(now())
+  completedAt       DateTime?
+
+  workflow        Workflow        @relation(fields: [workflowId], references: [id])
+  workflowVersion WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
+  flowGroup       FlowGroup       @relation(fields: [flowGroupId], references: [id])
+
+  // Truth tables - using Restrict to preserve audit trail (no Cascade)
+  nodeActivations     NodeActivation[]
+  taskExecutions      TaskExecution[]
+  evidenceAttachments EvidenceAttachment[]
+
+  @@index([flowGroupId])
+  @@index([workflowId])
+}
+
+/// Flow execution status
+/// ACTIVE: Flow is executing
+/// COMPLETED: Flow reached terminal condition
+/// SUSPENDED: Flow paused (e.g., step limit exceeded)
+/// BLOCKED: Fan-out failure; visible, terminal for v2 (INV-023)
+enum FlowStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+  BLOCKED
+}
+
+// =============================================================================
+// FLOWSPEC: TRUTH TABLES (IMMUTABLE EXECUTION RECORDS)
+// Canon: 00_flowspec_glossary.md §3.1, 20_flowspec_invariants.md
+// 
+// CRITICAL: These tables are Truth - append-only, immutable.
+// - NO @updatedAt (INV-007: Outcome Immutability)
+// - NO onDelete: Cascade (audit trail preservation)
+// - NO actionable column (INV-006: Derived state not stored)
+// =============================================================================
+
+/// Node activation event (Truth)
+/// Recorded when a Node becomes active via Entry designation or Gate routing.
+/// This is Truth - immutable once recorded.
+/// INV-007: No @updatedAt, INV-009: Only FlowSpec mutates Truth
+model NodeActivation {
+  id          String   @id @default(cuid())
+  flowId      String
+  nodeId      String
+  activatedAt DateTime @default(now())
+  iteration   Int      @default(1) // For cycle tracking - new activation = new iteration
+
+  // Using Restrict instead of Cascade to preserve audit trail
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Restrict)
+
+  @@index([flowId, nodeId])
+}
+
+/// Task execution state (Truth)
+/// Records Task start and Outcome. Outcomes are immutable once recorded.
+/// INV-007: Outcome immutability - no @updatedAt
+/// INV-009: Only FlowSpec mutates Truth
+model TaskExecution {
+  id               String    @id @default(cuid())
+  flowId           String
+  taskId           String
+  nodeActivationId String?   // Links to which node activation triggered this
+  startedAt        DateTime? // When work began on the Task
+  startedBy        String?   // User ID who started the Task
+  outcome          String?   // Recorded outcome (immutable once set)
+  outcomeAt        DateTime? // When outcome was recorded
+  outcomeBy        String?   // User ID who recorded the outcome
+  iteration        Int       @default(1) // For cycle tracking
+
+  // Using Restrict instead of Cascade to preserve audit trail
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Restrict)
+
+  @@index([flowId, taskId])
+}
+
+/// Evidence attachment (Truth)
+/// Evidence attached to a Task. Evidence is append-only, cannot be deleted.
+/// INV-005: No floating evidence - always attached to a Task
+/// INV-007: No @updatedAt (immutable)
+model EvidenceAttachment {
+  id              String       @id @default(cuid())
+  flowId          String
+  taskId          String
+  taskExecutionId String?
+  type            EvidenceType
+  data            Json         // File reference or structured content
+  attachedAt      DateTime     @default(now())
+  attachedBy      String       // User ID who attached
+  idempotencyKey  String?      // For preventing duplicate attachments
+
+  // Using Restrict instead of Cascade to preserve audit trail
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Restrict)
+
+  @@unique([idempotencyKey])
+  @@index([flowId, taskId])
+}
+
+/// Evidence types
+enum EvidenceType {
+  FILE
+  TEXT
+  STRUCTURED
+}
+
+// =============================================================================
+// FLOWSPEC: FAN-OUT FAILURE TRACKING
+// Canon: 10_flowspec_engine_contract.md §10.3.2
+// 
+// NOTE: No retriedAt or retryCount fields - retry is explicitly deferred from v2
+// =============================================================================
+
+/// Fan-out failure log
+/// Records when fan-out instantiation fails. Flow enters BLOCKED state.
+/// INV-023: Outcome preserved, Flow blocked on failure
+/// NOTE: No retry mechanism in v2 (§10.3.2 explicit deferral)
+model FanOutFailure {
+  id                String   @id @default(cuid())
+  triggeringFlowId  String
+  triggeringTaskId  String
+  triggeringOutcome String
+  targetWorkflowId  String
+  errorReason       String
+  createdAt         DateTime @default(now())
+  resolved          Boolean  @default(false) // Manual resolution flag
+
+  @@index([triggeringFlowId])
+  @@index([resolved])
 }

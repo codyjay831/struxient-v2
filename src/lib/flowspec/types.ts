@@ -1,0 +1,364 @@
+/**
+ * FlowSpec Engine Core Types
+ *
+ * Canon Source: 00_flowspec_glossary.md, 10_flowspec_engine_contract.md
+ * Epic: EPIC-01 FlowSpec Engine Core
+ *
+ * These types represent the core concepts of the FlowSpec execution engine.
+ * Types are divided into:
+ * - Specification Types (design-time, from Workflow definition)
+ * - Runtime Types (execution-time, from Flow instances)
+ * - Truth Types (immutable execution records)
+ * - Derived Types (computed from Truth)
+ */
+
+import type {
+  Workflow as PrismaWorkflow,
+  WorkflowVersion as PrismaWorkflowVersion,
+  Node as PrismaNode,
+  Task as PrismaTask,
+  Outcome as PrismaOutcome,
+  Gate as PrismaGate,
+  Flow as PrismaFlow,
+  FlowGroup as PrismaFlowGroup,
+  NodeActivation as PrismaNodeActivation,
+  TaskExecution as PrismaTaskExecution,
+  EvidenceAttachment as PrismaEvidenceAttachment,
+} from "@prisma/client";
+import {
+  WorkflowStatus,
+  FlowStatus,
+  CompletionRule,
+  EvidenceType,
+} from "@prisma/client";
+
+// Re-export Prisma enums for convenience
+export { WorkflowStatus, FlowStatus, CompletionRule, EvidenceType };
+
+// =============================================================================
+// SPECIFICATION TYPES (DESIGN-TIME)
+// =============================================================================
+
+/**
+ * Workflow specification with all related entities loaded.
+ * This is the complete design-time representation of a workflow.
+ */
+export interface WorkflowWithRelations extends PrismaWorkflow {
+  nodes: NodeWithRelations[];
+  gates: PrismaGate[];
+}
+
+/**
+ * Node with all related entities loaded.
+ */
+export interface NodeWithRelations extends PrismaNode {
+  tasks: TaskWithRelations[];
+  outboundGates: PrismaGate[];
+  inboundGates: PrismaGate[];
+}
+
+/**
+ * Task with all related entities loaded.
+ */
+export interface TaskWithRelations extends PrismaTask {
+  outcomes: PrismaOutcome[];
+}
+
+/**
+ * Workflow version snapshot - immutable after publish.
+ * The snapshot JSON contains the complete workflow structure at publish time.
+ */
+export interface WorkflowSnapshot {
+  workflowId: string;
+  version: number;
+  name: string;
+  description: string | null;
+  isNonTerminating: boolean;
+  nodes: SnapshotNode[];
+  gates: SnapshotGate[];
+}
+
+export interface SnapshotNode {
+  id: string;
+  name: string;
+  isEntry: boolean;
+  completionRule: CompletionRule;
+  specificTasks: string[];
+  tasks: SnapshotTask[];
+}
+
+export interface SnapshotTask {
+  id: string;
+  name: string;
+  instructions: string | null;
+  evidenceRequired: boolean;
+  evidenceSchema: unknown | null;
+  displayOrder: number;
+  outcomes: SnapshotOutcome[];
+  crossFlowDependencies: SnapshotCrossFlowDependency[];
+}
+
+export interface SnapshotCrossFlowDependency {
+  id: string;
+  sourceWorkflowId: string;
+  sourceTaskPath: string;
+  requiredOutcome: string;
+}
+
+export interface SnapshotOutcome {
+  id: string;
+  name: string;
+}
+
+/**
+ * Outcome recorded within a Flow Group.
+ * Used for evaluating Cross-Flow Dependencies.
+ */
+export interface GroupOutcome {
+  workflowId: string;
+  taskId: string;
+  outcome: string;
+}
+
+export interface SnapshotGate {
+  id: string;
+  sourceNodeId: string;
+  outcomeName: string;
+  targetNodeId: string | null;
+}
+
+// =============================================================================
+// RUNTIME TYPES (EXECUTION-TIME)
+// =============================================================================
+
+/**
+ * Flow with all execution-related entities loaded.
+ */
+export interface FlowWithRelations extends PrismaFlow {
+  workflow: PrismaWorkflow;
+  workflowVersion: PrismaWorkflowVersion;
+  flowGroup: PrismaFlowGroup;
+  nodeActivations: PrismaNodeActivation[];
+  taskExecutions: PrismaTaskExecution[];
+  evidenceAttachments: PrismaEvidenceAttachment[];
+}
+
+/**
+ * Scope identifier for Flow Group binding.
+ * Canon: 00_flowspec_glossary.md §2.3.3
+ */
+export interface Scope {
+  type: string; // e.g., "job", "project", "engagement"
+  id: string; // unique identifier within the type
+}
+
+// =============================================================================
+// TRUTH TYPES (IMMUTABLE EXECUTION RECORDS)
+// Canon: 00_flowspec_glossary.md §3.1
+// =============================================================================
+
+/**
+ * Node activation event shape (Truth).
+ * Canon: 10_flowspec_engine_contract.md §5.2.1
+ */
+export interface NodeActivationEvent {
+  flowId: string;
+  nodeId: string;
+  activatedAt: Date;
+  iteration: number;
+}
+
+/**
+ * Task start event shape (Truth).
+ */
+export interface TaskStartEvent {
+  flowId: string;
+  taskId: string;
+  startedAt: Date;
+  startedBy: string;
+  iteration: number;
+}
+
+/**
+ * Outcome recording event shape (Truth).
+ * INV-007: Outcome immutability - once recorded, cannot be changed.
+ */
+export interface OutcomeEvent {
+  flowId: string;
+  taskId: string;
+  outcome: string;
+  outcomeAt: Date;
+  outcomeBy: string;
+  iteration: number;
+}
+
+/**
+ * Evidence attachment event shape (Truth).
+ * INV-005: No floating evidence - always attached to a Task.
+ */
+export interface EvidenceEvent {
+  flowId: string;
+  taskId: string;
+  type: EvidenceType;
+  data: unknown;
+  attachedAt: Date;
+  attachedBy: string;
+  idempotencyKey?: string;
+}
+
+// =============================================================================
+// DERIVED TYPES (COMPUTED FROM TRUTH)
+// Canon: 00_flowspec_glossary.md §3.2
+// =============================================================================
+
+/**
+ * Derived state for a Node within a Flow.
+ */
+export interface DerivedNodeState {
+  nodeId: string;
+  isActive: boolean;
+  isStarted: boolean;
+  isComplete: boolean;
+  currentIteration: number;
+}
+
+/**
+ * Derived state for a Task within a Flow.
+ * INV-019: FlowSpec evaluates all Actionability.
+ */
+export interface DerivedTaskState {
+  taskId: string;
+  nodeId: string;
+  isActionable: boolean;
+  isStarted: boolean;
+  hasOutcome: boolean;
+  currentIteration: number;
+  outcome?: string;
+}
+
+/**
+ * Actionable task information returned to consumers.
+ * Canon: 10_flowspec_engine_contract.md §9.1
+ */
+export interface ActionableTask {
+  flowId: string;
+  flowGroupId: string;
+  workflowId: string;
+  workflowName: string;
+  taskId: string;
+  taskName: string;
+  nodeId: string;
+  nodeName: string;
+  instructions: string | null;
+  allowedOutcomes: string[];
+  evidenceRequired: boolean;
+  evidenceSchema: unknown | null;
+  iteration: number;
+  domainHint: "execution" | "finance" | "sales";
+  startedAt: Date | null;
+}
+
+// =============================================================================
+// ENGINE OPERATION TYPES
+// =============================================================================
+
+/**
+ * Result of recording a task start.
+ */
+export interface RecordTaskStartResult {
+  success: boolean;
+  taskExecutionId?: string;
+  error?: EngineError;
+}
+
+/**
+ * Result of recording an outcome.
+ */
+export interface RecordOutcomeResult {
+  success: boolean;
+  taskExecutionId?: string;
+  gateResults?: GateEvaluationResult[];
+  error?: EngineError;
+}
+
+/**
+ * Result of gate evaluation.
+ */
+export interface GateEvaluationResult {
+  gateId: string;
+  sourceNodeId: string;
+  outcomeName: string;
+  targetNodeId: string | null; // null = terminal
+  activated: boolean;
+}
+
+/**
+ * Result of node activation.
+ */
+export interface NodeActivationResult {
+  success: boolean;
+  nodeActivationId?: string;
+  iteration?: number;
+  error?: EngineError;
+}
+
+/**
+ * Engine error types.
+ */
+export type EngineErrorCode =
+  | "TASK_NOT_ACTIONABLE"
+  | "TASK_ALREADY_STARTED"
+  | "TASK_NOT_STARTED"
+  | "OUTCOME_ALREADY_RECORDED"
+  | "INVALID_OUTCOME"
+  | "EVIDENCE_REQUIRED"
+  | "INVALID_EVIDENCE_FORMAT"
+  | "FLOW_NOT_FOUND"
+  | "TASK_NOT_FOUND"
+  | "NODE_NOT_FOUND"
+  | "WORKFLOW_NOT_PUBLISHED"
+  | "CONCURRENT_MODIFICATION";
+
+export interface EngineError {
+  code: EngineErrorCode;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+// =============================================================================
+// GATE ROUTING TYPES
+// =============================================================================
+
+/**
+ * Gate key - Gates are keyed by (nodeId, outcomeName).
+ * INV-024: Gate key is Node-level.
+ */
+export interface GateKey {
+  nodeId: string;
+  outcomeName: string;
+}
+
+/**
+ * Gate route definition.
+ */
+export interface GateRoute {
+  gateId: string;
+  sourceNodeId: string;
+  outcomeName: string;
+  targetNodeId: string | null; // null = terminal path
+}
+
+// =============================================================================
+// TYPE GUARDS
+// =============================================================================
+
+export function isValidOutcome(
+  outcome: string,
+  allowedOutcomes: string[]
+): boolean {
+  return allowedOutcomes.includes(outcome);
+}
+
+export function isTerminalGate(gate: GateRoute): boolean {
+  return gate.targetNodeId === null;
+}
