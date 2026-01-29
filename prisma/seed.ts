@@ -1,0 +1,205 @@
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const definition = {
+    workflowId: "solar-install-basic",
+    version: 1,
+    name: "Solar Install - Basic",
+    description: "Standard residential solar installation workflow including safety, racking, electrical, and commissioning.",
+    isNonTerminating: false,
+    nodes: [
+      {
+        id: "node_safety",
+        name: "Site Setup & Safety",
+        isEntry: true,
+        completionRule: "ALL_TASKS_DONE",
+        specificTasks: ["task_safety_meeting", "task_inventory"],
+        tasks: [
+          {
+            id: "task_safety_meeting",
+            name: "Crew Safety Briefing",
+            instructions: "Conduct tailboard meeting and verify all crew members have required PPE.",
+            evidenceRequired: true,
+            evidenceSchema: { "type": "file", "mimeTypes": ["image/jpeg", "image/png"], "description": "Photo of the crew." },
+            displayOrder: 1,
+            outcomes: [{ id: "o1", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          },
+          {
+            id: "task_inventory",
+            name: "Inventory Verification",
+            instructions: "Verify equipment on site.",
+            evidenceRequired: false,
+            evidenceSchema: null,
+            displayOrder: 2,
+            outcomes: [{ id: "o2", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          }
+        ]
+      },
+      {
+        id: "node_roof",
+        name: "Roof Prep & Racking",
+        isEntry: false,
+        completionRule: "ALL_TASKS_DONE",
+        specificTasks: ["task_flashing", "task_rails"],
+        tasks: [
+          {
+            id: "task_flashing",
+            name: "Install Flashings",
+            instructions: "Install leak-proof flashings.",
+            evidenceRequired: true,
+            evidenceSchema: { "type": "file", "mimeTypes": ["image/jpeg", "image/png"], "description": "Flashing photo." },
+            displayOrder: 1,
+            outcomes: [{ id: "o3", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          },
+          {
+            id: "task_rails",
+            name: "Mount Rails",
+            instructions: "Secure rails to standoffs.",
+            evidenceRequired: false,
+            evidenceSchema: null,
+            displayOrder: 2,
+            outcomes: [{ id: "o4", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          }
+        ]
+      },
+      {
+        id: "node_elec",
+        name: "Electrical & Inverter",
+        isEntry: false,
+        completionRule: "ALL_TASKS_DONE",
+        specificTasks: ["task_inverter", "task_conduit"],
+        tasks: [
+          {
+            id: "task_inverter",
+            name: "Mount Inverter",
+            instructions: "Secure inverter to wall.",
+            evidenceRequired: true,
+            evidenceSchema: { "type": "file", "mimeTypes": ["image/jpeg", "image/png"], "description": "Inverter photo." },
+            displayOrder: 1,
+            outcomes: [{ id: "o5", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          },
+          {
+            id: "task_conduit",
+            name: "Conduit Run",
+            instructions: "Run conduit from roof to inverter.",
+            evidenceRequired: false,
+            evidenceSchema: null,
+            displayOrder: 2,
+            outcomes: [{ id: "o6", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          }
+        ]
+      },
+      {
+        id: "node_panels",
+        name: "Panel Mounting",
+        isEntry: false,
+        completionRule: "ALL_TASKS_DONE",
+        specificTasks: ["task_array"],
+        tasks: [
+          {
+            id: "task_array",
+            name: "Install Panels",
+            instructions: "Secure PV modules.",
+            evidenceRequired: true,
+            evidenceSchema: { "type": "file", "mimeTypes": ["image/jpeg", "image/png"], "description": "Array photo." },
+            displayOrder: 1,
+            outcomes: [{ id: "o7", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          }
+        ]
+      },
+      {
+        id: "node_comm",
+        name: "Commissioning & QC",
+        isEntry: false,
+        completionRule: "ALL_TASKS_DONE",
+        specificTasks: ["task_voltage", "task_cleanup"],
+        tasks: [
+          {
+            id: "task_voltage",
+            name: "Voltage Test",
+            instructions: "Measure Voc for each string.",
+            evidenceRequired: true,
+            evidenceSchema: {
+              "type": "structured",
+              "jsonSchema": {
+                "type": "object",
+                "properties": { "string_1_voc": { "type": "number" } },
+                "required": ["string_1_voc"]
+              }
+            },
+            displayOrder: 1,
+            outcomes: [
+              { id: "o8", name: "PASSED" },
+              { id: "o9", name: "FAIL_REWORK" }
+            ],
+            crossFlowDependencies: []
+          },
+          {
+            id: "task_cleanup",
+            name: "Site Cleanup",
+            instructions: "Restore site condition.",
+            evidenceRequired: true,
+            evidenceSchema: { "type": "text", "minLength": 5, "description": "Cleanup notes." },
+            displayOrder: 2,
+            outcomes: [{ id: "o10", name: "COMPLETE" }],
+            crossFlowDependencies: []
+          }
+        ]
+      }
+    ],
+    "gates": [
+      { "id": "g1", "sourceNodeId": "node_safety", "outcomeName": "COMPLETE", "targetNodeId": "node_roof" },
+      { "id": "g2", "sourceNodeId": "node_roof", "outcomeName": "COMPLETE", "targetNodeId": "node_elec" },
+      { "id": "g3", "sourceNodeId": "node_elec", "outcomeName": "COMPLETE", "targetNodeId": "node_panels" },
+      { "id": "g4", "sourceNodeId": "node_panels", "outcomeName": "COMPLETE", "targetNodeId": "node_comm" },
+      { "id": "g5", "sourceNodeId": "node_comm", "outcomeName": "PASSED", "targetNodeId": null },
+      { "id": "g6", "sourceNodeId": "node_comm", "outcomeName": "FAIL_REWORK", "targetNodeId": "node_elec" },
+      { "id": "g7", "sourceNodeId": "node_comm", "outcomeName": "COMPLETE", "targetNodeId": null }
+    ]
+  };
+
+  const template = await prisma.workflowTemplate.upsert({
+    where: {
+      tradeKey_name_version: {
+        tradeKey: "SOLAR",
+        name: "Solar Install - Basic",
+        version: 1,
+      },
+    },
+    update: {
+      category: "INSTALL",
+      description: "Standard residential solar installation workflow from site arrival to commissioning.",
+      definition: definition as any,
+      tags: ["real demo"],
+    },
+    create: {
+      tradeKey: "SOLAR",
+      category: "INSTALL",
+      name: "Solar Install - Basic",
+      description: "Standard residential solar installation workflow from site arrival to commissioning.",
+      version: 1,
+      definition: definition as any,
+      tags: ["real demo"],
+    },
+  });
+
+  console.log(`Upserted template: ${template.name} (ID: ${template.id})`);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

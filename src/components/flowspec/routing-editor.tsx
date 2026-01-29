@@ -59,11 +59,15 @@ interface RoutingEditorProps {
 }
 
 // Helper to get all outcomes for a node
-function getNodeOutcomes(node: Node): { taskName: string; outcomeName: string }[] {
-  const outcomes: { taskName: string; outcomeName: string }[] = [];
+function getNodeOutcomes(node: Node): { taskId: string; taskName: string; outcomeName: string }[] {
+  const outcomes: { taskId: string; taskName: string; outcomeName: string }[] = [];
   for (const task of node.tasks) {
     for (const outcome of task.outcomes) {
-      outcomes.push({ taskName: task.name, outcomeName: outcome.name });
+      outcomes.push({
+        taskId: task.id,
+        taskName: task.name,
+        outcomeName: outcome.name,
+      });
     }
   }
   return outcomes;
@@ -249,11 +253,12 @@ export function RoutingEditor({
 
                     {/* Outcomes Table */}
                     <div className="space-y-1">
-                      {outcomes.map(({ taskName, outcomeName }) => {
+                      {outcomes.map(({ taskId, taskName, outcomeName }) => {
                         const gate = findGate(gates, node.id, outcomeName);
                         const isRouted = !!gate;
-                        const key = `${node.id}:${outcomeName}`;
-                        const isCurrentLoading = isLoading === key;
+                        const rowKey = `${node.id}:${taskId}:${outcomeName}`;
+                        const loadingKey = `${node.id}:${outcomeName}`;
+                        const isCurrentLoading = isLoading === loadingKey;
 
                         // Check if this row should be highlighted
                         const isHighlightedByGate = highlightGateId && gate?.id === highlightGateId;
@@ -264,7 +269,7 @@ export function RoutingEditor({
 
                         return (
                           <div
-                            key={key}
+                            key={rowKey}
                             className={`flex items-center gap-2 p-2 rounded-md border bg-muted/30 transition-all ${
                               isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""
                             }`}
