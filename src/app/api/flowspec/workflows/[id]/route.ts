@@ -9,6 +9,11 @@ import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
+import {
+  updateWorkflow,
+  deleteWorkflow,
+  workflowNameExists,
+} from "@/lib/flowspec/persistence/workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -76,21 +81,15 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     // Check name uniqueness if changed
     if (name && name !== workflow.name) {
-      const existing = await prisma.workflow.findFirst({
-        where: { companyId: workflow.companyId, name, version: workflow.version },
-      });
-      if (existing) {
+      if (await workflowNameExists(workflow.companyId, name, workflow.version, id)) {
         return apiError("NAME_EXISTS", "A workflow with this name already exists");
       }
     }
 
-    const updated = await prisma.workflow.update({
-      where: { id },
-      data: {
-        name: name ?? undefined,
-        description: description ?? undefined,
-        isNonTerminating: isNonTerminating ?? undefined,
-      },
+    const updated = await updateWorkflow(id, {
+      name: name ?? undefined,
+      description: description ?? undefined,
+      isNonTerminating: isNonTerminating ?? undefined,
     });
 
     return apiSuccess({ workflow: updated }, 200, authority);
@@ -111,13 +110,13 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const tenantCtx = await verifyTenantOwnership(workflow.companyId);
 
     // Enforce deletion rules - v2 says Not Published (or all versions deleted)
     // For simplicity in v2, we allow deleting drafts. 
     // If it's published, we might want to restrict or cascade.
     
-    await prisma.workflow.delete({ where: { id } });
+    await deleteWorkflow(id, tenantCtx);
 
     return apiSuccess({ success: true });
   } catch (error) {

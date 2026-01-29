@@ -170,7 +170,7 @@ describe("EPIC-07: FlowSpec Builder API", () => {
       const data = await res.json();
 
       expect(res.status).toBe(403);
-      expect(data.error.code).toBe("FORBIDDEN");
+      expect(data.error.code).toBe("NO_MEMBERSHIP");
     });
   });
 

@@ -81,6 +81,13 @@ model Workflow {
   updatedAt        DateTime       @updatedAt
   publishedAt      DateTime?
 
+  // Template provenance (immutable after import)
+  // Set only by createWorkflowFromTemplate; excluded from update path
+  templateId      String?   // Source template ID
+  templateVersion Int?      // Source template version at import time
+  importedAt      DateTime? // When template was imported (no @default)
+  importedBy      String?   // User ID who imported
+
   nodes       Node[]
   gates       Gate[]
   versions    WorkflowVersion[]
@@ -394,4 +401,30 @@ model FanOutFailure {
 
   @@index([triggeringFlowId])
   @@index([resolved])
+}
+
+// =============================================================================
+// FLOWSPEC: WORKFLOW TEMPLATES (SYSTEM-DEFINED)
+// Pre-built workflow blueprints for import into tenant workspaces.
+// Templates are non-executing; importing creates a tenant-owned DRAFT.
+// =============================================================================
+
+/// Workflow template (system-defined, non-executing)
+/// Templates store a WorkflowSnapshot JSON structure for cloning into tenant workflows.
+/// Templates have no companyId - they are system-global and read-only.
+/// Updates require inserting a new version row (no in-place edits).
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  tradeKey    String   // e.g., "HVAC", "ROOFING", "PLUMBING"
+  category    String   // e.g., "SALES", "INSTALL", "FINANCE"
+  name        String
+  description String?
+  version     Int      @default(1)
+  definition  Json     // WorkflowSnapshot structure
+  tags        String[] // e.g., ["Residential", "Commercial"]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tradeKey, name, version])
+  @@index([tradeKey, category])
 }

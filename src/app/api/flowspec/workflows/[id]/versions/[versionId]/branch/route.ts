@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    const companyId = await verifyTenantOwnership(workflow.companyId);
+    const { companyId } = await verifyTenantOwnership(workflow.companyId);
 
     const session = await auth();
     if (!session.userId) {

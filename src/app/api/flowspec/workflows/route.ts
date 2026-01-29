@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getActorTenantContext, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiSuccess, apiError, apiList } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
+import { createWorkflow, workflowNameExists } from "@/lib/flowspec/persistence/workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -50,22 +51,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for unique name within tenant
-    const existing = await prisma.workflow.findFirst({
-      where: { companyId, name, version: 1 },
-    });
-
-    if (existing) {
+    if (await workflowNameExists(companyId, name)) {
       return apiError("NAME_EXISTS", "A workflow with this name already exists");
     }
 
-    const workflow = await prisma.workflow.create({
-      data: {
-        companyId,
-        name,
-        description,
-        status: "DRAFT",
-        version: 1,
-      },
+    const workflow = await createWorkflow({
+      companyId,
+      name,
+      description,
     });
 
     return apiSuccess({ workflow }, 201, authority);

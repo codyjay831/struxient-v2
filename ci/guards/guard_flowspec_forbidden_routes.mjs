@@ -47,6 +47,17 @@ const FORBIDDEN_PATTERNS = [
     pathRegex: /\/flows\/\[id\]\/workflowVersion/i,
     reason: 'Flow is permanently bound to its version (INV-010)',
   },
+  // Template immutability - updates require new version row
+  {
+    method: 'PATCH',
+    pathRegex: /\/templates\/\[id\]$/i,
+    reason: 'Templates are immutable. Updates require inserting a new version row.',
+  },
+  {
+    method: 'DELETE',
+    pathRegex: /\/templates\/\[id\]$/i,
+    reason: 'Templates cannot be deleted (system-defined only in v1)',
+  },
 ];
 
 class ForbiddenRoutesGuard {

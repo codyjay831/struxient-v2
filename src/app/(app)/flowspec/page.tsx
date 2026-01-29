@@ -220,6 +220,9 @@ export default function FlowSpecPage() {
           >
             <RefreshCwIcon className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
+          <Button variant="outline" onClick={() => router.push("/templates")}>
+            Browse Templates
+          </Button>
           <CreateWorkflowDialog onWorkflowCreated={handleWorkflowCreated} />
         </div>
       </div>

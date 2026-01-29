@@ -10,6 +10,13 @@ import { validateWorkflow } from "../validation";
 import type { WorkflowWithRelations } from "../types";
 import type { LifecycleTransitionResult, PublishResult } from "./types";
 import { createWorkflowSnapshot } from "./versioning";
+import {
+  updateWorkflow,
+  findWorkflowById,
+  hydrateSnapshotToWorkflow,
+  publishWorkflow,
+} from "../persistence/workflow";
+import type { WorkflowSnapshot } from "../types";
 
 /**
  * Transitions a workflow from DRAFT to VALIDATED state if it passes validation.
@@ -71,15 +78,11 @@ export async function validateWorkflowAction(
     };
   }
 
-  // Update status
-  const updated = await prisma.workflow.update({
-    where: { id: workflowId },
-    data: { status: WorkflowStatus.VALIDATED },
-    include: {
-      nodes: { include: { tasks: { include: { outcomes: true } } } },
-      gates: true,
-    },
-  });
+  // Update status via gateway
+  await updateWorkflow(workflowId, { status: WorkflowStatus.VALIDATED });
+
+  // Fetch updated workflow with relations
+  const updated = await findWorkflowById(workflowId);
 
   return {
     success: true,
@@ -156,39 +159,22 @@ export async function publishWorkflowAction(
 
   const snapshot = createWorkflowSnapshot(workflow as unknown as WorkflowWithRelations);
 
-  // Use a transaction to update status and create version
-  const result = await prisma.$transaction(async (tx) => {
-    // 1. Create WorkflowVersion
-    const version = await tx.workflowVersion.create({
-      data: {
-        workflowId: workflow.id,
-        version: workflow.version,
-        snapshot: snapshot as any,
-        publishedBy,
-      },
-    });
+  // Use gateway to publish (updates status and creates version in transaction)
+  const result = await publishWorkflow(
+    workflow.id,
+    workflow.version,
+    snapshot as unknown as WorkflowSnapshot,
+    publishedBy
+  );
 
-    // 2. Update Workflow status and publishedAt
-    const updated = await tx.workflow.update({
-      where: { id: workflow.id },
-      data: {
-        status: WorkflowStatus.PUBLISHED,
-        publishedAt: new Date(),
-      },
-      include: {
-        nodes: { include: { tasks: { include: { outcomes: true } } } },
-        gates: true,
-      },
-    });
-
-    return { updated, version };
-  });
+  // Fetch updated workflow with full relations for return
+  const fullWorkflow = await findWorkflowById(workflow.id);
 
   return {
     success: true,
     from: WorkflowStatus.VALIDATED,
     to: WorkflowStatus.PUBLISHED,
-    workflow: result.updated as unknown as WorkflowWithRelations,
+    workflow: fullWorkflow as unknown as WorkflowWithRelations,
     versionId: result.version.id,
     version: result.version.version,
   };
@@ -225,14 +211,11 @@ export async function revertToDraftAction(
     };
   }
 
-  const updated = await prisma.workflow.update({
-    where: { id: workflowId },
-    data: { status: WorkflowStatus.DRAFT },
-    include: {
-      nodes: { include: { tasks: { include: { outcomes: true } } } },
-      gates: true,
-    },
-  });
+  // Update status via gateway
+  await updateWorkflow(workflowId, { status: WorkflowStatus.DRAFT });
+
+  // Fetch updated workflow with relations
+  const updated = await findWorkflowById(workflowId);
 
   return {
     success: true,
@@ -276,13 +259,11 @@ export async function branchFromVersion(
     };
   }
 
-  const snapshot = version.snapshot as any;
+  const snapshot = version.snapshot as unknown as WorkflowSnapshot;
 
-  // Create a new Draft workflow from the snapshot
-  // This involves re-creating all nodes, tasks, outcomes, and gates
-  const newWorkflow = await prisma.$transaction(async (tx) => {
-    // 1. Create the new Workflow record
-    // We increment the version for the new draft
+  // Create a new Draft workflow from the snapshot using shared hydration logic
+  const result = await prisma.$transaction(async (tx) => {
+    // Determine next version number
     const latestVersion = await tx.workflow.findFirst({
       where: { companyId, name: snapshot.name },
       orderBy: { version: "desc" },
@@ -290,94 +271,14 @@ export async function branchFromVersion(
 
     const nextVersion = (latestVersion?.version ?? snapshot.version) + 1;
 
-    const wf = await tx.workflow.create({
-      data: {
-        name: snapshot.name,
-        description: snapshot.description,
-        companyId,
-        version: nextVersion,
-        status: WorkflowStatus.DRAFT,
-        isNonTerminating: snapshot.isNonTerminating,
-      },
+    // Use shared hydration function (no provenance for branch)
+    return hydrateSnapshotToWorkflow(tx, snapshot, {
+      companyId,
+      version: nextVersion,
     });
-
-    // Maps to track ID translation
-    const nodeIdMap = new Map<string, string>();
-    const taskIdMap = new Map<string, string>();
-
-    // 2. Create Nodes and Tasks
-    for (const sNode of snapshot.nodes) {
-      const newNode = await tx.node.create({
-        data: {
-          workflowId: wf.id,
-          name: sNode.name,
-          isEntry: sNode.isEntry,
-          completionRule: sNode.completionRule,
-          specificTasks: [], // Will update after tasks are created
-        },
-      });
-      nodeIdMap.set(sNode.id, newNode.id);
-
-      for (const sTask of sNode.tasks) {
-        const newTask = await tx.task.create({
-          data: {
-            nodeId: newNode.id,
-            name: sTask.name,
-            instructions: sTask.instructions,
-            evidenceRequired: sTask.evidenceRequired,
-            evidenceSchema: sTask.evidenceSchema as any,
-            displayOrder: sTask.displayOrder,
-          },
-        });
-        taskIdMap.set(sTask.id, newTask.id);
-
-        for (const sOutcome of sTask.outcomes) {
-          await tx.outcome.create({
-            data: {
-              taskId: newTask.id,
-              name: sOutcome.name,
-            },
-          });
-        }
-      }
-    }
-
-    // 3. Update specificTasks for nodes (now that we have new task IDs)
-    for (const sNode of snapshot.nodes) {
-      if (sNode.specificTasks.length > 0) {
-        const newSpecificTasks = sNode.specificTasks
-          .map((oldId: string) => taskIdMap.get(oldId))
-          .filter(Boolean) as string[];
-
-        await tx.node.update({
-          where: { id: nodeIdMap.get(sNode.id) },
-          data: { specificTasks: newSpecificTasks },
-        });
-      }
-    }
-
-    // 4. Create Gates
-    for (const sGate of snapshot.gates) {
-      await tx.gate.create({
-        data: {
-          workflowId: wf.id,
-          sourceNodeId: nodeIdMap.get(sGate.sourceNodeId)!,
-          outcomeName: sGate.outcomeName,
-          targetNodeId: sGate.targetNodeId ? nodeIdMap.get(sGate.targetNodeId) : null,
-        },
-      });
-    }
-
-    return wf;
   });
 
-  const fullWorkflow = await prisma.workflow.findUnique({
-    where: { id: newWorkflow.id },
-    include: {
-      nodes: { include: { tasks: { include: { outcomes: true } } } },
-      gates: true,
-    },
-  });
+  const fullWorkflow = await findWorkflowById(result.workflowId);
 
   return {
     success: true,
