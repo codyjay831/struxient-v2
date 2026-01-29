@@ -273,11 +273,31 @@ The Structured Builder presents workflow structure as nested lists with detail p
 
 #### 5.3.4 Evidence Schema Editor
 
-| Element | Description |
-|---------|-------------|
-| Enable Toggle | "Require Evidence" checkbox |
-| Schema Editor | JSON editor for schema definition |
-| Validation | Real-time JSON syntax check |
+**Canon Source:** 10_flowspec_engine_contract.md §5.3.3
+
+**Responsibilities:**
+
+The Evidence Schema Editor is responsible for:
+- Collecting evidence requirement configuration from users
+- Persisting the canonical JSON schema shape defined in §5.3.3 without lossy transformations
+- Enforcing INV-025: if evidence is required, a valid schema must exist
+- Presenting validation feedback for invalid configurations
+
+**Prohibitions:**
+
+- The Editor MUST NOT introduce intermediate representations that differ from the canonical schema
+- The Editor MUST NOT abstract `structured` evidence in a way that loses JSON Schema fidelity
+
+**Structured Evidence (v1):**
+
+The `structured` evidence type requires JSON Schema authoring which cannot be abstracted without loss. In v1:
+- `structured` schema editing requires developer capability
+- Users without this capability may view existing structured schemas but not create or modify them
+- Fallback to raw JSON editing is permitted for users with appropriate capability
+
+**No Shadow Truth (POLICY):**
+
+The canonical evidence schema is `task.evidenceSchema` as stored in the database. The Editor reads from and writes to this field via the API. No intermediate "UI model" may serve as an alternative source of truth.
 
 ---
 

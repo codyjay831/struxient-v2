@@ -29,6 +29,7 @@ The following routes are confirmed to exist:
 | `/api/flowspec/workflows` | GET, POST | `src/app/api/flowspec/workflows/route.ts` |
 | `/api/flowspec/workflows/[id]` | GET, PATCH, DELETE | `src/app/api/flowspec/workflows/[id]/route.ts` |
 | `/api/flowspec/workflows/[id]/validate` | POST | `src/app/api/flowspec/workflows/[id]/validate/route.ts` |
+| `/api/flowspec/workflows/[id]/revert-to-draft` | POST | `src/app/api/flowspec/workflows/[id]/revert-to-draft/route.ts` |
 | `/api/flowspec/workflows/[id]/publish` | POST | `src/app/api/flowspec/workflows/[id]/publish/route.ts` |
 | `/api/flowspec/workflows/[id]/versions` | GET | Directory exists |
 | `/api/flowspec/workflows/[id]/versions/[versionId]` | GET | Directory exists |
@@ -106,6 +107,7 @@ The following routes are confirmed to exist:
 | Update description | `/api/flowspec/workflows/[id]` | PATCH | `{ description }` | Draft only | INV-011 |
 | Toggle non-terminating | `/api/flowspec/workflows/[id]` | PATCH | `{ isNonTerminating }` | Draft only | INV-011 |
 | Validate workflow | `/api/flowspec/workflows/[id]/validate` | POST | — | Draft only | — |
+| Return to Draft | `/api/flowspec/workflows/[id]/revert-to-draft` | POST | — | Validated only | — |
 | Publish workflow | `/api/flowspec/workflows/[id]/publish` | POST | — | Validated only | INV-011 |
 | List versions | `/api/flowspec/workflows/[id]/versions` | GET | — | Authenticated | — |
 | View version | `/api/flowspec/workflows/[id]/versions/[vId]` | GET | — | Authenticated | Read-only |

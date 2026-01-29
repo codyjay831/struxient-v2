@@ -538,6 +538,7 @@ The following statements must be true for the Builder to be considered complete.
 
 - [ ] Drafts can be saved and edited.
 - [ ] Validation transitions Draft to Validated.
+- [ ] Validated ↔ Draft
 - [ ] Publish transitions Validated to Published.
 - [ ] Published versions are immutable.
 - [ ] Users can view previous versions.

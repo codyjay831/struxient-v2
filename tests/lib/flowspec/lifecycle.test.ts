@@ -137,6 +137,32 @@ describe("EPIC-04: FlowSpec Workflow Lifecycle", () => {
     expect(updated?.status).toBe(WorkflowStatus.DRAFT);
   });
 
+  it("should block revert to DRAFT if already in DRAFT state", async () => {
+    const company = await createTestCompany();
+    const workflow = await createValidDraftWorkflow(company.id);
+    // workflow is in DRAFT
+
+    const result = await revertToDraftAction(workflow.id);
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_STATE");
+    expect(result.error?.message).toContain("Only Validated workflows can be reverted");
+  });
+
+  it("should block revert to DRAFT if workflow is PUBLISHED", async () => {
+    const company = await createTestCompany();
+    const workflow = await createValidDraftWorkflow(company.id);
+    await validateWorkflowAction(workflow.id);
+    await publishWorkflowAction(workflow.id, "test-user");
+
+    const result = await revertToDraftAction(workflow.id);
+    expect(result.success).toBe(false);
+    expect(result.error?.code).toBe("INVALID_STATE");
+    
+    // Verify workflow remains PUBLISHED
+    const updated = await prisma.workflow.findUnique({ where: { id: workflow.id } });
+    expect(updated?.status).toBe(WorkflowStatus.PUBLISHED);
+  });
+
   it("should transition from VALIDATED to PUBLISHED and create a version", async () => {
     const company = await createTestCompany();
     const workflow = await createValidDraftWorkflow(company.id);

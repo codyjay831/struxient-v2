@@ -164,23 +164,44 @@ Implement the Evidence system that handles Evidence attachment to Tasks, Evidenc
 |----|-----------|-------------|
 | INV-005 | No Floating Evidence | Evidence must be attached to exactly one Task |
 | INV-016 | Evidence at Recording | Requirements evaluated at Outcome recording time |
+| INV-025 | Evidence Schema Required | If `evidenceRequired: true`, `evidenceSchema` MUST be non-null and valid |
 
 ---
 
 ## 8. Implementation Notes
 
-### 8.1 Evidence Requirement Schema
+### 8.1 Evidence Schema Contract
 
+**Canon Source:** 10_flowspec_engine_contract.md §5.3.3
+
+**NON-AUTHORITATIVE:** The Evidence Schema contract is defined in canon. The examples below are for implementation reference only and do not define the contract.
+
+**Example: File Evidence Schema**
 ```json
 {
-  "taskId": "T1.1",
-  "evidenceRequired": true,
-  "evidenceSchema": {
-    "type": "file",
-    "mimeTypes": ["image/jpeg", "image/png", "application/pdf"],
-    "maxSize": 10485760,
-    "description": "Upload photo documentation"
-  }
+  "type": "file",
+  "mimeTypes": ["image/jpeg", "image/png", "application/pdf"],
+  "maxSize": 10485760,
+  "description": "Upload photo documentation"
+}
+```
+
+**Example: Text Evidence Schema**
+```json
+{
+  "type": "text",
+  "minLength": 10,
+  "maxLength": 500,
+  "description": "Explain the reason for this decision"
+}
+```
+
+**Example: Structured Evidence Schema**
+```json
+{
+  "type": "structured",
+  "jsonSchema": { "type": "object", "required": ["checklistComplete"], "properties": { "checklistComplete": { "type": "boolean" } } },
+  "description": "Complete the inspection checklist"
 }
 ```
 
@@ -200,11 +221,17 @@ Implement the Evidence system that handles Evidence attachment to Tasks, Evidenc
 
 ### 8.3 Evidence Types
 
+**Canon Source:** 10_flowspec_engine_contract.md §5.3.3
+
+**NON-AUTHORITATIVE SUMMARY:** The table below is a quick reference only. See canon §5.3.3 for authoritative definitions.
+
 | Type | Description | Schema Properties |
 |------|-------------|-------------------|
-| file | Uploaded file | mimeTypes, maxSize |
-| text | Free-form text | maxLength |
-| structured | JSON data | JSON schema |
+| file | Uploaded file | `mimeTypes` (string[]), `maxSize` (number), `description` (string) |
+| text | Free-form text | `minLength` (number), `maxLength` (number), `description` (string) |
+| structured | JSON data | `jsonSchema` (object), `description` (string) |
+
+All properties except `type` are optional.
 
 ### 8.4 Evidence Requirement Check at Outcome Recording
 

@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-Implement the API layer that supports the FlowSpec Builder UI. This includes CRUD operations for Workflows, Nodes, Tasks, Outcomes, and Gates, as well as lifecycle operations (Validate, Publish) and versioning endpoints.
+Implement the API layer that supports the FlowSpec Builder UI. This includes CRUD operations for Workflows, Nodes, Tasks, Outcomes, and Gates, as well as lifecycle operations (Validate, Revert to Draft, Publish) and versioning endpoints.
 
 ### 1.1 Authorization Boundary
 
@@ -26,6 +26,7 @@ Implement the API layer that supports the FlowSpec Builder UI. This includes CRU
 - Gate (routing) CRUD
 - Evidence Requirements configuration
 - Validation endpoint
+- Revert to Draft endpoint
 - Publish endpoint
 - Version management endpoints
 - UI/API parity (all UI features accessible via API)
@@ -169,6 +170,7 @@ Implement the API layer that supports the FlowSpec Builder UI. This includes CRU
 | Route | Method | Purpose | Validation |
 |-------|--------|---------|------------|
 | `/api/flowspec/workflows/{id}/validate` | POST | Validate Workflow | Workflow is Draft |
+| `/api/flowspec/workflows/{id}/revert-to-draft` | POST | Revert to Draft | Workflow is Validated |
 | `/api/flowspec/workflows/{id}/publish` | POST | Publish Workflow | Workflow is Validated |
 | `/api/flowspec/workflows/{id}/versions` | GET | List Versions | None |
 | `/api/flowspec/workflows/{id}/versions/{versionId}` | GET | Get Specific Version | Version exists |

@@ -189,6 +189,79 @@ Flow (Instance)
 3. Attempting to record an Outcome without satisfying Evidence Requirements MUST fail.
 4. Evidence Requirements are evaluated at Outcome recording time.
 
+#### 5.3.3 Evidence Schema Contract (CANONICAL)
+
+**Definition:** The Evidence Schema defines the type and constraints for required Evidence. This section is the authoritative contract for Evidence Schema structure.
+
+**Evidence Types (Enumerated):**
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `file` | Uploaded file with optional MIME type and size constraints | Photos, documents, PDFs |
+| `text` | Free-form text with optional length constraints | Notes, descriptions, justifications |
+| `structured` | JSON data conforming to a JSON Schema | Form data, structured records |
+
+**Schema Shape (Canonical JSON Structure):**
+
+All Evidence Schemas MUST have a `type` field. Additional fields depend on the type:
+
+**File Schema:**
+```json
+{
+  "type": "file",
+  "mimeTypes": ["image/jpeg", "image/png", "application/pdf"],
+  "maxSize": 10485760,
+  "description": "Upload photo documentation"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"file"` | YES | Evidence type discriminator |
+| `mimeTypes` | `string[]` | NO | Allowed MIME types; if omitted, any file type accepted |
+| `maxSize` | `number` | NO | Maximum file size in bytes; if omitted, no limit enforced |
+| `description` | `string` | NO | Human-readable description |
+
+**Text Schema:**
+```json
+{
+  "type": "text",
+  "minLength": 10,
+  "maxLength": 500,
+  "description": "Explain the reason for this decision"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"text"` | YES | Evidence type discriminator |
+| `minLength` | `number` | NO | Minimum text length; if omitted, no minimum |
+| `maxLength` | `number` | NO | Maximum text length; if omitted, no maximum |
+| `description` | `string` | NO | Human-readable description |
+
+**Structured Schema:**
+```json
+{
+  "type": "structured",
+  "jsonSchema": { "type": "object", "properties": { ... } },
+  "description": "Fill out the inspection checklist"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"structured"` | YES | Evidence type discriminator |
+| `jsonSchema` | `object` | NO | JSON Schema object for structured data validation |
+| `description` | `string` | NO | Human-readable description |
+
+**Schema Validation Rules:**
+
+1. Schema MUST have a `type` field with value `"file"`, `"text"`, or `"structured"`.
+2. Schema with unrecognized `type` value is INVALID.
+3. If `evidenceRequired` is `true`, `evidenceSchema` MUST be non-null and valid (see INV-025).
+4. Empty object `{}` is INVALID (missing required `type` field).
+5. Type-specific fields are validated only if present (all are optional).
+
 ---
 
 ### 5.4 Outcome Semantics
@@ -308,7 +381,7 @@ Flow (Instance)
 
 ```
 Draft → Validated (via Validate action)
-Validated → Draft (via Edit action — reverts for changes)
+Validated → Draft (via Edit action — reverts for changes; UI: "Return to Draft")
 Validated → Published (via Publish action)
 Published → (terminal, no transitions out)
 ```

@@ -627,7 +627,7 @@ Implement Evidence attachment and requirements enforcement.
 
 #### Objectives
 
-Implement the Workflow state machine: Draft → Validated → Published.
+Implement the Workflow state machine: Draft ↔ Validated → Published.
 
 #### Implementation Steps
 
@@ -1062,7 +1062,7 @@ Each module requires unit tests covering:
 
 ### 6.2 Integration Tests
 
-- Flow lifecycle: Draft → Published → Flow creation → Execution
+- Flow lifecycle: Draft ↔ Validated → Published → Flow creation → Execution
 - Cross-flow dependencies: Finance → Execution coordination
 - Evidence requirements enforcement
 - Permission data shaping

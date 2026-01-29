@@ -241,7 +241,7 @@ PATCH /api/flowspec/workflows/{id}
 - [ ] Draft Workflows cannot create Flows
 - [ ] Validate action transitions Draft → Validated (if validation passes)
 - [ ] Validate action fails if validation has errors
-- [ ] Edit action transitions Validated → Draft
+- [ ] Edit action transitions Validated → Draft (UI: "Return to Draft")
 - [ ] Publish action transitions Validated → Published
 - [ ] Publish action requires validation to have passed
 - [ ] Published Workflows cannot be modified

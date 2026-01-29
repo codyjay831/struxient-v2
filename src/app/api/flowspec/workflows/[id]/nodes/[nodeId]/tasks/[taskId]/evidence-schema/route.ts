@@ -43,9 +43,17 @@ export async function PUT(request: NextRequest, { params }: Props) {
       return apiError("TASK_NOT_FOUND", "Task not found", null, 404);
     }
 
-    // Basic validation of schema could be added here
+    // INV-025: Schema must have a valid type field
     if (!schema || typeof schema !== "object") {
       return apiError("INVALID_SCHEMA", "Evidence schema must be a valid JSON object");
+    }
+
+    const validTypes = ["file", "text", "structured"];
+    if (!("type" in schema) || !validTypes.includes(schema.type)) {
+      return apiError(
+        "INVALID_SCHEMA_TYPE",
+        "Evidence schema must have a type field with value 'file', 'text', or 'structured' (INV-025)"
+      );
     }
 
     const updated = await prisma.task.update({

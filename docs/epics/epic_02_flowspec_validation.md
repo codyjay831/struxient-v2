@@ -236,6 +236,8 @@ Traverse all paths from Entry Nodes. At least one path must lead to a Node with 
 - [ ] Validation detects conflicting routes for same outcome name in Node
 - [ ] Validation detects missing terminal path (unless non-terminating)
 - [ ] Validation detects invalid Evidence schemas
+- [ ] Validation detects `evidenceRequired: true` with null/empty `evidenceSchema` (INV-025)
+- [ ] Validation detects `evidenceSchema` with missing or invalid `type` field
 - [ ] Validation detects Cross-Flow Dependencies to non-existent sources
 - [ ] Validation detects circular cross-flow dependencies as errors
 - [ ] Validation detects Fan-Out Rules targeting unpublished Workflows

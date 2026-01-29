@@ -133,6 +133,7 @@ This document maps every Builder feature to its UI location, UI control, API rou
 |---------|-------------|------------|-----------|-------------------------------|------------|-------------|
 | Validate Workflow | Builder Toolbar | "Validate" button | `PLACEHOLDER:/api/flowspec/workflows/{id}/validate` POST | `{}` → `{ valid: boolean, errors: [...] }` | Workflow is Draft | Authenticated user |
 | Publish Workflow | Builder Toolbar | "Publish" button | `PLACEHOLDER:/api/flowspec/workflows/{id}/publish` POST | `{}` → `{ version }` | Workflow is Validated | Authenticated user |
+| Return to Draft | Builder Toolbar | "Return to Draft" | `/api/flowspec/workflows/{id}/revert-to-draft` POST | `{}` → `{ workflow }` | Workflow is Validated | Authenticated user |
 | List Versions | Version dropdown / modal | Dropdown | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions` GET | `{}` → `{ versions: [...] }` | None | Authenticated user |
 | View Version | Version dropdown | Selection | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions/{versionId}` GET | `{}` → `{ workflow }` | Version exists | Authenticated user |
 | Create Draft from Version | Version view | "Edit as Draft" button | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions/{versionId}/branch` POST | `{}` → `{ workflow (draft) }` | Version exists | Authenticated user |
@@ -207,6 +208,7 @@ The following routes MUST be implemented for the Builder to function:
 |--------|-------|---------|
 | POST | `PLACEHOLDER:/api/flowspec/workflows/{id}/validate` | Validate workflow |
 | POST | `PLACEHOLDER:/api/flowspec/workflows/{id}/publish` | Publish workflow |
+| POST | `/api/flowspec/workflows/{id}/revert-to-draft` | Revert to Draft |
 | GET | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions` | List versions |
 | GET | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions/{versionId}` | Get specific version |
 | POST | `PLACEHOLDER:/api/flowspec/workflows/{id}/versions/{versionId}/branch` | Create draft from version |

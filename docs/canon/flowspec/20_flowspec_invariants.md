@@ -418,6 +418,22 @@ During Workflow validation, group all Task Outcomes by (nodeId, outcomeName). If
 
 ---
 
+### INV-025: Evidence Schema Required When Evidence Required
+
+**Statement:**  
+If a Task has `evidenceRequired: true`, the Task MUST have a non-null, valid `evidenceSchema`. A valid schema MUST have a `type` field with value `"file"`, `"text"`, or `"structured"`.
+
+**Rationale:**  
+Requiring evidence without defining what evidence is required creates an unachievable constraint. Users cannot provide conforming evidence if the schema is undefined. This also blocks validation rule 8.3.2 ("required Evidence achievable") from being satisfied.
+
+**Violation Example:**  
+Task "Upload Contract" has `evidenceRequired: true` but `evidenceSchema: null`. User attempts to attach evidence but system has no schema to validate against. At Outcome recording time, the system cannot determine if the evidence requirement is satisfied.
+
+**Detection Idea:**  
+During Workflow validation, for each Task where `evidenceRequired === true`, verify that `evidenceSchema` is non-null and contains a valid `type` field. Fail validation if not.
+
+---
+
 ## 3. Invariant Index
 
 | ID | Short Name | Category |
@@ -446,6 +462,7 @@ During Workflow validation, group all Task Outcomes by (nodeId, outcomeName). If
 | INV-022 | Actionability at Start Only | Execution |
 | INV-023 | Fan-Out Failure ≠ Outcome Rollback | Fan-Out |
 | INV-024 | Gate Key is Node-Level | Gates |
+| INV-025 | Evidence Schema Required When Evidence Required | Evidence |
 
 ---
 

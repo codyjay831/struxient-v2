@@ -118,6 +118,11 @@ export default function WorkflowDetailPage() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
+  // Revert to Draft state
+  const [isReverting, setIsReverting] = useState(false);
+  const [revertDialogOpen, setRevertDialogOpen] = useState(false);
+  const [revertError, setRevertError] = useState<string | null>(null);
+
   // Highlight state for validation navigation (2s TTL)
   const [highlight, setHighlight] = useState<{
     type: "node" | "task" | "outcome" | "gate";
@@ -229,6 +234,31 @@ export default function WorkflowDetailPage() {
       setPublishError(err instanceof Error ? err.message : "Failed to publish workflow");
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const handleRevertToDraft = async () => {
+    if (!workflow) return;
+    setIsReverting(true);
+    setRevertError(null);
+
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/revert-to-draft`, {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || "Failed to revert workflow to draft");
+      }
+
+      // Success - refresh workflow to show DRAFT status
+      await fetchWorkflow();
+      setRevertDialogOpen(false);
+    } catch (err) {
+      setRevertError(err instanceof Error ? err.message : "Failed to revert workflow to draft");
+    } finally {
+      setIsReverting(false);
     }
   };
 
@@ -423,6 +453,22 @@ export default function WorkflowDetailPage() {
                 </TooltipContent>
               )}
             </Tooltip>
+
+            {/* Return to Draft Button (VALIDATED only) */}
+            {workflow.status === "VALIDATED" && (
+              <Button
+                variant="outline"
+                onClick={() => setRevertDialogOpen(true)}
+                disabled={isReverting}
+              >
+                {isReverting ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <ArrowLeftIcon className="size-4" />
+                )}
+                Return to Draft
+              </Button>
+            )}
 
             {/* Publish Button */}
             <Tooltip>
@@ -640,6 +686,38 @@ export default function WorkflowDetailPage() {
               <Button onClick={handlePublish} disabled={isPublishing}>
                 {isPublishing && <Loader2Icon className="size-4 animate-spin" />}
                 Publish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Revert to Draft Confirmation Dialog */}
+        <Dialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Return to Draft</DialogTitle>
+              <DialogDescription>
+                This will revert the workflow to Draft status, allowing you to make changes.
+                You will need to validate again before publishing.
+              </DialogDescription>
+            </DialogHeader>
+            {revertError && (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                <AlertCircleIcon className="size-4" />
+                {revertError}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setRevertDialogOpen(false)}
+                disabled={isReverting}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleRevertToDraft} disabled={isReverting}>
+                {isReverting && <Loader2Icon className="size-4 animate-spin" />}
+                Return to Draft
               </Button>
             </DialogFooter>
           </DialogContent>
