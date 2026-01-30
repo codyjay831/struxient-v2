@@ -29,6 +29,8 @@ model Company {
   members    CompanyMember[]
   workflows  Workflow[]
   flowGroups FlowGroup[]
+  customers  Customer[]
+  jobs       Job[]
 }
 
 /// Membership role within a company
@@ -58,6 +60,44 @@ model CompanyMember {
 
   @@unique([companyId, userId])
   @@index([userId])
+  @@index([companyId])
+}
+
+// =============================================================================
+// DOMAIN: JOBS & CUSTOMERS (PHASE 3 / M1)
+// =============================================================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+
+  jobs      Job[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  companyId   String
+  customerId  String
+  flowGroupId String   @unique
+
+  flowGroup   FlowGroup @relation(fields: [flowGroupId], references: [id], onDelete: Restrict)
+
+  address     String?
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([companyId])
 }
 
@@ -257,6 +297,7 @@ model FlowGroup {
   companyId String
   createdAt DateTime @default(now())
 
+  job     Job?
   flows   Flow[]
   company Company @relation(fields: [companyId], references: [id])
 
@@ -423,6 +464,7 @@ model WorkflowTemplate {
   definition  Json     // WorkflowSnapshot structure
   tags        String[] // e.g., ["Residential", "Commercial"]
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([tradeKey, name, version])
   @@index([tradeKey, category])
