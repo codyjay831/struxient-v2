@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-Implement the FlowSpec execution engine — the sole system responsible for defining and executing workflows. The engine owns all execution Truth, computes all Derived State, evaluates all Actionability, and routes all execution based on Outcomes and Gates.
+Implement the FlowSpec execution engine — the authoritative **Truth Store** responsible for defining and executing workflows. The engine owns all execution Truth, computes all Derived State, evaluates all Actionability, and routes all execution based on Outcomes and Gates.
 
 ### 1.1 Authorization Boundary
 

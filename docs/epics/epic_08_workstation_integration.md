@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-Implement the Work Station execution surface that allows humans to view Actionable Tasks, perform work, attach Evidence, and submit Outcomes to FlowSpec. Work Station is a consumer of FlowSpec, not an executor of workflows.
+Implement the Work Station **Execution Surface** that allows humans to view Actionable Tasks, perform work, attach Evidence, and submit Outcomes to FlowSpec. Work Station is a consumer of FlowSpec, not an executor of workflows. It exists for action, not historical lookup (which belongs to the **Job Card** Projection Surface).
 
 ### 1.1 Authorization Boundary
 

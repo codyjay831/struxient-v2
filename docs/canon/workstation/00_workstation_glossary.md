@@ -67,6 +67,14 @@ See: [FlowSpec Engine Contract §2.1](../flowspec/10_flowspec_engine_contract.md
 - Execution Surfaces consume FlowSpec; they do not control it.
 - All Execution Surfaces share the same relationship to FlowSpec: read Derived State, submit Outcomes.
 
+- Execution Surfaces are NOT Projection Surfaces. They exist for action, 
+  not historical lookup.
+- Execution Surfaces MUST NOT cache Truth as authoritative.
+- Execution Surfaces submit to FlowSpec; they do NOT record locally.
+
+**Rule:** An Execution Surface is defined by its ability to submit Outcomes 
+and Evidence. If a surface cannot submit, it is a Projection Surface.
+
 ---
 
 ### 3.3 Task Rendering

@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-Implement the Flow instantiation system that creates live execution instances from Published Workflows, binds them to specific Workflow versions, manages Flow Groups via Scope, handles fan-out patterns, and activates Entry Nodes to begin execution.
+Implement the Flow instantiation system that creates live execution instances from Published Workflows, binds them to specific Workflow versions, manages Flow Groups via Scope, handles fan-out patterns, and activates Entry Nodes to begin execution. The `scope` parameter serves as the metadata bridge between the **Truth Store** (FlowSpec) and **Projection Surfaces** (like Jobs).
 
 ### 1.1 Authorization Boundary
 

@@ -18,6 +18,7 @@ This implementation plan defines the build sequence for Struxient v2's core work
 | **FlowSpec Engine** | Workflow definition and execution engine | `docs/canon/flowspec/` |
 | **FlowSpec Builder** | Visual workflow editor | `40_flowspec_builder_contract.md` |
 | **Work Station** | Human task execution surface | `docs/canon/workstation/` |
+| **Projection Surface** | Human lookup and history | `docs/canon/jobs/` |
 | **Permissions** | Capability-based data visibility | `docs/canon/permissions/` |
 
 ### 1.2 Foundational Boundary
@@ -112,6 +113,13 @@ The Authorization Layer **MUST NOT**:
                     │
                     ▼
              ┌────────────┐
+             │  EPIC-10   │
+             │ Projection │
+             │ Layer      │
+             └─────┬──────┘
+                    │
+                    ▼
+             ┌────────────┐
              │  EPIC-08   │
              │ Work       │
              │ Station    │
@@ -128,7 +136,8 @@ The critical path for a minimal viable product:
 4. **EPIC-04** → Workflow Lifecycle (publish workflows)
 5. **EPIC-03** → Flow Instantiation (create live executions)
 6. **EPIC-07** → Builder API (create workflows programmatically)
-7. **EPIC-08** → Work Station (human execution surface)
+7. **EPIC-10** → Projection Layer (visibility and history)
+8. **EPIC-08** → Work Station (human execution surface)
 
 ### 2.2 Parallel Workstreams
 
@@ -1033,9 +1042,9 @@ Implement the human execution surface for performing Tasks.
 | 4 | EPIC-04 | Lifecycle | EPIC-03, EPIC-05, EPIC-07 |
 | 5 | EPIC-03 | Flow Instantiation | EPIC-05, EPIC-08 |
 | 6 | EPIC-07 | Builder API | EPIC-08 |
-| 7 | EPIC-05 | Cross-Flow | EPIC-08 |
-| 8 | EPIC-09 | Permissions | None (parallel) |
-| 9 | EPIC-08 | Work Station | End |
+| 7 | EPIC-10 | Projection | Visibility | EPIC-08 |
+| 8 | EPIC-09 | Permissions | None (parallel) | None |
+| 9 | EPIC-08 | Work Station | End | End |
 
 ### 5.2 Parallel Opportunities
 
@@ -1048,6 +1057,10 @@ After EPIC-04:
 
 After EPIC-03:
 - EPIC-05 can start
+- EPIC-10 can start (depends on EPIC-03 and EPIC-07)
+
+After EPIC-10:
+- EPIC-08 can start
 
 ---
 
@@ -1129,6 +1142,8 @@ Each module requires unit tests covering:
 | `10_workstation_contract.md` | Work Station behavior contract |
 | `20_workstation_invariants.md` | Work Station invariants |
 | `10_permissions_contract.md` | Permission system contract |
+| `00_jobs_glossary.md` | Job and Job Card definitions |
+| `epic_10_customer_job_visibility.md` | Projection Layer specification |
 
 ---
 

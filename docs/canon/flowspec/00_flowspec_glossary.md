@@ -127,6 +127,11 @@ This document defines ALL terms used within the FlowSpec system. Every term MUST
 - Flow Group MUST NOT contain execution logic, routing rules, or lifecycle states.
 - Flow Group groups Flows; it does not control them.
 
+**External Linkage:**  
+A Flow Group MAY be referenced by an external domain artifact (e.g., Job) 
+for human-facing navigation. This linkage is metadata only; the external 
+artifact does NOT own, contain, or control the Flow Group or its Flows.
+
 ---
 
 ### 2.3.3 Scope (Flow Group Scope)
@@ -262,6 +267,12 @@ scope: { type: "job", id: "job-12345" }
 
 **Rule:** Only FlowSpec may mutate execution Truth. External domains may NOT directly modify Truth.
 
+**Terminology Note:** The term "record" in Struxient documentation refers to 
+persisted data entries. However, only FlowSpec Truth tables are authoritative 
+for execution state. Domain artifacts like Jobs and Customers are metadata 
+records—they are persisted and meaningful, but they project or reference 
+FlowSpec Truth rather than owning it.
+
 ---
 
 ### 3.2 Derived State (Signals)
@@ -332,6 +343,28 @@ scope: { type: "job", id: "job-12345" }
 Task "Begin Installation" in the Execution Flow has a Cross-Flow Dependency on Outcome `DEPOSIT_COLLECTED` from the Finance Flow. The Task exists and its Flow is started, but it is not Actionable until Finance records that Outcome.
 
 **Rule:** Cross-Flow Dependencies are constraints, not triggers. FlowSpec evaluates constraints; no domain triggers another.
+
+---
+
+### 3.6 Projection Surface
+
+**Definition:** A Projection Surface is any domain artifact that displays, 
+aggregates, or caches FlowSpec Truth for human consumption. Projection 
+Surfaces do NOT own Truth.
+
+**Clarification:**
+- Job Cards are Projection Surfaces.
+- Dashboards, reports, and status views are Projection Surfaces.
+- Projection Surfaces MAY cache Derived State but MUST treat FlowSpec as authoritative.
+- Projection Surfaces MUST NOT mutate Truth.
+
+**Rule:** If a surface can be reconstructed entirely from FlowSpec Truth, 
+it is a Projection Surface.
+
+**Relationship to Truth:**
+- Projection Surfaces read Truth (via FlowSpec APIs)
+- Projection Surfaces never write Truth
+- Projection Surfaces may display Derived State
 
 ---
 
@@ -440,6 +473,7 @@ The following terms are PROHIBITED in FlowSpec documentation and implementation 
 | Signals | 3.2 |
 | Task | 2.5 |
 | Truth | 3.1 |
+| Projection Surface | 3.6 |
 | Validated | 4.2 |
 | Workflow | 2.2 |
 

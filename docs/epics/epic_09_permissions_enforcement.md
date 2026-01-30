@@ -9,7 +9,7 @@
 
 ## 1. Purpose
 
-Implement the capability-based permission system that controls visibility of sensitive data classes (specifically cost data) through data shaping at the API layer. This is a minimal system focused on protecting internal financials, not a full RBAC implementation.
+Implement the capability-based permission system that controls visibility of sensitive data classes (specifically cost data) through data shaping at the API layer. This system ensures that whenever execution Truth is accessed by a **Projection Surface** (like a Job Card or report), sensitive financials are protected based on the actor's capabilities.
 
 ---
 
