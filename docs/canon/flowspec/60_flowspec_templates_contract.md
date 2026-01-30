@@ -63,8 +63,10 @@ The process of cloning a Template's definition into a tenant-owned Workflow.
 All mutations to Workflow structure (Drafts) and Templates MUST go through the central persistence gateway.
 
 ### 5.2 CI Guards
+
 1. `guard_flowspec_persistence_boundary.mjs`: Enforces that raw Prisma writes to `Workflow`, `Node`, `Task`, `Outcome`, and `Gate` tables are prohibited outside the authorized persistence modules.
-2. `guard_flowspec_schema_constraints.mjs`: Validates that snapshots and template definitions conform to the Zod schema before storage.
+2. `guard_flowspec_schema_constraints.mjs`: Enforces Prisma and structural schema invariants for stored snapshots.
+3. `guard_flowspec_template_schema.mjs`: Validates template definitions stored in `src/lib/flowspec/templates/definitions/*.json`. This guard executes `tests/compliance/template_schema.test.ts`, ensuring that both runtime import and CI use `parseTemplateDefinition` as the single source of truth.
 
 ---
 
