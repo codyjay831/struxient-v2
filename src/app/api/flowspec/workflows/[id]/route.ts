@@ -13,6 +13,7 @@ import {
   updateWorkflow,
   deleteWorkflow,
   workflowNameExists,
+  ensureDraftForStructuralEdit,
 } from "@/lib/flowspec/persistence/workflow";
 
 export const dynamic = "force-dynamic";
@@ -74,9 +75,14 @@ export async function PATCH(request: NextRequest, { params }: Props) {
 
     const { authority } = await verifyTenantOwnership(workflow.companyId);
 
-    // INV-011: Published Immutable
-    if (workflow.status === WorkflowStatus.PUBLISHED) {
-      return apiError("PUBLISHED_IMMUTABLE", "Published workflows cannot be modified", null, 403);
+    // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
+    try {
+      await ensureDraftForStructuralEdit(id);
+    } catch (err: any) {
+      if (err.code === "PUBLISHED_IMMUTABLE") {
+        return apiError("PUBLISHED_IMMUTABLE", err.message, null, 403);
+      }
+      throw err;
     }
 
     // Check name uniqueness if changed

@@ -274,7 +274,6 @@ export function computeTaskActionable(
  * Helper to match a task path (e.g. "nodeId.taskId") against a taskId.
  */
 function matchesTaskPath(path: string, taskId: string): boolean {
-  if (path === taskId) return true;
   if (path.includes(".")) {
     const parts = path.split(".");
     return parts[parts.length - 1] === taskId;

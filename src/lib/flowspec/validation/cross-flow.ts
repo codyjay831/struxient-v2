@@ -9,6 +9,16 @@ import type { WorkflowWithRelations } from "../types";
 import type { ValidationError } from "./types";
 
 /**
+ * Validates the format of a sourceTaskPath.
+ * Expected format: "nodeId.taskId"
+ */
+export function isValidTaskPathFormat(path: string): boolean {
+  if (!path || typeof path !== "string") return false;
+  const parts = path.split(".");
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
+
+/**
  * Validates cross-flow dependencies.
  *
  * Checks:
@@ -88,15 +98,25 @@ export async function validateCrossFlow(
         }
 
         // 4. Check if source task exists
-        // dep.sourceTaskPath is expected to be "nodeId.taskId" or just "taskId"
-        // Let's assume taskId for now as that's what Prisma models usually use.
+        // dep.sourceTaskPath MUST be "nodeId.taskId" per canon
+        if (!dep.sourceTaskPath.includes(".")) {
+          errors.push({
+            severity: "error",
+            category: "cross_flow",
+            path: pathPrefix,
+            code: "INVALID_TASK_PATH_FORMAT",
+            message: `Cross-flow dependency has invalid sourceTaskPath format: "${dep.sourceTaskPath}". Expected "nodeId.taskId"`,
+            suggestion: "Update dependency to use the correct nodeId.taskId format",
+          });
+          continue;
+        }
+
+        const [sNodeId, sTaskId] = dep.sourceTaskPath.split(".");
         let foundTask = null;
-        for (const sNode of sourceWorkflow.nodes) {
-          const sTask = sNode.tasks.find(t => t.id === dep.sourceTaskPath || t.name === dep.sourceTaskPath);
-          if (sTask) {
-            foundTask = sTask;
-            break;
-          }
+
+        const sNode = sourceWorkflow.nodes.find(n => n.id === sNodeId);
+        if (sNode) {
+          foundTask = sNode.tasks.find(t => t.id === sTaskId);
         }
 
         if (!foundTask) {
@@ -105,8 +125,8 @@ export async function validateCrossFlow(
             category: "cross_flow",
             path: pathPrefix,
             code: "SOURCE_TASK_NOT_FOUND",
-            message: `Cross-flow dependency references non-existent Task "${dep.sourceTaskPath}" in Workflow "${sourceWorkflow.name}"`,
-            suggestion: "Update dependency to point to a valid Task",
+            message: `Cross-flow dependency references non-existent Task "${dep.sourceTaskPath}" in Workflow "${sourceWorkflow.name}" (checked by IDs only)`,
+            suggestion: "Update dependency to point to a valid Node and Task ID",
           });
           continue;
         }

@@ -13,7 +13,7 @@
  * - INV-011: Published Immutable (No WorkflowVersion PATCH)
  */
 
-import { readdirSync, statSync } from 'fs';
+import { readdirSync, statSync, readFileSync } from 'fs';
 import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -24,17 +24,17 @@ const API_PATH = join(__dirname, '../../src/app/api/flowspec');
 const FORBIDDEN_PATTERNS = [
   {
     method: 'PATCH',
-    pathRegex: /\/flows\/\[id\]\/tasks\/\[taskId\]\/outcome/i,
+    pathRegex: /\/flows\/\[flowId\]\/tasks\/\[taskId\]\/outcome/i,
     reason: 'Mutating recorded Outcome violates INV-007 (Outcome Immutability)',
   },
   {
     method: 'DELETE',
-    pathRegex: /\/flows\/\[id\]\/tasks\/\[taskId\]\/outcome/i,
+    pathRegex: /\/flows\/\[flowId\]\/tasks\/\[taskId\]\/outcome/i,
     reason: 'Deleting recorded Outcome violates INV-007 (Outcome Immutability)',
   },
   {
     method: 'DELETE',
-    pathRegex: /\/flows\/\[id\]\/evidence\/\[evidenceId\]/i,
+    pathRegex: /\/flows\/\[flowId\]\/tasks\/\[taskId\]\/evidence/i,
     reason: 'Evidence is append-only and cannot be deleted',
   },
   {
@@ -44,8 +44,8 @@ const FORBIDDEN_PATTERNS = [
   },
   {
     method: 'PATCH',
-    pathRegex: /\/flows\/\[id\]\/workflowVersion/i,
-    reason: 'Flow is permanently bound to its version (INV-010)',
+    pathRegex: /\/flows\/\[flowId\]$/i,
+    reason: 'Flow version binding is permanent (INV-010)',
   },
   // Template immutability - updates require new version row
   {
@@ -73,7 +73,7 @@ class ForbiddenRoutesGuard {
         const fullPath = join(dirPath, file);
         if (statSync(fullPath).isDirectory()) {
           this.getAllRouteFiles(fullPath, arrayOfFiles);
-        } else if (file === 'route.ts') {
+        } else if (file === 'route.ts' || file === 'route.js' || file === 'route.mjs') {
           arrayOfFiles.push(fullPath);
         }
       }
@@ -83,21 +83,48 @@ class ForbiddenRoutesGuard {
     return arrayOfFiles;
   }
 
+  isMethodExported(content, method) {
+    // Remove block comments
+    const cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '');
+    
+    const lines = cleanContent.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//')) continue;
+
+      // Simple exports: export const PATCH, export async function PATCH
+      const simpleExport = new RegExp(`export\\s+(const|async\\s+function)\\s+${method}\\b`);
+      if (simpleExport.test(trimmed)) return true;
+
+      // Braced exports: export { PATCH }, export { a, b as PATCH }
+      const bracedExport = /export\s+\{([^}]+)\}/g;
+      let match;
+      while ((match = bracedExport.exec(trimmed)) !== null) {
+        const exports = match[1].split(',').map(e => e.trim());
+        for (const exp of exports) {
+          if (exp === method) return true;
+          if (exp.endsWith(` as ${method}`)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   checkRoute(filePath) {
     const relativePath = relative(API_PATH, filePath).replace(/\\/g, '/');
-    const routeDir = dirname(relativePath);
+    const routeDir = '/' + dirname(relativePath);
     
-    // Read file to check methods implemented (GET, POST, PATCH, DELETE)
-    // For now, we'll just check if the directory path matches forbidden patterns
-    // and if the file would handle that method.
+    const content = readFileSync(filePath, 'utf8');
     
     for (const pattern of FORBIDDEN_PATTERNS) {
       if (pattern.pathRegex.test(routeDir)) {
-        this.violations.push({
-          file: join('src/app/api/flowspec', relativePath),
-          method: pattern.method,
-          reason: pattern.reason,
-        });
+        if (this.isMethodExported(content, pattern.method)) {
+          this.violations.push({
+            file: join('src/app/api/flowspec', relativePath).replace(/\\/g, '/'),
+            method: pattern.method,
+            reason: pattern.reason,
+          });
+        }
       }
     }
   }

@@ -188,6 +188,53 @@ export async function deleteWorkflow(id: string, tenantCtx: TenantContext): Prom
 }
 
 /**
+ * Ensures a workflow is in DRAFT state before allowing structural edits.
+ * 
+ * POLICY B (Auto-Revert): 
+ * If status is VALIDATED, automatically revert to DRAFT.
+ * If status is PUBLISHED, reject (structural edits prohibited).
+ * 
+ * @param workflowId - The workflow ID
+ * @param tx - Optional Prisma transaction client
+ * @returns The workflow record (updated if needed)
+ * @throws Error with code if workflow is PUBLISHED or not found
+ */
+export async function ensureDraftForStructuralEdit(
+  workflowId: string,
+  tx?: Prisma.TransactionClient
+): Promise<{ status: WorkflowStatus }> {
+  const client = tx || prisma;
+  
+  const workflow = await client.workflow.findUnique({
+    where: { id: workflowId },
+    select: { status: true }
+  });
+
+  if (!workflow) {
+    const error = new Error("Workflow not found");
+    (error as any).code = "WORKFLOW_NOT_FOUND";
+    throw error;
+  }
+
+  if (workflow.status === WorkflowStatus.PUBLISHED) {
+    const error = new Error("Published workflows cannot be modified (INV-011)");
+    (error as any).code = "PUBLISHED_IMMUTABLE";
+    throw error;
+  }
+
+  if (workflow.status === WorkflowStatus.VALIDATED) {
+    // POLICY B: Auto-revert VALIDATED to DRAFT (INV-026)
+    return client.workflow.update({
+      where: { id: workflowId },
+      data: { status: WorkflowStatus.DRAFT },
+      select: { status: true }
+    });
+  }
+
+  return { status: workflow.status };
+}
+
+/**
  * Publish a workflow: update status and create an immutable version snapshot.
  *
  * @param workflowId - Workflow ID

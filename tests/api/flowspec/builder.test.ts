@@ -153,6 +153,34 @@ describe("EPIC-07: FlowSpec Builder API", () => {
       expect(data.error.code).toBe("PUBLISHED_IMMUTABLE");
     });
 
+    it("should auto-revert VALIDATED workflow to DRAFT on update (INV-026 Policy B)", async () => {
+      const company = await createTestCompany();
+      await createTestMember(company.id, MOCK_USER_ID);
+      (auth as any).mockResolvedValue({ userId: MOCK_USER_ID });
+
+      const wf = await prisma.workflow.create({
+        data: { 
+          name: "Validated Wf", 
+          companyId: company.id,
+          status: WorkflowStatus.VALIDATED
+        }
+      });
+
+      const req = new NextRequest(`http://localhost/api/flowspec/workflows/${wf.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Auto-Reverted Rename" }),
+      });
+
+      const res = await singleWorkflowRoute.PATCH(req, { params: Promise.resolve({ id: wf.id }) });
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.workflow.name).toBe("Auto-Reverted Rename");
+      
+      const updated = await prisma.workflow.findUnique({ where: { id: wf.id } });
+      expect(updated?.status).toBe(WorkflowStatus.DRAFT);
+    });
+
     it("should reject cross-tenant access", async () => {
       const company1 = await createTestCompany("C1");
       const company2 = await createTestCompany("C2");

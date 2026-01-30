@@ -79,7 +79,7 @@ describe("Gate Status Enforcement", () => {
     });
 
     statuses.forEach((status) => {
-      it(`should fail in ${status} status`, async () => {
+      it(`should ${status === WorkflowStatus.VALIDATED ? "auto-revert to DRAFT" : "fail"} in ${status} status`, async () => {
         await prisma.workflow.update({
           where: { id: workflowId },
           data: { status },
@@ -95,10 +95,16 @@ describe("Gate Status Enforcement", () => {
         });
 
         const res = await gateRoute.POST(req, { params: Promise.resolve({ id: workflowId }) });
-        const data = await res.json();
-
-        expect(res.status).toBe(403);
-        expect(data.error.code).toBe("WORKFLOW_NOT_EDITABLE");
+        
+        if (status === WorkflowStatus.VALIDATED) {
+          expect(res.status).toBe(201);
+          const updated = await prisma.workflow.findUnique({ where: { id: workflowId } });
+          expect(updated?.status).toBe(WorkflowStatus.DRAFT);
+        } else {
+          const data = await res.json();
+          expect(res.status).toBe(403);
+          expect(data.error.code).toBe("PUBLISHED_IMMUTABLE");
+        }
       });
     });
   });
@@ -124,7 +130,7 @@ describe("Gate Status Enforcement", () => {
     });
 
     statuses.forEach((status) => {
-      it(`should fail in ${status} status`, async () => {
+      it(`should ${status === WorkflowStatus.VALIDATED ? "auto-revert to DRAFT" : "fail"} in ${status} status`, async () => {
         await prisma.workflow.update({
           where: { id: workflowId },
           data: { status },
@@ -136,10 +142,16 @@ describe("Gate Status Enforcement", () => {
         });
 
         const res = await singleGateRoute.PATCH(req, { params: Promise.resolve({ id: workflowId, gateId }) });
-        const data = await res.json();
-
-        expect(res.status).toBe(403);
-        expect(data.error.code).toBe("WORKFLOW_NOT_EDITABLE");
+        
+        if (status === WorkflowStatus.VALIDATED) {
+          expect(res.status).toBe(200);
+          const updated = await prisma.workflow.findUnique({ where: { id: workflowId } });
+          expect(updated?.status).toBe(WorkflowStatus.DRAFT);
+        } else {
+          const data = await res.json();
+          expect(res.status).toBe(403);
+          expect(data.error.code).toBe("PUBLISHED_IMMUTABLE");
+        }
       });
     });
   });
@@ -164,7 +176,7 @@ describe("Gate Status Enforcement", () => {
     });
 
     statuses.forEach((status) => {
-      it(`should fail in ${status} status`, async () => {
+      it(`should ${status === WorkflowStatus.VALIDATED ? "auto-revert to DRAFT" : "fail"} in ${status} status`, async () => {
         await prisma.workflow.update({
           where: { id: workflowId },
           data: { status },
@@ -175,10 +187,16 @@ describe("Gate Status Enforcement", () => {
         });
 
         const res = await singleGateRoute.DELETE(req, { params: Promise.resolve({ id: workflowId, gateId }) });
-        const data = await res.json();
-
-        expect(res.status).toBe(403);
-        expect(data.error.code).toBe("WORKFLOW_NOT_EDITABLE");
+        
+        if (status === WorkflowStatus.VALIDATED) {
+          expect(res.status).toBe(200);
+          const updated = await prisma.workflow.findUnique({ where: { id: workflowId } });
+          expect(updated?.status).toBe(WorkflowStatus.DRAFT);
+        } else {
+          const data = await res.json();
+          expect(res.status).toBe(403);
+          expect(data.error.code).toBe("PUBLISHED_IMMUTABLE");
+        }
       });
     });
   });

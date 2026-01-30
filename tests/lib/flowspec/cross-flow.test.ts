@@ -136,7 +136,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
       data: {
         taskId: executionTask.id,
         sourceWorkflowId: financeWf.id,
-        sourceTaskPath: financeTask.id, // Using taskId directly as path
+        sourceTaskPath: `${financeWf.nodes[0].id}.${financeTask.id}`,
         requiredOutcome: "DEPOSIT_COLLECTED"
       }
     });
@@ -157,7 +157,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
           crossFlowDependencies: [{
             id: dep.id,
             sourceWorkflowId: financeWf.id,
-            sourceTaskPath: financeTask.id,
+            sourceTaskPath: `${financeWf.nodes[0].id}.${financeTask.id}`,
             requiredOutcome: "DEPOSIT_COLLECTED"
           }]
         }]
@@ -212,7 +212,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
     const nodeE = await prisma.node.create({ data: { workflowId: executionWf.id, name: "N1", isEntry: true } });
     const taskE = await prisma.task.create({ data: { nodeId: nodeE.id, name: "TE" } });
     const dep = await prisma.crossFlowDependency.create({
-      data: { taskId: taskE.id, sourceWorkflowId: financeWf.id, sourceTaskPath: taskF.id, requiredOutcome: "DONE" }
+      data: { taskId: taskE.id, sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF.id}`, requiredOutcome: "DONE" }
     });
 
     // Create snapshots
@@ -220,7 +220,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
       data: { workflowId: financeWf.id, version: 1, snapshot: { workflowId: financeWf.id, nodes: [{ id: nodeF.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskF.id, name: "TF", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }] }], gates: [] } as any, publishedBy: "A" }
     });
     await prisma.workflowVersion.create({
-      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE.id, name: "TE", outcomes: [], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: taskF.id, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
+      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE.id, name: "TE", outcomes: [], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF.id}`, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
     });
 
     // Instantiate in DIFFERENT groups
@@ -263,7 +263,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
     await prisma.outcome.create({ data: { taskId: taskE.id, name: "OK" } });
     
     const dep = await prisma.crossFlowDependency.create({
-      data: { taskId: taskE.id, sourceWorkflowId: financeWf.id, sourceTaskPath: taskF.id, requiredOutcome: "DONE" }
+      data: { taskId: taskE.id, sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF.id}`, requiredOutcome: "DONE" }
     });
 
     // Create snapshots
@@ -271,7 +271,7 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
       data: { workflowId: financeWf.id, version: 1, snapshot: { workflowId: financeWf.id, nodes: [{ id: nodeF.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskF.id, name: "TF", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }] }], gates: [] } as any, publishedBy: "A" }
     });
     await prisma.workflowVersion.create({
-      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE.id, name: "TE", outcomes: [{ name: "OK" }], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: taskF.id, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
+      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE.id, name: "TE", outcomes: [{ name: "OK" }], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF.id}`, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
     });
 
     const scope = { type: "job", id: "INV-022" };
@@ -331,18 +331,18 @@ describe("EPIC-05: FlowSpec Cross-Flow Dependencies", () => {
     // Execution TE1 depends on Finance TF1
     // Finance TF2 depends on Execution TE1
     await prisma.crossFlowDependency.create({
-      data: { taskId: taskE1.id, sourceWorkflowId: financeWf.id, sourceTaskPath: taskF1.id, requiredOutcome: "DONE" }
+      data: { taskId: taskE1.id, sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF1.id}`, requiredOutcome: "DONE" }
     });
     await prisma.crossFlowDependency.create({
-      data: { taskId: taskF2.id, sourceWorkflowId: executionWf.id, sourceTaskPath: taskE1.id, requiredOutcome: "DONE" }
+      data: { taskId: taskF2.id, sourceWorkflowId: executionWf.id, sourceTaskPath: `${nodeE.id}.${taskE1.id}`, requiredOutcome: "DONE" }
     });
 
     // Create snapshots (abbreviated)
     await prisma.workflowVersion.create({
-      data: { workflowId: financeWf.id, version: 1, snapshot: { workflowId: financeWf.id, nodes: [{ id: nodeF.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskF1.id, name: "TF1", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }, { id: taskF2.id, name: "TF2", outcomes: [{ name: "DONE" }], crossFlowDependencies: [{ sourceWorkflowId: executionWf.id, sourceTaskPath: taskE1.id, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
+      data: { workflowId: financeWf.id, version: 1, snapshot: { workflowId: financeWf.id, nodes: [{ id: nodeF.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskF1.id, name: "TF1", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }, { id: taskF2.id, name: "TF2", outcomes: [{ name: "DONE" }], crossFlowDependencies: [{ sourceWorkflowId: executionWf.id, sourceTaskPath: `${nodeE.id}.${taskE1.id}`, requiredOutcome: "DONE" }] }] }], gates: [] } as any, publishedBy: "A" }
     });
     await prisma.workflowVersion.create({
-      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE1.id, name: "TE1", outcomes: [{ name: "DONE" }], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: taskF1.id, requiredOutcome: "DONE" }] }, { id: taskE2.id, name: "TE2", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }] }], gates: [] } as any, publishedBy: "A" }
+      data: { workflowId: executionWf.id, version: 1, snapshot: { workflowId: executionWf.id, nodes: [{ id: nodeE.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: taskE1.id, name: "TE1", outcomes: [{ name: "DONE" }], crossFlowDependencies: [{ sourceWorkflowId: financeWf.id, sourceTaskPath: `${nodeF.id}.${taskF1.id}`, requiredOutcome: "DONE" }] }, { id: taskE2.id, name: "TE2", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }] }], gates: [] } as any, publishedBy: "A" }
     });
 
     const scope = { type: "job", id: "BIDIR" };

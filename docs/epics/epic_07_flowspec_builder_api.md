@@ -275,6 +275,7 @@ The following routes **MUST NOT** be implemented:
 | INV-007 | Outcome Immutability | No Outcome PATCH/DELETE on Flows |
 | INV-010 | Flow Bound to Version | No Workflow version PATCH on Flows |
 | INV-011 | Published Immutable | No PATCH on Published Workflows |
+| INV-026 | Structural Edits in DRAFT Only | Policy B: VALIDATED auto-revert to DRAFT |
 | INV-024 | Gate Key is Node-Level | Gates use sourceNodeId |
 
 ---

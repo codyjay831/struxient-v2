@@ -9,6 +9,7 @@ import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiSuccess, apiError, apiList } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
+import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +59,14 @@ export async function POST(request: NextRequest, { params }: Props) {
 
     await verifyTenantOwnership(workflow.companyId);
 
-    // INV-011: Published Immutable
-    if (workflow.status === WorkflowStatus.PUBLISHED) {
-      return apiError("PUBLISHED_IMMUTABLE", "Published workflows cannot be modified", null, 403);
+    // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
+    try {
+      await ensureDraftForStructuralEdit(workflowId);
+    } catch (err: any) {
+      if (err.code === "PUBLISHED_IMMUTABLE") {
+        return apiError("PUBLISHED_IMMUTABLE", err.message, null, 403);
+      }
+      throw err;
     }
 
     if (!sourceNodeId || !triggerOutcome || !targetWorkflowId) {

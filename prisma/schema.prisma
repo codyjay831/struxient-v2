@@ -423,7 +423,6 @@ model WorkflowTemplate {
   definition  Json     // WorkflowSnapshot structure
   tags        String[] // e.g., ["Residential", "Commercial"]
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
   @@unique([tradeKey, name, version])
   @@index([tradeKey, category])
