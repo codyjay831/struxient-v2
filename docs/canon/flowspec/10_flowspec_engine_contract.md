@@ -631,4 +631,50 @@ Cross-Flow Gating allows Tasks in one Flow to wait for Outcomes in another Flow 
 
 ---
 
+## 14. Post-Sale Job Provisioning v1.1
+
+### 14.1 Anchor Definitions
+
+1. **Anchor Flow**: The earliest instantiated Flow in a Flow Group (Execution context).
+   - **Selection Rule**: Earliest `createdAt` timestamp, tie-break by lexicographically smallest `id`.
+   - *Evidence: src/lib/flowspec/truth.ts:434–440*
+2. **Anchor Task**: The designated task within the Anchor Flow's Entry Node that receives identity metadata.
+   - **Selection Rule**: Lowest `displayOrder` within Entry Node(s), tie-break by lexicographically smallest `id`.
+   - *Evidence: src/lib/flowspec/instantiation/index.ts:27–39*
+3. **Anchor Identity**: Immutable structured evidence containing `customerId` written to the Anchor Task.
+   - **Strategy (B1)**: Authority lives in Anchor Identity evidence; FlowGroups have no identity columns in the schema.
+   - *Evidence: src/lib/flowspec/truth.ts:430–432*
+
+### 14.2 Provisioning Lifecycle
+
+1. **Atomic Start**: Execution starts (Sales ON/OFF) via atomic transaction creating FlowGroup, Anchor Flow, and writing Anchor Identity.
+   - **Guard**: Instantiation MUST fail if Anchor Task cannot accept required STRUCTURED schema.
+   - *Evidence: src/lib/flowspec/instantiation/index.ts:112–124, 172–183*
+2. **Provisioning Trigger**: Recording the `SALE_CLOSED` outcome on any task invokes the `provisionJob` hook.
+   - *Evidence: src/lib/flowspec/instantiation/fanout.ts:37–47*
+3. **Identity Verification**: Provisioning verifies `customerId` in `SALE_CLOSED` evidence against Anchor Identity.
+   - **Mismatch Policy**: Mismatch causes provisioning to fail and Flow to transition to `BLOCKED`.
+   - *Evidence: src/lib/flowspec/instantiation/fanout.ts:149–151*
+
+### 14.3 Duplicate Policy (C1)
+
+A Flow Group may contain at most one Flow per `workflowId`. Subsequent attempts to instantiate the same workflow into the same group are idempotent skips.
+- *Evidence: src/lib/flowspec/instantiation/index.ts:142–156*
+
+### 14.4 BLOCKED Execution Semantics
+
+**Definition**: A Flow is `BLOCKED` when a critical side-effect (like Job provisioning) fails.
+1. **Persistence**: The triggering Outcome (e.g., `SALE_CLOSED`) remains persisted in Truth.
+2. **Execution Halt**: A `BLOCKED` flow cannot start new tasks or record new outcomes.
+3. **Visibility**: `BLOCKED` state must be surfaced to users via UI banners but provides no mutation path on projection surfaces.
+- *Evidence: src/lib/flowspec/engine.ts:142–150, 269–277*
+
+### 14.5 Projection Drift Fuse
+
+Fields like `isBlocked` on FlowGroup list APIs are **projections** derived from child Flow statuses.
+- **Rule**: Derived fields MUST NOT be used as execution authority or sources of truth for mutation rules.
+- *Evidence: src/app/api/flowspec/flow-groups/route.ts:27–31*
+
+---
+
 **End of Document**
