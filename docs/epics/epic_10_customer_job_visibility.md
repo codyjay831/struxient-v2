@@ -13,7 +13,39 @@ While the **Truth Store** (FlowSpec) and **Execution Surface** (Work Station) ar
 
 ---
 
-## 2. In Scope (Planning Only)
+## 2. Execution Phases
+
+### Phase 1: Projection Read Models (Define Once)
+1. **Customer → Jobs Projection**: Aggregate metadata and link to Job list. Derived high-level status (Signals) only.
+2. **Job Card Metadata Projection**: Identity and context only (Who/Where/When).
+3. **Job Card Execution Timeline**: Chronological log of recorded Outcomes and Evidence from FlowSpec.
+
+### Phase 2: Read-Only Query Wiring
+- Customer → Jobs relationship wiring.
+- Job → FlowGroup linkage.
+- FlowGroup → Execution Timeline aggregation.
+- **Rule**: Any cache MUST be reconstructible entirely from FlowSpec Truth.
+
+### Phase 3: Job Creation & Binding (Hard Enforcement)
+**Mandatory Sequence**:
+1. Create Customer record.
+2. Select Workflow.
+3. Instantiate FlowGroup (creating Scope).
+4. Create Job record and bind `flowGroupId`.
+- **Constraint**: 1:1 relationship between Job and FlowGroup enforced.
+
+### Phase 4: Navigation Wiring
+- Customer → Job Card (Projection).
+- Job Card → Work Station (Execution).
+- **Forbidden**: Action UI or state-change controls on the Job Card.
+
+### Phase 5: Drift Guards & Tests
+- **Guard**: Prevent addition of `status`, `stage`, or `currentNode` columns to the Job table.
+- **Test**: Reconstruction Test — verify Job Card can be rebuilt from zero cache using only FlowSpec Truth.
+
+---
+
+## 3. In Scope (Planning Only)
 
 - Mapping Customer records to Job records.
 - Linking Job records to FlowGroup execution instances (via `scope`).
@@ -51,6 +83,14 @@ While the **Truth Store** (FlowSpec) and **Execution Surface** (Work Station) ar
 - [ ] Requirements for the Job Card to act as a read-only **Projection Surface** are established.
 - [ ] The distinction between metadata (Job name, address) and Truth (Task outcomes, Evidence) is maintained.
 - [ ] Navigation flows from Customer → Job → FlowGroup are logically mapped.
+
+---
+
+## 7. Implementation Constraints (EPIC-10)
+
+- **Derived Signals**: Any derived state (ACTIVE, COMPLETED, BLOCKED, etc.) displayed on projection surfaces must be computed from FlowSpec-owned status at request time.
+- **GET-Only Routes**: API routes for EPIC-10 projections are GET-only by contract to ensure side-effect-free reconstruction.
+- **Deterministic Ledgers**: All timeline projections must use deterministic sorting (timestamp → typeOrder → recordId).
 
 ---
 

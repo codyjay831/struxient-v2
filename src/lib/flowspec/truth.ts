@@ -380,7 +380,7 @@ export async function updateFlowStatus(
   status: "ACTIVE" | "COMPLETED" | "SUSPENDED" | "BLOCKED",
   completedAt?: Date
 ): Promise<void> {
-  return prisma.flow.update({
+  await prisma.flow.update({
     where: { id: flowId },
     data: {
       status,
@@ -424,4 +424,63 @@ export async function getFlowGroupOutcomes(
     taskId: ex.taskId,
     outcome: ex.outcome!,
   }));
+}
+
+/**
+ * Gets the Anchor Identity evidence for a Flow Group.
+ * B1: Stored on the Anchor Task of the Anchor Flow.
+ */
+export async function getAnchorIdentity(flowGroupId: string): Promise<{ customerId: string } | null> {
+  const anchorFlow = await prisma.flow.findFirst({
+    where: { flowGroupId },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    include: {
+      workflowVersion: true,
+    },
+  });
+
+  if (!anchorFlow) return null;
+
+  // Anchor Task is deterministic: lowest displayOrder, then lexicographical ID in the entry node.
+  const snapshot = anchorFlow.workflowVersion.snapshot as any;
+  const entryNodes = snapshot.nodes.filter((n: any) => n.isEntry);
+  const allEntryTasks = entryNodes.flatMap((n: any) => n.tasks);
+  
+  const anchorTask = [...allEntryTasks].sort((a, b) => {
+    if (a.displayOrder !== b.displayOrder) {
+      return a.displayOrder - b.displayOrder;
+    }
+    return a.id.localeCompare(b.id);
+  })[0];
+
+  if (!anchorTask) return null;
+
+  const evidence = await prisma.evidenceAttachment.findFirst({
+    where: {
+      flowId: anchorFlow.id,
+      taskId: anchorTask.id,
+      type: "STRUCTURED",
+    },
+    orderBy: { attachedAt: "asc" },
+  });
+
+  if (!evidence || !evidence.data) return null;
+  return (evidence.data as any).content || null;
+}
+
+/**
+ * Gets the Sale Details evidence for a Task.
+ */
+export async function getSaleDetails(flowId: string, taskId: string): Promise<{ customerId: string; serviceAddress: string; packageId?: string; contractValue?: number } | null> {
+  const evidence = await prisma.evidenceAttachment.findFirst({
+    where: {
+      flowId,
+      taskId,
+      type: "STRUCTURED",
+    },
+    orderBy: { attachedAt: "desc" },
+  });
+
+  if (!evidence || !evidence.data) return null;
+  return (evidence.data as any).content || null;
 }

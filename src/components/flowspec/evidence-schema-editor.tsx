@@ -74,7 +74,7 @@ function parseInitialSchema(schema: EvidenceSchema | null): EditorState {
     return { mode: "new" };
   }
 
-  const schemaObj = schema as Record<string, unknown>;
+   const schemaObj = schema as unknown as Record<string, unknown>;
 
   // Check if type exists and is recognized
   if (!("type" in schemaObj) || !isValidEvidenceType(schemaObj.type)) {

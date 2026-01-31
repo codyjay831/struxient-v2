@@ -40,10 +40,13 @@ async function createTestFlowGroup(companyId: string, scopeId: string) {
 
 async function cleanupTestData() {
   await prisma.job.deleteMany({});
-  await prisma.customer.deleteMany({});
+  await prisma.evidenceAttachment.deleteMany({});
+  await prisma.taskExecution.deleteMany({});
+  await prisma.nodeActivation.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.companyMember.deleteMany({});
+  await prisma.customer.deleteMany({});
   await prisma.company.deleteMany({});
 }
 
@@ -128,7 +131,22 @@ describe("Phase 3 / M1: Job & Customer Foundation API Tests", () => {
     expect(data.job.customer.name).toBe("Test Customer");
   });
 
-  it("should return 404 if job metadata is missing for a FlowGroup", async () => {
+  it("should return job: null if job metadata is missing for an existing FlowGroup", async () => {
+    const company = await createTestCompany("Test Company");
+    await createTestMember(company.id, USER_A);
+    (auth as any).mockResolvedValue({ userId: USER_A });
+
+    const fg = await createTestFlowGroup(company.id, "fg_no_job");
+
+    const req = new NextRequest(`http://localhost/api/jobs/by-flow-group/${fg.id}`);
+    const res = await jobByFgRoute.GET(req, { params: Promise.resolve({ flowGroupId: fg.id }) });
+    
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.job).toBe(null);
+  });
+
+  it("should return 404 if FlowGroup itself is missing", async () => {
     const company = await createTestCompany("Test Company");
     await createTestMember(company.id, USER_A);
     (auth as any).mockResolvedValue({ userId: USER_A });
@@ -138,7 +156,7 @@ describe("Phase 3 / M1: Job & Customer Foundation API Tests", () => {
     
     expect(res.status).toBe(404);
     const data = await res.json();
-    expect(data.error.code).toBe("JOB_NOT_FOUND");
+    expect(data.error.code).toBe("FLOW_GROUP_NOT_FOUND");
   });
 
   it("should enforce unique FlowGroup ↔ Job relationship", async () => {

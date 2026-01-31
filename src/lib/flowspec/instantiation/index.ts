@@ -5,8 +5,8 @@
  */
 
 import { prisma } from "../../prisma";
-import { WorkflowStatus, FlowStatus } from "@prisma/client";
-import type { Scope, WorkflowSnapshot, FlowWithRelations } from "../types";
+import { WorkflowStatus, FlowStatus, EvidenceType } from "@prisma/client";
+import type { Scope, WorkflowSnapshot, SnapshotNode, SnapshotTask } from "../types";
 import { getOrCreateFlowGroup, verifyFlowGroupScopeMatch } from "./scope";
 import { activateEntryNodes } from "../engine";
 
@@ -21,6 +21,24 @@ export interface CreateFlowResult {
 }
 
 /**
+ * Resolves the deterministic Anchor Task within the entry nodes.
+ * Rule: Lowest displayOrder among all tasks in entry nodes, then lexicographical ID.
+ */
+function findAnchorTask(snapshot: WorkflowSnapshot): SnapshotTask | undefined {
+  const entryNodes = snapshot.nodes.filter(n => n.isEntry);
+  const allEntryTasks = entryNodes.flatMap(n => n.tasks);
+  
+  if (allEntryTasks.length === 0) return undefined;
+  
+  return [...allEntryTasks].sort((a, b) => {
+    if (a.displayOrder !== b.displayOrder) {
+      return a.displayOrder - b.displayOrder;
+    }
+    return a.id.localeCompare(b.id);
+  })[0];
+}
+
+/**
  * Creates a new Flow instance from a Published Workflow.
  *
  * INV-010: Flow bound to version at creation time.
@@ -28,18 +46,29 @@ export interface CreateFlowResult {
  *
  * @param workflowId - The ID of the workflow to instantiate
  * @param scope - The unit of work identifier
- * @param flowGroupId - Optional flowGroupId hint
  * @param companyId - The tenant ID
+ * @param options - Optional flowGroupId hint and initial evidence (Anchor Identity)
+ * @param tx - Optional Prisma transaction client
  * @returns CreateFlowResult
  */
 export async function createFlow(
   workflowId: string,
   scope: Scope,
   companyId: string,
-  flowGroupId?: string
+  options: {
+    flowGroupId?: string;
+    initialEvidence?: {
+      data: unknown;
+      attachedBy: string;
+    };
+  } = {},
+  tx?: any
 ): Promise<CreateFlowResult> {
+  const client = tx || prisma;
+  const { flowGroupId, initialEvidence } = options;
+
   // 1. Load Workflow and check status
-  const workflow = await prisma.workflow.findUnique({
+  const workflow = await client.workflow.findUnique({
     where: { id: workflowId },
     include: {
       versions: {
@@ -77,9 +106,26 @@ export async function createFlow(
     };
   }
 
-  // 2. Manage Flow Group membership via Scope
+  const snapshot = latestVersion.snapshot as unknown as WorkflowSnapshot;
+
+  // 2. Entry Evidence Schema Guard (if initialEvidence provided)
+  let anchorTask: SnapshotTask | undefined;
+  if (initialEvidence) {
+    anchorTask = findAnchorTask(snapshot);
+    if (!anchorTask) {
+      return {
+        success: false,
+        error: {
+          code: "ANCHOR_TASK_MISSING",
+          message: "Workflow entry node has no tasks to receive Anchor Identity",
+        },
+      };
+    }
+  }
+
+  // 3. Manage Flow Group membership via Scope
   if (flowGroupId) {
-    const isMatch = await verifyFlowGroupScopeMatch(flowGroupId, companyId, scope);
+    const isMatch = await verifyFlowGroupScopeMatch(flowGroupId, companyId, scope, client);
     if (!isMatch) {
       return {
         success: false,
@@ -91,21 +137,56 @@ export async function createFlow(
     }
   }
 
-  const flowGroup = await getOrCreateFlowGroup(companyId, scope);
+  const flowGroup = await getOrCreateFlowGroup(companyId, scope, client);
 
-  // 3. Create Flow instance
-  // INV-010: Permanently bind to this version
-  const flow = await prisma.flow.create({
-    data: {
-      workflowId: workflow.id,
-      workflowVersionId: latestVersion.id,
+  // 4. Duplicate Policy C1: One Flow per WorkflowId per FlowGroup (skip if any flow exists)
+  const existingFlow = await client.flow.findFirst({
+    where: {
       flowGroupId: flowGroup.id,
-      status: FlowStatus.ACTIVE,
+      workflowId: workflow.id,
     },
   });
 
-  // 4. Activate Entry Node(s)
-  const snapshot = latestVersion.snapshot as unknown as WorkflowSnapshot;
+  if (existingFlow) {
+    return {
+      success: true, // Idempotent success
+      flowId: existingFlow.id,
+      flowGroupId: flowGroup.id,
+    };
+  }
+
+  // 5. Create Flow instance and initial evidence atomically
+  // INV-010: Permanently bind to this version
+  
+  // Internal helper for flow creation
+  const createFlowRecord = async (t: any) => {
+    const flow = await t.flow.create({
+      data: {
+        workflowId: workflow.id,
+        workflowVersionId: latestVersion.id,
+        flowGroupId: flowGroup.id,
+        status: FlowStatus.ACTIVE,
+      },
+    });
+
+    // Write Anchor Identity evidence if provided
+    if (initialEvidence && anchorTask) {
+      await t.evidenceAttachment.create({
+        data: {
+          flowId: flow.id,
+          taskId: anchorTask.id,
+          type: EvidenceType.STRUCTURED,
+          data: { content: initialEvidence.data } as any,
+          attachedBy: initialEvidence.attachedBy,
+        },
+      });
+    }
+    return flow;
+  };
+
+  const flow = tx ? await createFlowRecord(tx) : await prisma.$transaction(createFlowRecord);
+
+  // 5. Activate Entry Node(s)
   await activateEntryNodes(flow.id, snapshot);
 
   return {

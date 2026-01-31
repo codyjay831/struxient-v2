@@ -139,6 +139,16 @@ export async function startTask(
     };
   }
 
+  if (flow.status === FlowStatus.BLOCKED) {
+    return {
+      success: false,
+      error: {
+        code: "FLOW_BLOCKED",
+        message: `Flow ${flowId} is BLOCKED and cannot start new tasks. Contact admin.`,
+      },
+    };
+  }
+
   const snapshot = getWorkflowSnapshot(flow);
 
   // Find the Task in the snapshot
@@ -252,6 +262,16 @@ export async function recordOutcome(
       error: {
         code: "FLOW_NOT_FOUND",
         message: `Flow ${flowId} not found`,
+      },
+    };
+  }
+
+  if (flow.status === FlowStatus.BLOCKED) {
+    return {
+      success: false,
+      error: {
+        code: "FLOW_BLOCKED",
+        message: `Flow ${flowId} is BLOCKED and cannot accept new outcomes. Contact admin.`,
       },
     };
   }

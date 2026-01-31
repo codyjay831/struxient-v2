@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, User, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 interface Customer {
   id: string;
@@ -149,9 +150,11 @@ export default function CustomersPage() {
                           <p className="text-xs text-muted-foreground">Created</p>
                           <p className="text-sm font-medium">{new Date(customer.createdAt).toLocaleDateString()}</p>
                         </div>
-                        <Button variant="ghost" size="icon" disabled>
-                          <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </Button>
+                        <Link href={`/customers/${customer.id}`}>
+                          <Button variant="ghost" size="icon">
+                            <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   ))}

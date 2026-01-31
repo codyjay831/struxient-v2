@@ -13,12 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, PlusCircle, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface EvidenceFormProps {
   flowId: string;
   taskId: string;
-  evidenceSchema: any | null;
+  evidenceSchema: { type?: string; description?: string } | null;
   evidenceRequired: boolean;
   onAttached: () => void;
 }
@@ -45,10 +46,11 @@ export function EvidenceForm({
   onAttached,
 }: EvidenceFormProps) {
   // Determine initial type from schema
-  const typeFromSchema = evidenceSchema?.type?.toUpperCase() || "TEXT";
+  const schema = evidenceSchema as { type?: string; description?: string } | null;
+  const typeFromSchema = schema?.type?.toUpperCase() || "TEXT";
   
   const [draft, setDraft] = useState<EvidenceDraft>(() => ({
-    type: typeFromSchema as any,
+    type: (typeFromSchema as any) === "STRUCTURED" ? "STRUCTURED" : (typeFromSchema as any) === "FILE" ? "FILE" : "TEXT",
     textValue: "",
     structuredJsonText: "",
     fileName: "",
@@ -171,8 +173,8 @@ export function EvidenceForm({
             className="min-h-[100px] text-sm"
             disabled={state === "submitting" || state === "success"}
           />
-          {evidenceSchema?.description && (
-            <p className="text-[10px] text-muted-foreground italic">{evidenceSchema.description}</p>
+          {schema?.description && (
+            <p className="text-[10px] text-muted-foreground italic">{schema.description}</p>
           )}
         </div>
       )}
@@ -189,7 +191,7 @@ export function EvidenceForm({
             disabled={state === "submitting" || state === "success"}
           />
           <p className="text-[10px] text-muted-foreground">
-            {evidenceSchema?.description || "Enter valid JSON object."}
+            {schema?.description || "Enter valid JSON object."}
           </p>
         </div>
       )}

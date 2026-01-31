@@ -16,14 +16,17 @@ import type { FlowGroup } from "@prisma/client";
  *
  * @param companyId - The tenant ID
  * @param scope - The scope identifier (type and id)
+ * @param tx - Optional Prisma transaction client
  * @returns The FlowGroup record
  */
 export async function getOrCreateFlowGroup(
   companyId: string,
-  scope: Scope
+  scope: Scope,
+  tx?: any
 ): Promise<FlowGroup> {
+  const client = tx || prisma;
   // Try to find existing Flow Group for this scope
-  const existing = await prisma.flowGroup.findUnique({
+  const existing = await client.flowGroup.findUnique({
     where: {
       companyId_scopeType_scopeId: {
         companyId,
@@ -38,7 +41,7 @@ export async function getOrCreateFlowGroup(
   }
 
   // Create new Flow Group
-  return prisma.flowGroup.create({
+  return client.flowGroup.create({
     data: {
       companyId,
       scopeType: scope.type,
@@ -54,14 +57,17 @@ export async function getOrCreateFlowGroup(
  * @param flowGroupId - The provided flowGroupId hint
  * @param companyId - The tenant ID
  * @param scope - The scope identifier
+ * @param tx - Optional Prisma transaction client
  * @returns True if they match or if no Flow Group exists for scope yet
  */
 export async function verifyFlowGroupScopeMatch(
   flowGroupId: string,
   companyId: string,
-  scope: Scope
+  scope: Scope,
+  tx?: any
 ): Promise<boolean> {
-  const existing = await prisma.flowGroup.findUnique({
+  const client = tx || prisma;
+  const existing = await client.flowGroup.findUnique({
     where: {
       companyId_scopeType_scopeId: {
         companyId,
@@ -72,17 +78,11 @@ export async function verifyFlowGroupScopeMatch(
   });
 
   if (!existing) {
-    // If no flow group exists for scope yet, any hint is "valid" in terms
-    // of not conflicting with existing truth, but we will create a new
-    // group anyway. However, if a flowGroupId is provided but doesn't exist,
-    // or belongs to another scope, that's a problem.
-    
-    const hintGroup = await prisma.flowGroup.findUnique({
+    const hintGroup = await client.flowGroup.findUnique({
       where: { id: flowGroupId }
     });
     
     if (hintGroup) {
-      // Hint exists but belongs to a different scope (since no group exists for THIS scope)
       return false;
     }
     

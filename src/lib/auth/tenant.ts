@@ -24,6 +24,7 @@ export class TenantIsolationError extends Error {
  */
 export interface TenantContext {
   companyId: string;
+  userId: string;
   authority: AuthorityContext;
 }
 
@@ -57,6 +58,7 @@ export async function verifyTenantOwnership(companyId: string): Promise<TenantCo
 
   return {
     companyId: member.companyId,
+    userId: session.userId,
     authority: buildAuthorityContext(member),
   };
 }
@@ -104,6 +106,7 @@ export async function getActorTenantContext(): Promise<TenantContext> {
 
   return {
     companyId: member.companyId,
+    userId: session.userId,
     authority: buildAuthorityContext(member),
   };
 }

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getActorTenantContext, tenantErrorResponse } from "@/lib/auth/tenant";
-import { apiSuccess, apiError } from "@/lib/api-utils";
+import { apiSuccess, apiError, apiList } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 

@@ -29,6 +29,7 @@ export interface ActionableTask {
   instructions: string | null;
   allowedOutcomes: string[];
   evidenceRequired: boolean;
+  evidenceSchema: { type?: string; description?: string } | null;
   domainHint: "execution" | "finance" | "sales";
   startedAt: string | null;
 }
@@ -121,9 +122,13 @@ export function TaskFeed({ onSelectTask, jobId }: TaskFeedProps) {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-muted-foreground">No actionable tasks right now.</p>
+            <p className="text-muted-foreground">
+              {jobId ? "No actionable tasks for this job right now." : "No actionable tasks right now."}
+            </p>
             <p className="text-sm text-muted-foreground mt-2">
-              Tasks will appear here when FlowSpec surfaces work for you.
+              {jobId 
+                ? "This job might be waiting on a pre-condition or manual milestone."
+                : "Tasks will appear here when FlowSpec surfaces work for you."}
             </p>
           </div>
         </CardContent>
@@ -184,7 +189,7 @@ export function TaskFeed({ onSelectTask, jobId }: TaskFeedProps) {
                       onClick={(e) => handleViewJob(e, task.flowGroupId)}
                     >
                       <Briefcase className="mr-1 h-3 w-3" />
-                      View Job
+                      Focus Job
                     </Button>
                   )}
                 </div>

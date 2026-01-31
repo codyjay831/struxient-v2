@@ -24,6 +24,8 @@ import type {
   NodeActivation as PrismaNodeActivation,
   TaskExecution as PrismaTaskExecution,
   EvidenceAttachment as PrismaEvidenceAttachment,
+  CrossFlowDependency as PrismaCrossFlowDependency,
+  FanOutRule as PrismaFanOutRule,
 } from "@prisma/client";
 import {
   WorkflowStatus,
@@ -46,6 +48,7 @@ export { WorkflowStatus, FlowStatus, CompletionRule, EvidenceType };
 export interface WorkflowWithRelations extends PrismaWorkflow {
   nodes: NodeWithRelations[];
   gates: PrismaGate[];
+  fanOutRules: PrismaFanOutRule[];
 }
 
 /**
@@ -62,6 +65,7 @@ export interface NodeWithRelations extends PrismaNode {
  */
 export interface TaskWithRelations extends PrismaTask {
   outcomes: PrismaOutcome[];
+  crossFlowDependencies: PrismaCrossFlowDependency[];
 }
 
 /**
@@ -256,6 +260,29 @@ export interface ActionableTask {
   iteration: number;
   domainHint: "execution" | "finance" | "sales";
   startedAt: Date | null;
+}
+
+// =============================================================================
+// DOMAIN-SPECIFIC STRUCTURED EVIDENCE TYPES
+// =============================================================================
+
+/**
+ * Anchor Identity - captured at the start of a FlowGroup.
+ * B1 strategy: stored as structured evidence on the Anchor Task.
+ */
+export interface AnchorIdentity {
+  customerId: string;
+}
+
+/**
+ * Sale Details - captured when a sale is closed (SALE_CLOSED).
+ * Used for Job provisioning and Anchor Identity verification.
+ */
+export interface SaleDetails {
+  customerId: string;
+  serviceAddress: string;
+  packageId?: string;
+  contractValue?: number;
 }
 
 // =============================================================================

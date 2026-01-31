@@ -4,7 +4,8 @@
  * Canon Source: 10_flowspec_engine_contract.md §7
  */
 
-import type { WorkflowStatus, WorkflowWithRelations, ValidationResult } from "../types";
+import type { WorkflowStatus, WorkflowWithRelations } from "../types";
+import type { ValidationResult } from "../validation/types";
 
 export interface LifecycleTransitionResult {
   success: boolean;
