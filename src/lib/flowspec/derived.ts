@@ -413,7 +413,13 @@ export function computeActionableTasks(
     }
   }
 
-  return actionableTasks;
+  // P3-T1: Canonical Sort (Fix #1)
+  // 1) flowId ASC, 2) taskId ASC, 3) iteration ASC (tie-breaker)
+  return actionableTasks.sort((a, b) => {
+    if (a.flowId !== b.flowId) return a.flowId.localeCompare(b.flowId);
+    if (a.taskId !== b.taskId) return a.taskId.localeCompare(b.taskId);
+    return (a.iteration ?? 0) - (b.iteration ?? 0);
+  });
 }
 
 // =============================================================================
