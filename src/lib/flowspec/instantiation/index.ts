@@ -157,9 +157,10 @@ export async function createFlow(
 
   // 5. Create Flow instance and initial evidence atomically
   // INV-010: Permanently bind to this version
+  const now = new Date();
   
   // Internal helper for flow creation
-  const createFlowRecord = async (t: any) => {
+  const executeInstantiation = async (t: any) => {
     const flow = await t.flow.create({
       data: {
         workflowId: workflow.id,
@@ -178,16 +179,18 @@ export async function createFlow(
           type: EvidenceType.STRUCTURED,
           data: { content: initialEvidence.data } as any,
           attachedBy: initialEvidence.attachedBy,
+          attachedAt: now,
         },
       });
     }
+
+    // 5. Activate Entry Node(s) - INSIDE transaction for atomicity
+    await activateEntryNodes(flow.id, snapshot, t, now);
+
     return flow;
   };
 
-  const flow = tx ? await createFlowRecord(tx) : await prisma.$transaction(createFlowRecord);
-
-  // 5. Activate Entry Node(s)
-  await activateEntryNodes(flow.id, snapshot);
+  const flow = tx ? await executeInstantiation(tx) : await prisma.$transaction(executeInstantiation);
 
   return {
     success: true,

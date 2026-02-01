@@ -19,7 +19,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { NodeActivation, TaskExecution, EvidenceAttachment } from "@prisma/client";
+import type { NodeActivation, TaskExecution, EvidenceAttachment, Prisma } from "@prisma/client";
 import type {
   NodeActivationEvent,
   TaskStartEvent,
@@ -41,19 +41,24 @@ import { EvidenceType } from "./types";
  * @param flowId - The Flow instance ID
  * @param nodeId - The Node being activated
  * @param iteration - Iteration count for cycle tracking (default 1)
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use (for atomic units)
  * @returns The created NodeActivation record
  */
 export async function recordNodeActivation(
   flowId: string,
   nodeId: string,
-  iteration: number = 1
+  iteration: number = 1,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<NodeActivation> {
-  const nodeActivation = await prisma.nodeActivation.create({
+  const client = tx || prisma;
+  const nodeActivation = await client.nodeActivation.create({
     data: {
       flowId,
       nodeId,
       iteration,
-      activatedAt: new Date(),
+      activatedAt: now || new Date(),
     },
   });
 
@@ -69,7 +74,7 @@ export async function recordNodeActivation(
 export async function getNodeActivations(flowId: string): Promise<NodeActivation[]> {
   return prisma.nodeActivation.findMany({
     where: { flowId },
-    orderBy: { activatedAt: "asc" },
+    orderBy: [{ activatedAt: "asc" }, { id: "asc" }],
   });
 }
 
@@ -79,13 +84,16 @@ export async function getNodeActivations(flowId: string): Promise<NodeActivation
  *
  * @param flowId - The Flow instance ID
  * @param nodeId - The Node ID
+ * @param tx - Optional Prisma transaction client
  * @returns The most recent NodeActivation or null
  */
 export async function getLatestNodeActivation(
   flowId: string,
-  nodeId: string
+  nodeId: string,
+  tx?: Prisma.TransactionClient
 ): Promise<NodeActivation | null> {
-  return prisma.nodeActivation.findFirst({
+  const client = tx || prisma;
+  return client.nodeActivation.findFirst({
     where: { flowId, nodeId },
     orderBy: { iteration: "desc" },
   });
@@ -105,6 +113,8 @@ export async function getLatestNodeActivation(
  * @param userId - The user starting the Task
  * @param nodeActivationId - Optional link to the NodeActivation that made this Task actionable
  * @param iteration - Iteration count for cycle tracking (default 1)
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns The created/updated TaskExecution record
  */
 export async function recordTaskStart(
@@ -112,10 +122,14 @@ export async function recordTaskStart(
   taskId: string,
   userId: string,
   nodeActivationId?: string,
-  iteration: number = 1
+  iteration: number = 1,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<TaskExecution> {
+  const client = tx || prisma;
+  
   // Check if there's already a TaskExecution for this iteration
-  const existing = await prisma.taskExecution.findFirst({
+  const existing = await client.taskExecution.findFirst({
     where: {
       flowId,
       taskId,
@@ -130,13 +144,13 @@ export async function recordTaskStart(
   }
 
   // Create new TaskExecution record
-  const taskExecution = await prisma.taskExecution.create({
+  const taskExecution = await client.taskExecution.create({
     data: {
       flowId,
       taskId,
       nodeActivationId,
       iteration,
-      startedAt: new Date(),
+      startedAt: now || new Date(),
       startedBy: userId,
     },
   });
@@ -153,6 +167,8 @@ export async function recordTaskStart(
  * @param outcome - The outcome value (must be in Task's allowed outcomes)
  * @param userId - The user recording the outcome
  * @param iteration - Iteration count for cycle tracking (default 1)
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns The updated TaskExecution record or error
  */
 export async function recordOutcome(
@@ -160,10 +176,14 @@ export async function recordOutcome(
   taskId: string,
   outcome: string,
   userId: string,
-  iteration: number = 1
+  iteration: number = 1,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<{ taskExecution?: TaskExecution; error?: EngineError }> {
+  const client = tx || prisma;
+
   // Find the TaskExecution for this iteration
-  const taskExecution = await prisma.taskExecution.findFirst({
+  const taskExecution = await client.taskExecution.findFirst({
     where: {
       flowId,
       taskId,
@@ -197,11 +217,11 @@ export async function recordOutcome(
   // Record the outcome
   // NOTE: We use a raw update here because TaskExecution has no @updatedAt
   // to maintain Truth immutability semantics
-  const updated = await prisma.taskExecution.update({
+  const updated = await client.taskExecution.update({
     where: { id: taskExecution.id },
     data: {
       outcome,
-      outcomeAt: new Date(),
+      outcomeAt: now || new Date(),
       outcomeBy: userId,
     },
   });
@@ -213,12 +233,17 @@ export async function recordOutcome(
  * Gets all TaskExecution records for a Flow.
  *
  * @param flowId - The Flow instance ID
+ * @param tx - Optional Prisma transaction client
  * @returns Array of TaskExecution records
  */
-export async function getTaskExecutions(flowId: string): Promise<TaskExecution[]> {
-  return prisma.taskExecution.findMany({
+export async function getTaskExecutions(
+  flowId: string,
+  tx?: Prisma.TransactionClient
+): Promise<TaskExecution[]> {
+  const client = tx || prisma;
+  return client.taskExecution.findMany({
     where: { flowId },
-    orderBy: [{ taskId: "asc" }, { iteration: "asc" }],
+    orderBy: [{ taskId: "asc" }, { iteration: "asc" }, { id: "asc" }],
   });
 }
 
@@ -258,7 +283,7 @@ export async function getTaskExecutionHistory(
 ): Promise<TaskExecution[]> {
   return prisma.taskExecution.findMany({
     where: { flowId, taskId },
-    orderBy: { iteration: "asc" },
+    orderBy: [{ iteration: "asc" }, { id: "asc" }],
   });
 }
 
@@ -278,6 +303,8 @@ export async function getTaskExecutionHistory(
  * @param userId - The user attaching the evidence
  * @param taskExecutionId - Optional link to specific TaskExecution
  * @param idempotencyKey - Optional key to prevent duplicate attachments
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns The created EvidenceAttachment record or error
  */
 export async function attachEvidence(
@@ -287,11 +314,15 @@ export async function attachEvidence(
   data: unknown,
   userId: string,
   taskExecutionId?: string,
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<{ evidenceAttachment?: EvidenceAttachment; error?: EngineError }> {
+  const client = tx || prisma;
+
   // Check for duplicate if idempotency key provided
   if (idempotencyKey) {
-    const existing = await prisma.evidenceAttachment.findUnique({
+    const existing = await client.evidenceAttachment.findUnique({
       where: { idempotencyKey },
     });
 
@@ -302,7 +333,7 @@ export async function attachEvidence(
   }
 
   try {
-    const evidenceAttachment = await prisma.evidenceAttachment.create({
+    const evidenceAttachment = await client.evidenceAttachment.create({
       data: {
         flowId,
         taskId,
@@ -311,7 +342,7 @@ export async function attachEvidence(
         data: data as object,
         attachedBy: userId,
         idempotencyKey,
-        attachedAt: new Date(),
+        attachedAt: now || new Date(),
       },
     });
 
@@ -322,7 +353,7 @@ export async function attachEvidence(
       error instanceof Error &&
       error.message.includes("Unique constraint failed")
     ) {
-      const existing = await prisma.evidenceAttachment.findUnique({
+      const existing = await client.evidenceAttachment.findUnique({
         where: { idempotencyKey: idempotencyKey! },
       });
       if (existing) {
@@ -346,7 +377,7 @@ export async function getTaskEvidence(
 ): Promise<EvidenceAttachment[]> {
   return prisma.evidenceAttachment.findMany({
     where: { flowId, taskId },
-    orderBy: { attachedAt: "asc" },
+    orderBy: [{ attachedAt: "asc" }, { id: "asc" }],
   });
 }
 
@@ -359,7 +390,7 @@ export async function getTaskEvidence(
 export async function getFlowEvidence(flowId: string): Promise<EvidenceAttachment[]> {
   return prisma.evidenceAttachment.findMany({
     where: { flowId },
-    orderBy: { attachedAt: "asc" },
+    orderBy: [{ attachedAt: "asc" }, { id: "asc" }],
   });
 }
 
@@ -374,17 +405,22 @@ export async function getFlowEvidence(flowId: string): Promise<EvidenceAttachmen
  * @param flowId - The Flow instance ID
  * @param status - The new FlowStatus
  * @param completedAt - Optional completion timestamp
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional current timestamp
  */
 export async function updateFlowStatus(
   flowId: string,
   status: "ACTIVE" | "COMPLETED" | "SUSPENDED" | "BLOCKED",
-  completedAt?: Date
+  completedAt?: Date,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<void> {
-  await prisma.flow.update({
+  const client = tx || prisma;
+  await client.flow.update({
     where: { id: flowId },
     data: {
       status,
-      completedAt: completedAt ?? (status === "COMPLETED" ? new Date() : undefined),
+      completedAt: completedAt ?? (status === "COMPLETED" ? (now || new Date()) : undefined),
     },
   });
 }
@@ -478,7 +514,7 @@ export async function getSaleDetails(flowId: string, taskId: string): Promise<{ 
       taskId,
       type: "STRUCTURED",
     },
-    orderBy: { attachedAt: "desc" },
+    orderBy: [{ attachedAt: "desc" }, { id: "desc" }],
   });
 
   if (!evidence || !evidence.data) return null;

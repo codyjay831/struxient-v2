@@ -238,8 +238,9 @@ export async function startTask(
  * This function:
  * 1. Validates the Outcome is allowed
  * 2. Checks evidence requirements (if any)
- * 3. Records the Outcome in Truth
- * 4. Evaluates Gates and activates target Nodes
+ * 3. Records the Outcome in Truth (inside $transaction)
+ * 4. Evaluates Gates and activates target Nodes (inside $transaction)
+ * 5. Executes Fan-Out (outside $transaction)
  *
  * @param flowId - The Flow ID
  * @param taskId - The Task ID
@@ -253,49 +254,35 @@ export async function recordOutcome(
   outcome: string,
   userId: string
 ): Promise<RecordOutcomeResult> {
-  // Get Flow with all execution data
+  // 1. Pre-transaction validation
   const flow = await getFlow(flowId);
-
   if (!flow) {
     return {
       success: false,
-      error: {
-        code: "FLOW_NOT_FOUND",
-        message: `Flow ${flowId} not found`,
-      },
+      error: { code: "FLOW_NOT_FOUND", message: `Flow ${flowId} not found` },
     };
   }
 
   if (flow.status === FlowStatus.BLOCKED) {
     return {
       success: false,
-      error: {
-        code: "FLOW_BLOCKED",
-        message: `Flow ${flowId} is BLOCKED and cannot accept new outcomes. Contact admin.`,
-      },
+      error: { code: "FLOW_BLOCKED", message: `Flow ${flowId} is BLOCKED. Contact admin.` },
     };
   }
 
   const snapshot = getWorkflowSnapshot(flow);
-
-  // Find the Task in the snapshot
   const { node, task } = findTaskInSnapshot(snapshot, taskId);
 
   if (!task || !node) {
     return {
       success: false,
-      error: {
-        code: "TASK_NOT_FOUND",
-        message: `Task ${taskId} not found in workflow`,
-      },
+      error: { code: "TASK_NOT_FOUND", message: `Task ${taskId} not found in workflow` },
     };
   }
 
-  // Get current iteration for the Node
+  // 2. Business logic validation
   const latestActivation = await getLatestNodeActivation(flowId, node.id);
   const iteration = latestActivation?.iteration ?? 1;
-
-  // Check if Task has been started
   const taskExecution = flow.taskExecutions.find(
     (te) => te.taskId === taskId && te.iteration === iteration
   );
@@ -303,95 +290,102 @@ export async function recordOutcome(
   if (!taskExecution?.startedAt) {
     return {
       success: false,
-      error: {
-        code: "TASK_NOT_STARTED",
-        message: `Task ${taskId} has not been started. Outcomes can only be recorded on started Tasks.`,
-      },
+      error: { code: "TASK_NOT_STARTED", message: `Task ${taskId} has not been started.` },
     };
   }
 
-  // INV-002: Validate outcome is in allowed outcomes
   const allowedOutcomes = task.outcomes.map((o) => o.name);
   if (!isValidOutcome(outcome, allowedOutcomes)) {
     return {
       success: false,
-      error: {
-        code: "INVALID_OUTCOME",
-        message: `Outcome "${outcome}" is not valid for Task ${taskId}`,
-        details: {
-          allowedOutcomes,
-          attemptedOutcome: outcome,
-        },
-      },
+      error: { code: "INVALID_OUTCOME", message: `Outcome "${outcome}" is not valid` },
     };
   }
 
-  // Check evidence requirements (INV-016: Evidence at Recording)
   if (task.evidenceRequired) {
     const evidence = await getTaskEvidence(flowId, taskId);
     const requirementResult = checkEvidenceRequirements(task, evidence);
-    
     if (!requirementResult.satisfied) {
       return {
         success: false,
-        error: {
-          code: "EVIDENCE_REQUIRED",
-          message: requirementResult.error || `Task ${taskId} requires evidence before an Outcome can be recorded`,
-          details: {
-            taskId,
-            evidenceSchema: task.evidenceSchema,
-          },
-        },
+        error: { code: "EVIDENCE_REQUIRED", message: requirementResult.error || "Evidence required" },
       };
     }
   }
 
-  // Record the Outcome in Truth (INV-007: Immutability enforced in truth.ts)
-  const result = await truthRecordOutcome(flowId, taskId, outcome, userId, iteration);
+  // 3. Atomic Unit of Progress
+  const now = new Date(); // Tighten-up C: Single timestamp for atomic unit
+  
+  let resultRecord: TaskExecution | undefined;
+  let gateResults: GateEvaluationResult[] = [];
+  let fanOutIntent: {
+    nodeId: string;
+    outcome: string;
+    scope: { type: string; id: string };
+    companyId: string;
+    flowGroupId: string;
+  } | null = null;
 
-  if (result.error) {
-    return {
-      success: false,
-      error: result.error,
-    };
+  try {
+    await prisma.$transaction(async (tx) => {
+      // a. Record Outcome (Tighten-up B: propagate tx)
+      const outcomeResult = await truthRecordOutcome(flowId, taskId, outcome, userId, iteration, tx, now);
+      if (outcomeResult.error) throw new Error(JSON.stringify(outcomeResult.error));
+      resultRecord = outcomeResult.taskExecution;
+
+      // b. Routing (Node Activations)
+      gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now);
+
+      // c. Check if Node completed for Fan-Out intent
+      const updatedExecutions = await getTaskExecutions(flowId, tx);
+      const nodeIsComplete = computeNodeComplete(node, updatedExecutions, iteration);
+      if (nodeIsComplete) {
+        fanOutIntent = {
+          nodeId: node.id,
+          outcome,
+          scope: { type: flow.flowGroup.scopeType, id: flow.flowGroup.scopeId },
+          companyId: flow.workflow.companyId,
+          flowGroupId: flow.flowGroupId
+        };
+      }
+
+      // d. Flow Completion check
+      const currentActivations = await tx.nodeActivation.findMany({ where: { flowId } });
+      const isComplete = computeFlowComplete(snapshot, currentActivations, updatedExecutions);
+      if (isComplete && flow.status !== FlowStatus.BLOCKED) {
+        await updateFlowStatus(flowId, FlowStatus.COMPLETED, undefined, tx, now);
+      }
+    });
+  } catch (err) {
+    // If it's one of our thrown errors, return it
+    try {
+      const parsed = JSON.parse((err as Error).message);
+      if (parsed.code) return { success: false, error: parsed };
+    } catch { /* ignore */ }
+    throw err;
   }
 
-  // Evaluate Gates and activate target Nodes
-  const gateResults = await processGateRouting(flow, snapshot, node, iteration);
-
-  // Execute Fan-Out (EPIC-03)
-  // We re-fetch executions to ensure we have the one we just recorded
-  const updatedExecutions = await getTaskExecutions(flowId);
-  const nodeIsComplete = computeNodeComplete(node, updatedExecutions, iteration);
-  if (nodeIsComplete) {
-    const scope = { type: flow.flowGroup.scopeType, id: flow.flowGroup.scopeId };
-    await executeFanOut(
-      flowId,
-      node.id,
-      outcome, // Use the outcome that completed the node
-      scope,
-      flow.workflow.companyId,
-      flow.flowGroupId
-    );
-  }
-
-  // Check if Flow is complete
-  const updatedFlow = await getFlow(flowId);
-  if (updatedFlow && updatedFlow.status !== FlowStatus.BLOCKED) {
-    const isComplete = computeFlowComplete(
-      snapshot,
-      updatedFlow.nodeActivations,
-      updatedFlow.taskExecutions
-    );
-
-    if (isComplete) {
-      await updateFlowStatus(flowId, FlowStatus.COMPLETED);
+  // 4. Side Effects (OUTSIDE_TX)
+  // Tighten-up A: Fanout failure MUST NOT roll back core truth.
+  if (fanOutIntent) {
+    try {
+      await executeFanOut(
+        flowId,
+        fanOutIntent.nodeId,
+        fanOutIntent.outcome,
+        fanOutIntent.scope,
+        fanOutIntent.companyId,
+        fanOutIntent.flowGroupId
+      );
+    } catch (err) {
+      console.error("[FlowSpec] Fan-out failure (non-blocking for core truth):", err);
+      // Fanout is best-effort and must be retried via separate mechanism
     }
   }
 
   return {
     success: true,
-    taskExecutionId: result.taskExecution!.id,
+    taskExecutionId: resultRecord!.id,
     gateResults,
   };
 }
@@ -572,44 +566,21 @@ export async function isTaskActionable(
  * @param flowId - The Flow ID
  * @param nodeId - The Node ID
  * @param iteration - Optional iteration (for cycles, defaults to calculated)
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns NodeActivationResult
  */
 export async function activateNode(
   flowId: string,
   nodeId: string,
-  iteration?: number
+  iteration?: number,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<NodeActivationResult> {
-  // Get Flow
-  const flow = await getFlow(flowId);
-
-  if (!flow) {
-    return {
-      success: false,
-      error: {
-        code: "FLOW_NOT_FOUND",
-        message: `Flow ${flowId} not found`,
-      },
-    };
-  }
-
-  const snapshot = getWorkflowSnapshot(flow);
-
-  // Verify Node exists in workflow
-  const node = snapshot.nodes.find((n) => n.id === nodeId);
-  if (!node) {
-    return {
-      success: false,
-      error: {
-        code: "NODE_NOT_FOUND",
-        message: `Node ${nodeId} not found in workflow`,
-      },
-    };
-  }
-
   // Calculate iteration if not provided
   let activationIteration = iteration;
   if (activationIteration === undefined) {
-    const latestActivation = await getLatestNodeActivation(flowId, nodeId);
+    const latestActivation = await getLatestNodeActivation(flowId, nodeId, tx);
     activationIteration = latestActivation ? latestActivation.iteration + 1 : 1;
   }
 
@@ -617,7 +588,9 @@ export async function activateNode(
   const nodeActivation = await recordNodeActivation(
     flowId,
     nodeId,
-    activationIteration
+    activationIteration,
+    tx,
+    now
   );
 
   return {
@@ -633,17 +606,21 @@ export async function activateNode(
  *
  * @param flowId - The Flow ID
  * @param snapshot - The Workflow snapshot
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns Array of NodeActivationResult
  */
 export async function activateEntryNodes(
   flowId: string,
-  snapshot: WorkflowSnapshot
+  snapshot: WorkflowSnapshot,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<NodeActivationResult[]> {
   const entryNodes = snapshot.nodes.filter((n) => n.isEntry);
   const results: NodeActivationResult[] = [];
 
   for (const node of entryNodes) {
-    const result = await activateNode(flowId, node.id, 1);
+    const result = await activateNode(flowId, node.id, 1, tx, now);
     results.push(result);
   }
 
@@ -663,16 +640,20 @@ export async function activateEntryNodes(
  * @param snapshot - The Workflow snapshot
  * @param node - The completed Node
  * @param iteration - The current iteration
+ * @param tx - Optional Prisma transaction client
+ * @param now - Optional timestamp to use
  * @returns Array of GateEvaluationResult
  */
 async function processGateRouting(
   flow: FlowWithRelations,
   snapshot: WorkflowSnapshot,
   node: SnapshotNode,
-  iteration: number
+  iteration: number,
+  tx?: Prisma.TransactionClient,
+  now?: Date
 ): Promise<GateEvaluationResult[]> {
-  // Re-fetch task executions to get latest state
-  const taskExecutions = await getTaskExecutions(flow.id);
+  // Re-fetch task executions to get latest state (Tighten-up B: use tx)
+  const taskExecutions = await getTaskExecutions(flow.id, tx);
 
   // Check if Node is complete
   const isComplete = computeNodeComplete(node, taskExecutions, iteration);
@@ -695,10 +676,11 @@ async function processGateRouting(
         outcomeName: route.outcomeName,
         targetNodeId: null,
         activated: false,
-      });
+        isTerminal: true, // Marker for terminal paths
+      } as any);
     } else {
       // Activate target Node (handles cycles automatically)
-      const activationResult = await activateNode(flow.id, route.targetNodeId);
+      const activationResult = await activateNode(flow.id, route.targetNodeId, undefined, tx, now);
       results.push({
         gateId: route.gateId,
         sourceNodeId: route.sourceNodeId,
