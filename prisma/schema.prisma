@@ -26,11 +26,12 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members    CompanyMember[]
-  workflows  Workflow[]
-  flowGroups FlowGroup[]
-  customers  Customer[]
-  jobs       Job[]
+  members         CompanyMember[]
+  workflows       Workflow[]
+  flowGroups      FlowGroup[]
+  customers       Customer[]
+  jobs            Job[]
+  externalParties ExternalParty[]
 }
 
 /// Membership role within a company
@@ -57,6 +58,10 @@ model CompanyMember {
   updatedAt DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Responsibility Back-relations
+  assignments          JobAssignment[] @relation("MemberAssignments")
+  performedAssignments JobAssignment[] @relation("AssignedBy")
 
   @@unique([companyId, userId])
   @@index([userId])
@@ -95,10 +100,69 @@ model Job {
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  // Responsibility Back-relation
+  assignments JobAssignment[]
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([companyId])
+}
+
+// =============================================================================
+// DOMAIN: RESPONSIBILITY / ASSIGNMENTS (PHASE 1)
+// =============================================================================
+
+enum AssigneeType {
+  PERSON
+  EXTERNAL
+}
+
+/// External Party metadata-only model (no userId, no auth)
+model ExternalParty {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  email     String?
+  phone     String?
+  metadata  Json?    // Optional arbitrary metadata
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignments JobAssignment[]
+
+  @@index([companyId])
+}
+
+/// Append-only Job Assignment record
+model JobAssignment {
+  id             String       @id @default(cuid())
+  jobId          String
+  slotKey        String       // e.g. "PM", "SALES_LEAD"
+  assigneeType   AssigneeType
+  
+  // Assignee: PERSON (CompanyMember) or EXTERNAL (ExternalParty)
+  memberId        String?
+  externalPartyId String?
+
+  // Attribution
+  assignedByMemberId String   // CompanyMember who performed the assignment
+  
+  // Append-only Supersession
+  supersededAt   DateTime?    // Null means current active assignment for this slot
+  
+  createdAt      DateTime     @default(now())
+
+  job           Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  member        CompanyMember? @relation("MemberAssignments", fields: [memberId], references: [id], onDelete: SetNull)
+  externalParty ExternalParty? @relation(fields: [externalPartyId], references: [id], onDelete: SetNull)
+  assignedBy    CompanyMember  @relation("AssignedBy", fields: [assignedByMemberId], references: [id], onDelete: Restrict)
+
+  @@index([jobId, slotKey, supersededAt])
+  @@index([memberId, supersededAt])
+  @@index([externalPartyId, supersededAt])
 }
 
 // =============================================================================
