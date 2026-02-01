@@ -10,12 +10,12 @@
  * Boundary: Uses API only, no direct FlowSpec engine imports.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, AlertCircle, Briefcase } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle } from "lucide-react";
 
 export interface ActionableTask {
   flowId: string;
@@ -32,14 +32,28 @@ export interface ActionableTask {
   evidenceSchema: { type?: string; description?: string } | null;
   domainHint: "execution" | "finance" | "sales";
   startedAt: string | null;
+  _metadata?: {
+    assignments: Array<{
+      slotKey: string;
+      assigneeType: 'PERSON' | 'EXTERNAL';
+      assignee: {
+        id: string;
+        name?: string;
+        userId?: string;
+        role?: string;
+      }
+    }>
+  }
 }
 
 interface TaskFeedProps {
   onSelectTask: (task: ActionableTask) => void;
   jobId?: string | null;
+  assignmentFilter?: boolean;
+  currentMemberId?: string | null;
 }
 
-export function TaskFeed({ onSelectTask, jobId }: TaskFeedProps) {
+export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberId }: TaskFeedProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<ActionableTask[]>([]);
@@ -71,6 +85,19 @@ export function TaskFeed({ onSelectTask, jobId }: TaskFeedProps) {
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
+
+  // OPTION_A_SPEC #10: Client-side matching logic
+  const filteredTasks = useMemo(() => {
+    if (!assignmentFilter || !currentMemberId) return tasks;
+
+    return tasks.filter(task => {
+      const assignments = task._metadata?.assignments || [];
+      return assignments.some(a => 
+        a.assigneeType === 'PERSON' && 
+        a.assignee.id === currentMemberId
+      );
+    });
+  }, [tasks, assignmentFilter, currentMemberId]);
 
   const handleViewJob = (e: React.MouseEvent, flowGroupId: string) => {
     e.stopPropagation();
@@ -139,64 +166,101 @@ export function TaskFeed({ onSelectTask, jobId }: TaskFeedProps) {
   // Task list
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Ready for Work ({tasks.length})</h2>
-        <Button variant="ghost" size="sm" onClick={fetchTasks} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </Button>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Ready for Work ({tasks.length})</h2>
+          <Button variant="ghost" size="sm" onClick={fetchTasks} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        
+        {/* OPTION_A_SPEC #4: Indicator */}
+        <p className="text-sm text-muted-foreground">
+          Showing {filteredTasks.length} assigned tasks of {tasks.length} total actionable
+        </p>
       </div>
 
       <div className="grid gap-3">
-        {tasks.map((task) => (
-          <Card
-            key={`${task.flowId}-${task.taskId}`}
-            className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all"
-            onClick={() => onSelectTask(task)}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-base">{task.taskName}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {task.domainHint}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {task.workflowName} • {task.nodeName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Job: {task.flowGroupId.slice(0, 8)}...
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 items-end">
-                  <div className="flex-shrink-0">
-                    {task.startedAt ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        In Progress
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
-                        Ready
-                      </Badge>
-                    )}
-                  </div>
-                  {!jobId && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={(e) => handleViewJob(e, task.flowGroupId)}
-                    >
-                      <Briefcase className="mr-1 h-3 w-3" />
-                      Focus Job
-                    </Button>
-                  )}
-                </div>
-              </div>
+        {filteredTasks.length === 0 ? (
+          <Card className="bg-muted/20 border-dashed">
+            <CardContent className="py-12 flex flex-col items-center justify-center text-center">
+              <UserCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="font-medium text-muted-foreground">No tasks assigned to you</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Toggle "Filter: My Assignments" off to see all actionable work.
+              </p>
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          filteredTasks.map((task) => (
+            <Card
+              key={`${task.flowId}-${task.taskId}`}
+              className="cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all"
+              onClick={() => onSelectTask(task)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-base">{task.taskName}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {task.domainHint}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {task.workflowName} • {task.nodeName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Job: {task.flowGroupId.slice(0, 8)}...
+                    </p>
+
+                    {/* OPTION_A_SPEC #7 & #8: Assignment Badges */}
+                    {task._metadata?.assignments && task._metadata.assignments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {task._metadata.assignments.map((a, idx) => (
+                          <Badge 
+                            key={idx} 
+                            variant="outline" 
+                            className={`text-[10px] px-1.5 py-0 h-5 font-normal text-muted-foreground border-muted-foreground/30 ${
+                              a.assigneeType === 'EXTERNAL' ? 'border-dashed' : ''
+                            }`}
+                          >
+                            {a.assigneeType === 'EXTERNAL' ? 'EXT: ' : ''}
+                            {a.slotKey}: {a.assignee.name || a.assignee.userId || a.assignee.id}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2 items-end">
+                    <div className="flex-shrink-0">
+                      {task.startedAt ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          In Progress
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200">
+                          Ready
+                        </Badge>
+                      )}
+                    </div>
+                    {!jobId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={(e) => handleViewJob(e, task.flowGroupId)}
+                      >
+                        <Briefcase className="mr-1 h-3 w-3" />
+                        Focus Job
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

@@ -11,9 +11,13 @@
 
 Implement the Work Station **Execution Surface** that allows humans to view Actionable Tasks, perform work, attach Evidence, and submit Outcomes to FlowSpec. Work Station is a consumer of FlowSpec, not an executor of workflows. It exists for action, not historical lookup (which belongs to the **Job Card** Projection Surface).
 
+**UPDATE (v2.1):** The Work Station now supports non-gating Responsibility filters. See EPIC-12 for details.
+
 ### 1.1 Authorization Boundary
 
-> **Tenant Isolation:** Work Station queries for Actionable Tasks are scoped to the actor's `companyId`. All submission endpoints require that the actor's `companyId` matches the Flow's `companyId`. Within a tenant, all authenticated members see all Actionable Tasks—there is no per-user task filtering or assignment in v2. This is an explicit non-goal.
+> **Tenant Isolation:** Work Station queries for Actionable Tasks are scoped to the actor's `companyId`. All submission endpoints require that the actor's `companyId` matches the Flow's `companyId`. Within a tenant, all authenticated members see all Actionable Tasks.
+>
+> **Assignments (v2.1):** While "My Assignments" filters exist, they are client-side ONLY and do not gate execution. The canonical actionable set remains identical for all members. (Source: EPIC-12)
 
 ---
 
@@ -320,3 +324,14 @@ Implement the Work Station **Execution Surface** that allows humans to view Acti
 ## 10. Open Questions
 
 None — canon complete.
+
+---
+
+## 11. Final Notes / Closure (Responsibility Integration)
+
+**Status:** SEALED (v2.1 Integration)
+The Work Station has been integrated with the Responsibility Layer v2.1 (EPIC-12).
+- Non-gating view filters added.
+- Client-side assignment matching implemented.
+- Neutral metadata badges added to task feed.
+- ALL FlowSpec-canonical invariants (no reduction, no engine coupling) remain enforced.
