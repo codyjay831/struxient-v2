@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +23,12 @@ import {
   GitBranchIcon,
   CircleStopIcon,
   PlusIcon,
+  RefreshCcwIcon,
+  InfoIcon,
 } from "lucide-react";
+import { getWorkflowLoopbacks } from "@/lib/builder/utils/loopback-detection";
+import { useLoopbackMetadata } from "@/components/builder/hooks/useLoopbackMetadata";
+import { Badge } from "@/components/ui/badge";
 
 interface Outcome {
   id: string;
@@ -38,6 +44,7 @@ interface Task {
 interface Node {
   id: string;
   name: string;
+  isEntry: boolean;
   tasks: Task[];
 }
 
@@ -101,6 +108,12 @@ export function RoutingEditor({
   highlightGateId,
   highlightOutcome,
 }: RoutingEditorProps) {
+  // Phase 1: Compute loopbacks derived at render time
+  const loopbacks = useMemo(() => getWorkflowLoopbacks({ nodes, gates }), [nodes, gates]);
+  
+  // Phase 2: Load UI-only loopback metadata from localStorage
+  const { metadata, updateLoopbackLabel } = useLoopbackMetadata(workflowId);
+
   // State for route operations
   const [isLoading, setIsLoading] = useState<string | null>(null); // key = nodeId:outcomeName
   const [error, setError] = useState<string | null>(null);
@@ -315,6 +328,16 @@ export function RoutingEditor({
                           const loadingKey = `${node.id}:${outcomeName}`;
                           const isCurrentLoading = isLoading === loadingKey;
 
+                          // Check if this route is a loopback
+                          const loopback = loopbacks.find(
+                            (l) => l.sourceNodeId === node.id && l.outcomeName === outcomeName
+                          );
+                          const isLoopback = !!loopback;
+                          const loopbackLabel = metadata[rowKey]?.label || "";
+                          const autoLabel = isLoopback 
+                            ? `Loop: ${node.name} → ${getNodeName(gate?.targetNodeId || null)}`
+                            : "";
+
                           // Check if this row should be highlighted
                           const isHighlightedByGate = highlightGateId && gate?.id === highlightGateId;
                           const isHighlightedByOutcome =
@@ -325,7 +348,7 @@ export function RoutingEditor({
                           return (
                             <div
                               key={rowKey}
-                              className={`flex items-center gap-4 p-2 rounded-md border transition-all ${
+                              className={`flex flex-col gap-2 p-3 rounded-md border transition-all ${
                                 isRouted 
                                   ? "bg-muted/30 border-border" 
                                   : "bg-amber-50/50 border-amber-200/50 dark:bg-amber-900/10 dark:border-amber-900/30"
@@ -333,119 +356,160 @@ export function RoutingEditor({
                                 isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""
                               }`}
                             >
-                              {/* Status Badge */}
-                              <div className="shrink-0 w-24">
-                                {isRouted ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                    <LinkIcon className="size-2.5" />
-                                    Routed
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                    <Link2OffIcon className="size-2.5" />
-                                    Missing
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Outcome name */}
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium text-sm truncate">
-                                  {outcomeName}
-                                </span>
-                              </div>
-
-                              {/* Arrow */}
-                              <ArrowRightIcon className="size-4 text-muted-foreground shrink-0" />
-
-                              {/* Target selector or display */}
-                              <div className="w-56 shrink-0 flex items-center gap-2">
-                                <select
-                                  value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    const targetId =
-                                      value === "__terminal__"
-                                        ? null
-                                        : value === "__none__"
-                                        ? undefined
-                                        : value;
-
-                                    if (targetId === undefined) {
-                                      // User selected "No route" - need to delete existing gate
-                                      if (gate) {
-                                        setDeleteTarget({
-                                          gate,
-                                          nodeName: node.name,
-                                          outcomeName,
-                                        });
-                                      }
-                                    } else {
-                                      handleSetRoute(node.id, outcomeName, targetId, gate);
-                                    }
-                                  }}
-                                  disabled={!isEditable || isCurrentLoading}
-                                  className={`w-full h-8 rounded-md border px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
-                                    !isRouted 
-                                      ? "border-amber-200 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-transparent" 
-                                      : "border-input bg-background"
-                                  }`}
-                                >
-                                  {!isRouted && (
-                                    <option value="__none__">Select target...</option>
+                              <div className="flex items-center gap-4">
+                                {/* Status Badge */}
+                                <div className="shrink-0 w-24">
+                                  {isRouted ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                      <LinkIcon className="size-2.5" />
+                                      Routed
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                      <Link2OffIcon className="size-2.5" />
+                                      Missing
+                                    </span>
                                   )}
-                                  <option value="__terminal__">
-                                    (Terminal) - End flow
-                                  </option>
-                                  {nodes
-                                    .filter((n) => n.id !== node.id) // Can't route to self
-                                    .map((targetNode) => (
-                                      <option key={targetNode.id} value={targetNode.id}>
-                                        {targetNode.name}
-                                      </option>
-                                    ))}
-                                </select>
+                                </div>
 
-                                {/* Loading indicator */}
-                                {isCurrentLoading && (
-                                  <Loader2Icon className="size-4 animate-spin text-muted-foreground shrink-0" />
-                                )}
+                                {/* Outcome name */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm truncate">
+                                      {outcomeName}
+                                    </span>
+                                    {isLoopback && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="h-5 px-1.5 gap-1 border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50">
+                                            <RefreshCcwIcon className="size-2.5" />
+                                            Loopback
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="text-xs">Routes to an earlier node in the workflow</p>
+                                          <p className="text-[10px] opacity-70">Visual label only. Does not affect execution.</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                  </div>
+                                </div>
 
-                                {/* Delete button for routed outcomes */}
-                                {isRouted && isEditable && !isCurrentLoading && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        size="icon-xs"
-                                        variant="ghost"
-                                        onClick={() =>
+                                {/* Arrow */}
+                                <ArrowRightIcon className="size-4 text-muted-foreground shrink-0" />
+
+                                {/* Target selector or display */}
+                                <div className="w-56 shrink-0 flex items-center gap-2">
+                                  <select
+                                    value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      const targetId =
+                                        value === "__terminal__"
+                                          ? null
+                                          : value === "__none__"
+                                          ? undefined
+                                          : value;
+
+                                      if (targetId === undefined) {
+                                        // User selected "No route" - need to delete existing gate
+                                        if (gate) {
                                           setDeleteTarget({
-                                            gate: gate!,
+                                            gate,
                                             nodeName: node.name,
                                             outcomeName,
-                                          })
+                                          });
                                         }
-                                        className="text-muted-foreground hover:text-destructive shrink-0"
-                                      >
-                                        <TrashIcon className="size-3" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Delete route</TooltipContent>
-                                  </Tooltip>
-                                )}
+                                      } else {
+                                        handleSetRoute(node.id, outcomeName, targetId, gate);
+                                      }
+                                    }}
+                                    disabled={!isEditable || isCurrentLoading}
+                                    className={`w-full h-8 rounded-md border px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      !isRouted 
+                                        ? "border-amber-200 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-transparent" 
+                                        : "border-input bg-background"
+                                    }`}
+                                  >
+                                    {!isRouted && (
+                                      <option value="__none__">Select target...</option>
+                                    )}
+                                    <option value="__terminal__">
+                                      (Terminal) - End flow
+                                    </option>
+                                    {nodes
+                                      .filter((n) => n.id !== node.id) // Can't route to self
+                                      .map((targetNode) => (
+                                        <option key={targetNode.id} value={targetNode.id}>
+                                          {targetNode.name}
+                                        </option>
+                                      ))}
+                                  </select>
 
-                                {/* Terminal indicator */}
-                                {gate?.targetNodeId === null && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <CircleStopIcon className="size-4 text-muted-foreground shrink-0" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      Terminal route - flow ends here
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
+                                  {/* Loading indicator */}
+                                  {isCurrentLoading && (
+                                    <Loader2Icon className="size-4 animate-spin text-muted-foreground shrink-0" />
+                                  )}
+
+                                  {/* Delete button for routed outcomes */}
+                                  {isRouted && isEditable && !isCurrentLoading && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          size="icon-xs"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            setDeleteTarget({
+                                              gate: gate!,
+                                              nodeName: node.name,
+                                              outcomeName,
+                                            })
+                                          }
+                                          className="text-muted-foreground hover:text-destructive shrink-0"
+                                        >
+                                          <TrashIcon className="size-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Delete route</TooltipContent>
+                                    </Tooltip>
+                                  )}
+
+                                  {/* Terminal indicator */}
+                                  {gate?.targetNodeId === null && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <CircleStopIcon className="size-4 text-muted-foreground shrink-0" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Terminal route - flow ends here
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
                               </div>
+
+                              {/* Loopback Labeling UI */}
+                              {isLoopback && (
+                                <div className="flex items-center gap-2 pl-28 pr-2 py-1.5 mt-1 border-t border-dashed bg-amber-50/30 dark:bg-amber-900/5 rounded-b-md">
+                                  <div className="flex items-center gap-2 flex-1">
+                                    <span className="text-[10px] font-semibold text-amber-700/70 dark:text-amber-400/70 uppercase">Label:</span>
+                                    <Input
+                                      value={loopbackLabel}
+                                      placeholder={autoLabel}
+                                      onChange={(e) => updateLoopbackLabel(rowKey, e.target.value)}
+                                      className="h-6 text-[11px] bg-background/50 border-amber-200/50 focus-visible:ring-amber-500/30"
+                                    />
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <InfoIcon className="size-3 text-amber-700/40 dark:text-amber-400/40" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[200px] text-[10px]">
+                                        This name is stored locally in your browser and used only for your own visual organization. It does not change the workflow definition.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })

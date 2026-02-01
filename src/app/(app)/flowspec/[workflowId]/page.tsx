@@ -19,6 +19,7 @@ import { ValidationResultsDialog, ValidationError, parseValidationPath } from "@
 import { CreateNodeDialog } from "@/components/flowspec/create-node-dialog";
 import { NodeDetailPanel, CompletionRule } from "@/components/flowspec/node-detail-panel";
 import { RoutingEditor } from "@/components/flowspec/routing-editor";
+import { LoopbackIndexPanel } from "@/components/builder/loopback-index-panel";
 import { FanOutRulesEditor } from "@/components/flowspec/fan-out-rules-editor";
 import { WorkflowVersionsCard, WorkflowVersion } from "@/components/flowspec/workflow-versions-card";
 import {
@@ -667,6 +668,13 @@ export default function WorkflowDetailPage() {
             }
           />
         </div>
+
+        {/* Loopback Index Panel (UX Enhancement) */}
+        <LoopbackIndexPanel
+          workflowId={workflowId}
+          nodes={workflow.nodes}
+          gates={workflow.gates}
+        />
 
         {/* Fan-Out Rules Editor */}
         <div id="fan-out-rules">

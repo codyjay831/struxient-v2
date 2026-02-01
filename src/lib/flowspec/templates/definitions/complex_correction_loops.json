@@ -1,0 +1,238 @@
+{
+  "workflowId": "permit-install-inspect-loops",
+  "version": 1,
+  "name": "Permit → Install → Inspect (Corrections Loops)",
+  "description": "Realistic workflow with loopbacks and correction cycles for testing Builder UX.",
+  "isNonTerminating": false,
+  "nodes": [
+    {
+      "id": "node_entry",
+      "name": "N0 Entry",
+      "isEntry": true,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_start"],
+      "tasks": [
+        {
+          "id": "task_start",
+          "name": "Initiate Process",
+          "instructions": "Confirm project start.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_start", "name": "START" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_intake",
+      "name": "N1 Intake & Precheck",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_verify_docs", "task_site_photos"],
+      "tasks": [
+        {
+          "id": "task_verify_docs",
+          "name": "Verify Documents",
+          "instructions": "Check all required docs are present.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_docs_ok", "name": "READY_FOR_DESIGN" }, { "id": "o_docs_missing", "name": "MISSING_INFO" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_site_photos",
+          "name": "Site Photos",
+          "instructions": "Upload site survey photos.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Survey photos" },
+          "displayOrder": 2,
+          "outcomes": [{ "id": "o_photos_ok", "name": "READY_FOR_DESIGN" }, { "id": "o_photos_missing", "name": "MISSING_INFO" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_design",
+      "name": "N2 Design / Plan Set",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_create_plans", "task_engineer_review"],
+      "tasks": [
+        {
+          "id": "task_create_plans",
+          "name": "Create Plans",
+          "instructions": "Draft structural and electrical plans.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Plan set PDF" },
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_plans_done", "name": "SUBMIT_PERMIT" }, { "id": "o_revisit", "name": "NEEDS_SITE_REVISIT" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_engineer_review",
+          "name": "Engineer Review",
+          "instructions": "Get PE stamp if required.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 2,
+          "outcomes": [{ "id": "o_eng_ok", "name": "SUBMIT_PERMIT" }, { "id": "o_eng_fail", "name": "NEEDS_SITE_REVISIT" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_permit_submitted",
+      "name": "N3 Permit Submitted",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_permit_tracking"],
+      "tasks": [
+        {
+          "id": "task_permit_tracking",
+          "name": "Track Permit Status",
+          "instructions": "Monitor AHJ for approval.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_permit_approved", "name": "PERMIT_APPROVED" }, { "id": "o_permit_denied", "name": "PERMIT_CORRECTIONS_REQUIRED" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_scheduling",
+      "name": "N4 Scheduling & Materials",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_order_gear", "task_set_date"],
+      "tasks": [
+        {
+          "id": "task_order_gear",
+          "name": "Order Equipment",
+          "instructions": "Verify all gear is ordered and tracking.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_gear_ok", "name": "INSTALL_READY" }, { "id": "o_gear_late", "name": "DELAYED_WAITING_MATERIALS" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_set_date",
+          "name": "Schedule Crew",
+          "instructions": "Confirm install date with customer.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 2,
+          "outcomes": [{ "id": "o_date_set", "name": "INSTALL_READY" }, { "id": "o_date_fail", "name": "DELAYED_WAITING_MATERIALS" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_install",
+      "name": "N5 Install Execution",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_install_racking", "task_install_panels", "task_electrical"],
+      "tasks": [
+        {
+          "id": "task_install_racking",
+          "name": "Install Racking",
+          "instructions": "Secure standoffs and rails.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Racking photo" },
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_rack_done", "name": "READY_FOR_INSPECTION" }, { "id": "o_rack_fix", "name": "FIELD_FIX_REQUIRED" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_install_panels",
+          "name": "Mount Modules",
+          "instructions": "Secure all solar panels.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Array photo" },
+          "displayOrder": 2,
+          "outcomes": [{ "id": "o_panels_done", "name": "READY_FOR_INSPECTION" }, { "id": "o_panels_fix", "name": "FIELD_FIX_REQUIRED" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_electrical",
+          "name": "Electrical Landing",
+          "instructions": "Complete inverter and AC/DC connections.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Inverter wiring" },
+          "displayOrder": 3,
+          "outcomes": [{ "id": "o_elec_done", "name": "READY_FOR_INSPECTION" }, { "id": "o_elec_fix", "name": "FIELD_FIX_REQUIRED" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_inspection",
+      "name": "N6 Inspection",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_ahj_inspection"],
+      "tasks": [
+        {
+          "id": "task_ahj_inspection",
+          "name": "AHJ Site Visit",
+          "instructions": "AHJ inspector must sign off.",
+          "evidenceRequired": true,
+          "evidenceSchema": { "type": "file", "description": "Signed job card" },
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_pass", "name": "PASS" }, { "id": "o_fail_minor", "name": "FAIL_MINOR" }, { "id": "o_fail_major", "name": "FAIL_MAJOR_ENGINEERING" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_closeout",
+      "name": "N7 Closeout",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": ["task_final_invoice", "task_pto"],
+      "tasks": [
+        {
+          "id": "task_final_invoice",
+          "name": "Final Invoice",
+          "instructions": "Send final invoice to customer.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 1,
+          "outcomes": [{ "id": "o_inv_sent", "name": "COMPLETE" }],
+          "crossFlowDependencies": []
+        },
+        {
+          "id": "task_pto",
+          "name": "Utility PTO",
+          "instructions": "Submit Permission to Operate to utility.",
+          "evidenceRequired": false,
+          "evidenceSchema": null,
+          "displayOrder": 2,
+          "outcomes": [{ "id": "o_pto_done", "name": "COMPLETE" }],
+          "crossFlowDependencies": []
+        }
+      ]
+    }
+  ],
+  "gates": [
+    { "id": "g0", "sourceNodeId": "node_entry", "outcomeName": "START", "targetNodeId": "node_intake" },
+    { "id": "g1_1", "sourceNodeId": "node_intake", "outcomeName": "READY_FOR_DESIGN", "targetNodeId": "node_design" },
+    { "id": "g1_2", "sourceNodeId": "node_intake", "outcomeName": "MISSING_INFO", "targetNodeId": "node_intake" },
+    { "id": "g2_1", "sourceNodeId": "node_design", "outcomeName": "SUBMIT_PERMIT", "targetNodeId": "node_permit_submitted" },
+    { "id": "g2_2", "sourceNodeId": "node_design", "outcomeName": "NEEDS_SITE_REVISIT", "targetNodeId": "node_intake" },
+    { "id": "g3_1", "sourceNodeId": "node_permit_submitted", "outcomeName": "PERMIT_APPROVED", "targetNodeId": "node_scheduling" },
+    { "id": "g3_2", "sourceNodeId": "node_permit_submitted", "outcomeName": "PERMIT_CORRECTIONS_REQUIRED", "targetNodeId": "node_design" },
+    { "id": "g4_1", "sourceNodeId": "node_scheduling", "outcomeName": "INSTALL_READY", "targetNodeId": "node_install" },
+    { "id": "g4_2", "sourceNodeId": "node_scheduling", "outcomeName": "DELAYED_WAITING_MATERIALS", "targetNodeId": "node_scheduling" },
+    { "id": "g5_1", "sourceNodeId": "node_install", "outcomeName": "READY_FOR_INSPECTION", "targetNodeId": "node_inspection" },
+    { "id": "g5_2", "sourceNodeId": "node_install", "outcomeName": "FIELD_FIX_REQUIRED", "targetNodeId": "node_install" },
+    { "id": "g6_1", "sourceNodeId": "node_inspection", "outcomeName": "PASS", "targetNodeId": "node_closeout" },
+    { "id": "g6_2", "sourceNodeId": "node_inspection", "outcomeName": "FAIL_MINOR", "targetNodeId": "node_install" },
+    { "id": "g6_3", "sourceNodeId": "node_inspection", "outcomeName": "FAIL_MAJOR_ENGINEERING", "targetNodeId": "node_design" },
+    { "id": "g7", "sourceNodeId": "node_closeout", "outcomeName": "COMPLETE", "targetNodeId": null }
+  ]
+}
