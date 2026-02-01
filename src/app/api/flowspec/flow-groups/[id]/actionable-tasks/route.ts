@@ -25,6 +25,9 @@ export async function GET(request: NextRequest, { params }: Props) {
 
     const flowGroup = await prisma.flowGroup.findUnique({
       where: { id: flowGroupId },
+      include: {
+        job: { select: { id: true } }
+      }
     });
 
     if (!flowGroup) {
@@ -48,7 +51,34 @@ export async function GET(request: NextRequest, { params }: Props) {
       groupTasks.push(...tasks);
     }
 
-    return apiList(groupTasks, groupTasks.length, 0, 100, authority);
+    // Fetch current assignments for the job
+    let assignments: any[] = [];
+    if (flowGroup.job?.id) {
+      assignments = await prisma.jobAssignment.findMany({
+        where: {
+          jobId: flowGroup.job.id,
+          supersededAt: null
+        },
+        include: {
+          member: { select: { id: true } },
+          externalParty: { select: { id: true, name: true } }
+        }
+      });
+    }
+
+    // Enrich tasks with _metadata.assignments
+    const enrichedTasks = groupTasks.map(task => ({
+      ...task,
+      _metadata: {
+        assignments: assignments.map(a => ({
+          slotKey: a.slotKey,
+          assigneeType: a.assigneeType,
+          assignee: a.member || a.externalParty
+        }))
+      }
+    }));
+
+    return apiList(enrichedTasks, enrichedTasks.length, 0, 100, authority);
   } catch (error) {
     return tenantErrorResponse(error);
   }
