@@ -515,6 +515,22 @@ CI guards enforcing import restrictions and read-only database connections for a
 
 ---
 
+### INV-031: Responsibility Isolation
+
+**Statement:**  
+FlowSpec MUST NOT depend on, import, or join with the Responsibility/Assignment Layer.  
+
+**Rationale:**  
+Execution truth must remain pure. Assignments are advisory metadata and must not influence the state machine.  
+
+**Violation Example:**  
+The FlowSpec engine queries `JobAssignment` to determine if a task can be started.
+
+**Detection Idea:**  
+CI guards (`guard_fs_iso_01.mjs`, `guard_fs_join_01.mjs`) monitoring imports and query patterns.
+
+---
+
 ## 3. Invariant Index
 
 | ID | Short Name | Category |
@@ -549,6 +565,7 @@ CI guards enforcing import restrictions and read-only database connections for a
 | INV-028 | Provenance is Write-Once | Templates |
 | INV-029 | Execution Step Ceiling | Execution |
 | INV-030 | Analysis Purity | Boundaries |
+| INV-031 | Responsibility Isolation | Boundaries |
 
 ---
 

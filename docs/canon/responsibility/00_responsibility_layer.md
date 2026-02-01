@@ -70,4 +70,18 @@ The Responsibility Layer is a high-risk drift vector for RBAC creep. Any change 
 | GR-2 | Observer-only Notifications | Notifications (if added) must not be triggered by Work Station. |
 | GR-3 | No RBAC Creep | Slots must never be used as access control. |
 | GR-4 | Explicit Semantics | Append-only supersession with tenant and assignee counts enforced. |
+| GR-5 | Domain Isolation | FlowSpec Core is forbidden from importing Responsibility logic. |
+| GR-6 | Join Prohibition | DB queries must never join Execution Truth with Responsibility metadata. |
 | ME-PURITY | Tenancy Me Purity | `/api/tenancy/me` must not leak auth/capability context. |
+
+---
+
+## 6. Canon Enforcement (Governance)
+
+CI guards are considered *authoritative canon enforcement*; failure of any listed guard constitutes a canon violation.
+
+The following mechanical gates block any merge violating v2.1 invariants:
+- **`guard_fs_iso_01.mjs`**: Blocks FlowSpec -> Responsibility imports.
+- **`guard_act_red_01.mjs`**: Blocks server-side task reduction.
+- **`guard_ui_sem_01.mjs`**: Blocks "authorized/permitted" language in assignment UI.
+- **`workstation_determinism.test.ts`**: Authoritative gate for relative order preservation.

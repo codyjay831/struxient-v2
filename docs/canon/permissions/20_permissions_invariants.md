@@ -170,7 +170,23 @@ Duplication leads to inconsistent enforcement across domains.
 Sales module has its own `SALES_COST_FIELDS` set that differs from the canonical list.
 
 **Detection:**  
-Code search for alternative cost field definitions.
+Code search for alternative cost field definitions.  
+
+---
+
+### PERM-INV-011: Assignment Boundary
+
+**Statement:**  
+`JobAssignment` records MUST NOT be treated as capabilities or permissions.  
+
+**Rationale:**  
+A worker's ability to execute a task is governed by their Role and Capabilities, never by whether they are assigned to the specific slot.  
+
+**Violation Example:**  
+An API endpoint checks `prisma.jobAssignment.findFirst` to decide if a member is allowed to `POST` an outcome.
+
+**Detection Idea:**  
+CI guard (`guard_ui_sem_01.mjs`) and authoritative integration tests.
 
 ---
 
@@ -188,3 +204,4 @@ Code search for alternative cost field definitions.
 | PERM-INV-008 | Unknown capabilities deny | High |
 | PERM-INV-009 | Semantic capability names | Medium |
 | PERM-INV-010 | Single source for cost fields | High |
+| PERM-INV-011 | Assignment Boundary | Critical |

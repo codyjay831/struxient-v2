@@ -76,6 +76,13 @@ Work Station is NOT:
 | 4.2.7 | Decide sequencing | Graph determines sequence (INV-012) |
 | 4.2.8 | Unlock or advance work | Submit Outcomes; FlowSpec routes |
 
+### 4.3 View Filtering (Option A)
+
+- **Non-Gating:** Filtering by "My Assignments" is a client-side view reduction only.
+- **Escape Hatch:** The UI MUST provide a prominent "Show All Tasks" button whenever a filter is active.
+- **Order Preservation:** Filtering MUST preserve the canonical relative order of tasks (`flowId`, `taskId`, `iteration`).
+- **Evidence:** `src/app/(app)/workstation/page.tsx` Lines 98-128.
+
 ---
 
 ## 5. Interaction Model
