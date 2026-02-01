@@ -99,6 +99,29 @@ Any modification requires a Seal Breach Proposal + passing `guard_act_purity_01`
 
 ---
 
+### 4. Work Station Execution Surface — v1.0
+**Status:** SEALED  
+**Date Sealed:** 2026-02-01  
+**Canon:** `docs/canon/workstation/00_execution_surface_sealed.md`  
+**Epic:** `docs/epics/epic_15_workstation_seal.md`
+
+**Scope (Done):**
+- **Execution Monopoly:** Sole authorized surface for FlowSpec mutations (INV-01).
+- **Presentation Determinism:** Canonical relative order preservation (INV-02).
+- **Side-Effect Isolation:** API allowlist and domain separation (INV-03).
+- **View-Only Filtering:** Non-reducing "My Assignments" filter logic.
+- **Escape Hatch:** Consistent "Show All" access for all tenant members.
+
+**Explicitly Not Included:**
+- Prioritization logic or local ranking.
+- Cross-domain mutative actions.
+- Notification dispatch or outbox integration.
+
+**Change Rule:**  
+Any modification requires a Seal Breach Proposal + passing `guard_ws_monopoly_01`, `guard_ws_no_reorder_01`, `guard_ws_side_effects_01`, and `workstation_determinism.test.ts`.
+
+---
+
 ## Subsystems Under Consideration (Not Sealed)
 
 _None at this time._

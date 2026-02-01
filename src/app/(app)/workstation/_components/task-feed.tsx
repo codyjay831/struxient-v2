@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle } from "lucide-react";
+import { filterMyAssignments } from "../_lib/filter-logic";
 
 export interface ActionableTask {
   flowId: string;
@@ -88,15 +89,7 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
 
   // OPTION_A_SPEC #10: Client-side matching logic
   const filteredTasks = useMemo(() => {
-    if (!assignmentFilter || !currentMemberId) return tasks;
-
-    return tasks.filter(task => {
-      const assignments = task._metadata?.assignments || [];
-      return assignments.some(a => 
-        a.assigneeType === 'PERSON' && 
-        a.assignee.id === currentMemberId
-      );
-    });
+    return filterMyAssignments(tasks, !!assignmentFilter, currentMemberId || null);
   }, [tasks, assignmentFilter, currentMemberId]);
 
   const handleViewJob = (e: React.MouseEvent, flowGroupId: string) => {

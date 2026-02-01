@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, PlusCircle, AlertCircle, CheckCircle2 } from "lucide-react";
+import { apiAttachEvidence } from "../_lib/execution-adapter";
 
 interface EvidenceFormProps {
   flowId: string;
@@ -101,24 +102,7 @@ export function EvidenceForm({
         };
       }
 
-      const response = await fetch(
-        `/api/flowspec/flows/${flowId}/tasks/${taskId}/evidence`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: draft.type,
-            data,
-            idempotencyKey: draft.idempotencyKey,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Failed to attach evidence");
-      }
+      await apiAttachEvidence(flowId, taskId, draft.type, data, draft.idempotencyKey);
 
       setState("success");
       

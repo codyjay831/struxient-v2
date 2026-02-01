@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Send, ArrowLeft, AlertCircle, CheckCircle2, Info, Paperclip } from "lucide-react";
+import { apiStartTask, apiRecordOutcome } from "../_lib/execution-adapter";
 import type { ActionableTask } from "./task-feed";
 import { EvidenceList } from "./evidence-list";
 import { EvidenceForm } from "./evidence-form";
@@ -52,26 +53,16 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
     setState("starting");
     setError(null);
     try {
-      const response = await fetch(
-        `/api/flowspec/flows/${task.flowId}/tasks/${task.taskId}/start`,
-        { method: "POST" }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Handle "already started" as success (idempotent)
-        if (data.code === "TASK_ALREADY_STARTED") {
-          setIsStarted(true);
-          setState("idle");
-          return;
-        }
-        throw new Error(data.message || "Failed to start task");
-      }
+      await apiStartTask(task.flowId, task.taskId);
 
       setIsStarted(true);
       setState("idle");
     } catch (err) {
+      if ((err as any).code === "TASK_ALREADY_STARTED") {
+        setIsStarted(true);
+        setState("idle");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to start task");
       setState("error");
     }
@@ -82,24 +73,7 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/flowspec/flows/${task.flowId}/tasks/${task.taskId}/outcome`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ outcome }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // WS-INV-006: Show specific error, don't crash
-        if (data.code === "EVIDENCE_REQUIRED") {
-          setEvidenceRefreshKey(k => k + 1);
-        }
-        throw new Error(data.message || "Failed to record outcome");
-      }
+      await apiRecordOutcome(task.flowId, task.taskId, outcome);
 
       setState("success");
 
@@ -108,6 +82,9 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
         onComplete();
       }, 1500);
     } catch (err) {
+      if ((err as any).code === "EVIDENCE_REQUIRED") {
+        setEvidenceRefreshKey(k => k + 1);
+      }
       setError(err instanceof Error ? err.message : "Failed to record outcome");
       setState("error");
     }
