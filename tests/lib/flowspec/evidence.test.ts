@@ -24,6 +24,7 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
+  await prisma.job.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
@@ -185,5 +186,278 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
 
     const result = checkEvidenceRequirements(task, attachedEvidence);
     expect(result.satisfied).toBe(false);
+  });
+
+  describe("Structured Evidence (Ajv)", () => {
+    it("should validate valid structured evidence", async () => {
+      const company = await createTestCompany();
+      const workflow = await prisma.workflow.create({
+        data: {
+          name: "Structured Evidence Workflow",
+          companyId: company.id,
+          status: WorkflowStatus.PUBLISHED,
+          version: 1,
+        },
+      });
+
+      const node = await prisma.node.create({
+        data: { workflowId: workflow.id, name: "Node 1", isEntry: true },
+      });
+
+      const schema = {
+        type: "structured",
+        jsonSchema: {
+          type: "object",
+          properties: {
+            score: { type: "number", minimum: 0 },
+            comment: { type: "string" },
+          },
+          required: ["score"],
+          additionalProperties: false,
+        },
+      };
+
+      const task = await prisma.task.create({
+        data: {
+          nodeId: node.id,
+          name: "Structured Task",
+          evidenceRequired: true,
+          evidenceSchema: schema as any,
+        },
+      });
+
+      const snapshot: WorkflowSnapshot = {
+        workflowId: workflow.id,
+        version: 1,
+        name: workflow.name,
+        description: null,
+        isNonTerminating: false,
+        nodes: [
+          {
+            id: node.id,
+            name: node.name,
+            isEntry: true,
+            completionRule: CompletionRule.ALL_TASKS_DONE,
+            specificTasks: [],
+            tasks: [
+              {
+                id: task.id,
+                name: task.name,
+                instructions: null,
+                evidenceRequired: true,
+                evidenceSchema: schema as any,
+                displayOrder: 0,
+                outcomes: [{ id: "o1", name: "DONE" }],
+              },
+            ],
+          },
+        ],
+        gates: [{ id: "g1", sourceNodeId: node.id, outcomeName: "DONE", targetNodeId: null }],
+      };
+
+      const workflowVersion = await prisma.workflowVersion.create({
+        data: { workflowId: workflow.id, version: 1, snapshot: snapshot as any, publishedBy: "test" },
+      });
+
+      const flowGroup = await prisma.flowGroup.create({
+        data: { scopeType: "test", scopeId: "test-2", companyId: company.id },
+      });
+
+      const flow = await prisma.flow.create({
+        data: {
+          workflow: { connect: { id: workflow.id } },
+          workflowVersion: { connect: { id: workflowVersion.id } },
+          flowGroup: { connect: { id: flowGroup.id } },
+        },
+      });
+
+      await activateEntryNodes(flow.id, snapshot);
+      await startTask(flow.id, task.id, "test-user");
+
+      // Valid structured evidence
+      const result = await attachEvidence(
+        flow.id,
+        task.id,
+        EvidenceType.STRUCTURED,
+        { content: { score: 10, comment: "Looks good" } },
+        "test-user"
+      );
+      expect(result.evidenceAttachment).toBeDefined();
+    });
+
+    it("should fail validation for missing required property", async () => {
+      const company = await createTestCompany();
+      const node = await prisma.node.create({
+        data: {
+          workflow: { create: { name: "W1", companyId: company.id, status: WorkflowStatus.PUBLISHED, version: 1 } },
+          name: "N1",
+          isEntry: true,
+        },
+      });
+      const workflow = await prisma.workflow.findFirst({ where: { companyId: company.id } });
+
+      const schema = {
+        type: "structured",
+        jsonSchema: {
+          type: "object",
+          properties: { score: { type: "number" } },
+          required: ["score"],
+        },
+      };
+
+      const task = await prisma.task.create({
+        data: { nodeId: node.id, name: "T1", evidenceRequired: true, evidenceSchema: schema as any },
+      });
+
+      const snapshot: any = { nodes: [{ id: node.id, tasks: [{ id: task.id, evidenceSchema: schema }] }] };
+      const workflowVersion = await prisma.workflowVersion.create({
+        data: { workflowId: workflow!.id, version: 1, snapshot: snapshot as any, publishedBy: "test" },
+      });
+
+      const flow = await prisma.flow.create({
+        data: {
+          workflow: { connect: { id: workflow!.id } },
+          workflowVersion: { connect: { id: workflowVersion.id } },
+          flowGroup: { create: { scopeType: "t", scopeId: "s", companyId: company.id } },
+        },
+      });
+
+      await activateEntryNodes(flow.id, snapshot);
+      await startTask(flow.id, task.id, "u1");
+
+      const result = await attachEvidence(flow.id, task.id, EvidenceType.STRUCTURED, { content: { comment: "no score" } }, "u1");
+      expect(result.error?.code).toBe("INVALID_EVIDENCE_FORMAT");
+      expect(result.error?.message).toContain("must have required property 'score'");
+    });
+
+    it("should fail validation for additional properties when not allowed", async () => {
+      const company = await createTestCompany();
+      const node = await prisma.node.create({
+        data: {
+          workflow: { create: { name: "W1", companyId: company.id, status: WorkflowStatus.PUBLISHED, version: 1 } },
+          name: "N1",
+          isEntry: true,
+        },
+      });
+      const workflow = await prisma.workflow.findFirst({ where: { companyId: company.id } });
+
+      const schema = {
+        type: "structured",
+        jsonSchema: {
+          type: "object",
+          properties: { score: { type: "number" } },
+          additionalProperties: false,
+        },
+      };
+
+      const task = await prisma.task.create({
+        data: { nodeId: node.id, name: "T1", evidenceRequired: true, evidenceSchema: schema as any },
+      });
+
+      const snapshot: any = { nodes: [{ id: node.id, tasks: [{ id: task.id, evidenceSchema: schema }] }] };
+      const workflowVersion = await prisma.workflowVersion.create({
+        data: { workflowId: workflow!.id, version: 1, snapshot: snapshot as any, publishedBy: "test" },
+      });
+
+      const flow = await prisma.flow.create({
+        data: {
+          workflow: { connect: { id: workflow!.id } },
+          workflowVersion: { connect: { id: workflowVersion.id } },
+          flowGroup: { create: { scopeType: "t", scopeId: "s", companyId: company.id } },
+        },
+      });
+
+      await activateEntryNodes(flow.id, snapshot);
+      await startTask(flow.id, task.id, "u1");
+
+      const result = await attachEvidence(flow.id, task.id, EvidenceType.STRUCTURED, { content: { score: 10, extra: "not allowed" } }, "u1");
+      expect(result.error?.code).toBe("INVALID_EVIDENCE_FORMAT");
+      expect(result.error?.message).toContain("must NOT have additional properties");
+    });
+
+    it("should fail for unsupported JSON Schema keywords", async () => {
+      const company = await createTestCompany();
+      const node = await prisma.node.create({
+        data: {
+          workflow: { create: { name: "W1", companyId: company.id, status: WorkflowStatus.PUBLISHED, version: 1 } },
+          name: "N1",
+          isEntry: true,
+        },
+      });
+      const workflow = await prisma.workflow.findFirst({ where: { companyId: company.id } });
+
+      const schema = {
+        type: "structured",
+        jsonSchema: {
+          type: "object",
+          oneOf: [{ properties: { a: { type: "string" } } }], // oneOf is not supported
+        },
+      };
+
+      const task = await prisma.task.create({
+        data: { nodeId: node.id, name: "T1", evidenceRequired: true, evidenceSchema: schema as any },
+      });
+
+      const snapshot: any = { nodes: [{ id: node.id, tasks: [{ id: task.id, evidenceSchema: schema }] }] };
+      const workflowVersion = await prisma.workflowVersion.create({
+        data: { workflowId: workflow!.id, version: 1, snapshot: snapshot as any, publishedBy: "test" },
+      });
+
+      const flow = await prisma.flow.create({
+        data: {
+          workflow: { connect: { id: workflow!.id } },
+          workflowVersion: { connect: { id: workflowVersion.id } },
+          flowGroup: { create: { scopeType: "t", scopeId: "s", companyId: company.id } },
+        },
+      });
+
+      await activateEntryNodes(flow.id, snapshot);
+      await startTask(flow.id, task.id, "u1");
+
+      const result = await attachEvidence(flow.id, task.id, EvidenceType.STRUCTURED, { content: { a: "test" } }, "u1");
+      expect(result.error?.code).toBe("INVALID_EVIDENCE_FORMAT");
+      expect(result.error?.message).toContain("Unsupported JSON Schema keyword: oneOf");
+    });
+
+    it("should fail-closed if jsonSchema is missing", async () => {
+      const company = await createTestCompany();
+      const node = await prisma.node.create({
+        data: {
+          workflow: { create: { name: "W1", companyId: company.id, status: WorkflowStatus.PUBLISHED, version: 1 } },
+          name: "N1",
+          isEntry: true,
+        },
+      });
+      const workflow = await prisma.workflow.findFirst({ where: { companyId: company.id } });
+
+      const schema = {
+        type: "structured",
+        // missing jsonSchema
+      };
+
+      const task = await prisma.task.create({
+        data: { nodeId: node.id, name: "T1", evidenceRequired: true, evidenceSchema: schema as any },
+      });
+
+      const snapshot: any = { nodes: [{ id: node.id, tasks: [{ id: task.id, evidenceSchema: schema }] }] };
+      const workflowVersion = await prisma.workflowVersion.create({
+        data: { workflowId: workflow!.id, version: 1, snapshot: snapshot as any, publishedBy: "test" },
+      });
+
+      const flow = await prisma.flow.create({
+        data: {
+          workflow: { connect: { id: workflow!.id } },
+          workflowVersion: { connect: { id: workflowVersion.id } },
+          flowGroup: { create: { scopeType: "t", scopeId: "s", companyId: company.id } },
+        },
+      });
+
+      await activateEntryNodes(flow.id, snapshot);
+      await startTask(flow.id, task.id, "u1");
+
+      const result = await attachEvidence(flow.id, task.id, EvidenceType.STRUCTURED, { content: { a: "test" } }, "u1");
+      expect(result.error?.code).toBe("INVALID_EVIDENCE_FORMAT");
+      expect(result.error?.message).toBe("Structured evidence requires a jsonSchema for validation");
+    });
   });
 });

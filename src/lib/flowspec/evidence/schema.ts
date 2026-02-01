@@ -4,8 +4,55 @@
  * Canon Source: epic_06_flowspec_evidence_system.md §4.3, §6.2
  */
 
-import type { EvidenceSchema, EvidenceData } from "./types";
+import type { EvidenceSchema, EvidenceData, EvidenceStructuredSchema } from "./types";
 import { EvidenceType } from "@prisma/client";
+import Ajv from "ajv";
+
+const ajv = new Ajv();
+
+const SUPPORTED_KEYWORDS = [
+  "type",
+  "properties",
+  "required",
+  "items",
+  "enum",
+  "description",
+  "properties",
+  "additionalProperties",
+  "minLength",
+  "maxLength",
+  "minimum",
+  "maximum",
+];
+
+/**
+ * Validates that the schema only contains supported keywords.
+ * Fail-closed if unsupported keywords are found.
+ */
+function validateSchemaSafety(schema: any, isPropertiesContext: boolean = false): { safe: boolean; error?: string } {
+  if (typeof schema !== "object" || schema === null) return { safe: true };
+
+  if (Array.isArray(schema)) {
+    for (const item of schema) {
+      const nested = validateSchemaSafety(item);
+      if (!nested.safe) return nested;
+    }
+    return { safe: true };
+  }
+
+  const keys = Object.keys(schema);
+  for (const key of keys) {
+    if (!isPropertiesContext && !SUPPORTED_KEYWORDS.includes(key) && !key.startsWith("$")) {
+      return { safe: false, error: `Unsupported JSON Schema keyword: ${key}` };
+    }
+
+    if (typeof schema[key] === "object" && schema[key] !== null) {
+      const nested = validateSchemaSafety(schema[key], key === "properties");
+      if (!nested.safe) return nested;
+    }
+  }
+  return { safe: true };
+}
 
 /**
  * Validates evidence data against a schema.
@@ -98,14 +145,39 @@ function validateTextEvidence(
 
 function validateStructuredEvidence(
   data: any,
-  schema: any // EvidenceStructuredSchema
+  schema: EvidenceStructuredSchema
 ): { valid: boolean; error?: string } {
   if (!data || typeof data !== "object" || !data.content || typeof data.content !== "object") {
     return { valid: false, error: "Invalid structured evidence data" };
   }
 
-  // Basic validation - in v2 we might use a full JSON schema validator like Ajv
-  // For now, we just check if it exists if required.
-  
+  if (!schema.jsonSchema) {
+    // Fail-closed: if it's structured but no schema is provided, we can't validate it safely
+    // unless we define a default "any object" policy. Plan required explicit rule.
+    // Explicit rule: if schema is missing, allow any object but warn? 
+    // Approved plan said: "schema missing? ... Fail-closed."
+    return { valid: false, error: "Structured evidence requires a jsonSchema for validation" };
+  }
+
+  // Check schema safety
+  const safety = validateSchemaSafety(schema.jsonSchema);
+  if (!safety.safe) {
+    return { valid: false, error: safety.error };
+  }
+
+  try {
+    const validate = ajv.compile(schema.jsonSchema);
+    const valid = validate(data.content);
+    if (!valid) {
+      const error = validate.errors?.[0];
+      return {
+        valid: false,
+        error: error ? `${error.instancePath} ${error.message}` : "JSON Schema validation failed",
+      };
+    }
+  } catch (err) {
+    return { valid: false, error: `JSON Schema compilation error: ${(err as Error).message}` };
+  }
+
   return { valid: true };
 }

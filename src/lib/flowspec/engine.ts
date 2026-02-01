@@ -33,7 +33,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { Flow, NodeActivation, TaskExecution, EvidenceAttachment } from "@prisma/client";
+import type { Flow, NodeActivation, TaskExecution, EvidenceAttachment, Prisma } from "@prisma/client";
 import { FlowStatus, EvidenceType } from "@prisma/client";
 import type {
   WorkflowSnapshot,
@@ -68,6 +68,7 @@ import {
 } from "./derived";
 import { checkEvidenceRequirements, validateEvidenceData, type EvidenceSchema } from "./evidence";
 import { executeFanOut } from "./instantiation/fanout";
+import { HookContext } from "./hooks";
 
 // =============================================================================
 // FLOW OPERATIONS
@@ -217,6 +218,7 @@ export async function startTask(
   }
 
   // Record Task start in Truth
+  const hookCtx = new HookContext();
   const taskExecution = await truthRecordTaskStart(
     flowId,
     taskId,
@@ -224,6 +226,9 @@ export async function startTask(
     latestActivation?.id,
     iteration
   );
+
+  hookCtx.queue({ type: "TASK_STARTED", flowId, taskId, userId });
+  await hookCtx.flush();
 
   return {
     success: true,
@@ -315,6 +320,7 @@ export async function recordOutcome(
 
   // 3. Atomic Unit of Progress
   const now = new Date(); // Tighten-up C: Single timestamp for atomic unit
+  const hookCtx = new HookContext();
   
   let resultRecord: TaskExecution | undefined;
   let gateResults: GateEvaluationResult[] = [];
@@ -333,8 +339,10 @@ export async function recordOutcome(
       if (outcomeResult.error) throw new Error(JSON.stringify(outcomeResult.error));
       resultRecord = outcomeResult.taskExecution;
 
+      hookCtx.queue({ type: "TASK_DONE", flowId, taskId, outcome, userId });
+
       // b. Routing (Node Activations)
-      gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now);
+      gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now, hookCtx);
 
       // c. Check if Node completed for Fan-Out intent
       const updatedExecutions = await getTaskExecutions(flowId, tx);
@@ -354,6 +362,7 @@ export async function recordOutcome(
       const isComplete = computeFlowComplete(snapshot, currentActivations, updatedExecutions);
       if (isComplete && flow.status !== FlowStatus.BLOCKED) {
         await updateFlowStatus(flowId, FlowStatus.COMPLETED, undefined, tx, now);
+        hookCtx.queue({ type: "FLOW_COMPLETED", flowId });
       }
     });
   } catch (err) {
@@ -364,6 +373,9 @@ export async function recordOutcome(
     } catch { /* ignore */ }
     throw err;
   }
+
+  // Transaction succeeded, flush hooks
+  await hookCtx.flush();
 
   // 4. Side Effects (OUTSIDE_TX)
   // Tighten-up A: Fanout failure MUST NOT roll back core truth.
@@ -379,7 +391,12 @@ export async function recordOutcome(
       );
     } catch (err) {
       console.error("[FlowSpec] Fan-out failure (non-blocking for core truth):", err);
-      // Fanout is best-effort and must be retried via separate mechanism
+      // Item 3: Explicitly persist FlowStatus.BLOCKED for the triggering flowId
+      try {
+        await updateFlowStatus(flowId, FlowStatus.BLOCKED);
+      } catch (blockErr) {
+        console.error("[FlowSpec] Failed to mark flow as BLOCKED after fan-out failure:", blockErr);
+      }
     }
   }
 
@@ -568,6 +585,7 @@ export async function isTaskActionable(
  * @param iteration - Optional iteration (for cycles, defaults to calculated)
  * @param tx - Optional Prisma transaction client
  * @param now - Optional timestamp to use
+ * @param hookCtx - Optional HookContext to queue activation event
  * @returns NodeActivationResult
  */
 export async function activateNode(
@@ -575,7 +593,8 @@ export async function activateNode(
   nodeId: string,
   iteration?: number,
   tx?: Prisma.TransactionClient,
-  now?: Date
+  now?: Date,
+  hookCtx?: HookContext
 ): Promise<NodeActivationResult> {
   // Calculate iteration if not provided
   let activationIteration = iteration;
@@ -593,6 +612,15 @@ export async function activateNode(
     now
   );
 
+  if (hookCtx) {
+    hookCtx.queue({
+      type: "NODE_ACTIVATED",
+      flowId,
+      nodeId,
+      iteration: nodeActivation.iteration,
+    });
+  }
+
   return {
     success: true,
     nodeActivationId: nodeActivation.id,
@@ -608,19 +636,21 @@ export async function activateNode(
  * @param snapshot - The Workflow snapshot
  * @param tx - Optional Prisma transaction client
  * @param now - Optional timestamp to use
+ * @param hookCtx - Optional HookContext to queue activation events
  * @returns Array of NodeActivationResult
  */
 export async function activateEntryNodes(
   flowId: string,
   snapshot: WorkflowSnapshot,
   tx?: Prisma.TransactionClient,
-  now?: Date
+  now?: Date,
+  hookCtx?: HookContext
 ): Promise<NodeActivationResult[]> {
   const entryNodes = snapshot.nodes.filter((n) => n.isEntry);
   const results: NodeActivationResult[] = [];
 
   for (const node of entryNodes) {
-    const result = await activateNode(flowId, node.id, 1, tx, now);
+    const result = await activateNode(flowId, node.id, 1, tx, now, hookCtx);
     results.push(result);
   }
 
@@ -642,6 +672,7 @@ export async function activateEntryNodes(
  * @param iteration - The current iteration
  * @param tx - Optional Prisma transaction client
  * @param now - Optional timestamp to use
+ * @param hookCtx - Optional HookContext to queue activation events
  * @returns Array of GateEvaluationResult
  */
 async function processGateRouting(
@@ -650,7 +681,8 @@ async function processGateRouting(
   node: SnapshotNode,
   iteration: number,
   tx?: Prisma.TransactionClient,
-  now?: Date
+  now?: Date,
+  hookCtx?: HookContext
 ): Promise<GateEvaluationResult[]> {
   // Re-fetch task executions to get latest state (Tighten-up B: use tx)
   const taskExecutions = await getTaskExecutions(flow.id, tx);
@@ -680,7 +712,7 @@ async function processGateRouting(
       } as any);
     } else {
       // Activate target Node (handles cycles automatically)
-      const activationResult = await activateNode(flow.id, route.targetNodeId, undefined, tx, now);
+      const activationResult = await activateNode(flow.id, route.targetNodeId, undefined, tx, now, hookCtx);
       results.push({
         gateId: route.gateId,
         sourceNodeId: route.sourceNodeId,
