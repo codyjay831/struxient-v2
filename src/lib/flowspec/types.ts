@@ -317,6 +317,7 @@ export interface GateEvaluationResult {
   outcomeName: string;
   targetNodeId: string | null; // null = terminal
   activated: boolean;
+  error?: EngineError;
 }
 
 /**
@@ -344,6 +345,7 @@ export type EngineErrorCode =
   | "TASK_NOT_FOUND"
   | "NODE_NOT_FOUND"
   | "WORKFLOW_NOT_PUBLISHED"
+  | "ITERATION_LIMIT_EXCEEDED"
   | "CONCURRENT_MODIFICATION";
 
 export interface EngineError {
@@ -374,6 +376,53 @@ export interface GateRoute {
   outcomeName: string;
   targetNodeId: string | null; // null = terminal path
 }
+
+// =============================================================================
+// ANALYSIS & DIAGNOSIS TYPES
+// =============================================================================
+
+/**
+ * Result of a publish-time impact analysis.
+ */
+export interface PublishImpactReport {
+  breakingChanges: ImpactBreakingChange[];
+  activeFlowsCount: number;
+  isAnalysisComplete: boolean;
+  timestamp: Date;
+}
+
+/**
+ * A specific breaking change detected during analysis.
+ */
+export interface ImpactBreakingChange {
+  type: "OUTCOME_RENAME" | "NODE_DELETION" | "TASK_PATH_SHIFT" | "JOIN_SEMANTIC_SHIFT";
+  severity: "HIGH" | "MEDIUM";
+  message: string;
+  affectedFlowsCount: number;
+  details: Record<string, unknown>;
+}
+
+/**
+ * Diagnosis of why a Flow is stalled.
+ */
+export interface StallDiagnosis {
+  isStalled: boolean;
+  reasonCode?: StallReasonCode;
+  message?: string;
+  details?: Record<string, unknown>;
+  timestamp: Date;
+}
+
+/**
+ * Stall reason codes.
+ */
+export type StallReasonCode =
+  | "ERR_CFD_NAME"      // Waiting for outcome that no longer exists in target
+  | "ERR_CFD_PATH"      // Task path referenced in CFD is unreachable/deleted
+  | "ERR_ORPHAN_FANOUT" // Node complete but fan-out rule missing
+  | "ERR_DEAD_GATE"     // Outcome recorded but no gate exists for it
+  | "ERR_SCHEMA_LOCK"   // Evidence required but schema missing or invalid
+  | "ERR_LOGIC_DEADLOCK"; // Circular dependencies between flows
 
 // =============================================================================
 // TYPE GUARDS

@@ -21,6 +21,15 @@ export async function GET(request: NextRequest, { params }: Props) {
       where: { id },
       include: {
         customer: true,
+        flowGroup: {
+          include: {
+            flows: {
+              where: {
+                status: { in: ["ACTIVE", "SUSPENDED"] }
+              }
+            }
+          }
+        }
       },
     });
 

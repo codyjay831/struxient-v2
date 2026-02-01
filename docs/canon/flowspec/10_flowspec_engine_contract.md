@@ -6,6 +6,7 @@
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [20_flowspec_invariants.md](./20_flowspec_invariants.md)
+- [25_flowspec_breaking_changes.md](./25_flowspec_breaking_changes.md)
 - [30_flowspec_examples.md](./30_flowspec_examples.md)
 
 ---
@@ -362,6 +363,7 @@ All Evidence Schemas MUST have a `type` field. Additional fields depend on the t
 2. The Builder SHOULD warn about potential infinite loops during validation.
 3. The engine MAY implement a configurable execution step limit as a safety measure.
 4. If a step limit is exceeded, the Flow is suspended (not terminated) with an error state.
+5. If implemented, a step limit MUST preserve Truth (recorded Outcomes) and transition the Flow to a fail-closed **BLOCKED** state.
 
 ---
 
@@ -465,6 +467,15 @@ FlowSpec exposes the following conceptual integration surfaces to external domai
 2. External domains MUST NOT directly modify Flow state, Outcomes, or Evidence.
 3. External domains interact ONLY through defined integration surfaces.
 4. External domains MAY cache Derived State but MUST treat FlowSpec as authoritative.
+
+### 9.4 Diagnostic Surface (Read-Only)
+
+**Definition:** A deterministic mechanism to explain why a Flow is stalled or behaving unexpectedly.
+
+**Rules:**
+1. Diagnosis MUST be read-only and deterministic based solely on Truth.
+2. Diagnosis MUST NOT record new Truth or modify existing state.
+3. Diagnosis logic MUST be isolated from execution logic (see INV-030).
 
 ---
 

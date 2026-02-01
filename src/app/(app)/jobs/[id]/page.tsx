@@ -4,9 +4,81 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, User, MapPin, Clock, History, FileText, CheckCircle2, Play, ExternalLink } from "lucide-react";
+import { Loader2, ArrowLeft, User, MapPin, Clock, History, FileText, CheckCircle2, Play, ExternalLink, AlertCircle, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+
+/**
+ * Deterministic Stall Diagnosis Panel
+ */
+function StallDiagnosisPanel({ flowId }: { flowId: string }) {
+  const [diagnosis, setDiagnosis] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDiagnosis() {
+      try {
+        const path = ["", "api", "flowspec", "flows", flowId, "diagnosis"].join("/");
+        const res = await fetch(path);
+        if (res.ok) {
+          const data = await res.json();
+          setDiagnosis(data);
+        }
+      } catch (err) {
+        console.error("Diagnosis fetch error:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchDiagnosis();
+  }, [flowId]);
+
+  if (isLoading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  if (!diagnosis?.isStalled) return null;
+
+  return (
+    <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 space-y-3">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300">Execution Stall Detected</h4>
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-mono uppercase">
+              {diagnosis.reasonCode}
+            </Badge>
+          </div>
+          <p className="text-xs text-amber-800 dark:text-amber-400 leading-relaxed">
+            {diagnosis.message}
+          </p>
+        </div>
+      </div>
+      
+      {diagnosis.details && (
+        <div className="pl-8 pt-2 border-t border-amber-200/50 flex flex-wrap gap-x-4 gap-y-2">
+          {diagnosis.details.sourceWorkflowId && (
+            <div className="text-[10px] text-amber-700 font-medium">
+              <span className="opacity-60 uppercase mr-1">Source Workflow:</span>
+              {diagnosis.details.sourceWorkflowId}
+            </div>
+          )}
+          {diagnosis.details.requiredOutcome && (
+            <div className="text-[10px] text-amber-700 font-medium">
+              <span className="opacity-60 uppercase mr-1">Required Outcome:</span>
+              {diagnosis.details.requiredOutcome}
+            </div>
+          )}
+        </div>
+      )}
+      
+      <div className="pl-8 flex items-center gap-2">
+        <HelpCircle className="h-3 w-3 text-amber-600" />
+        <p className="text-[10px] text-amber-600 italic">
+          Why am I seeing this? The job is waiting for a signal that was changed or deleted in a template update.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 interface TimelineEvent {
   type: "NODE_ACTIVATED" | "TASK_STARTED" | "TASK_OUTCOME" | "EVIDENCE_ATTACHED";
@@ -31,6 +103,13 @@ interface Job {
   customer: {
     id: string;
     name: string;
+  };
+  flowGroup?: {
+    flows: {
+      id: string;
+      status: string;
+      workflowId: string;
+    }[];
   };
 }
 
@@ -169,6 +248,11 @@ export default function JobCardPage() {
 
         {/* Section B: Execution Timeline Projection */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Stall Diagnosis Panel (Only if flows are active but stalled) */}
+          {job.flowGroup?.flows.map(flow => (
+            <StallDiagnosisPanel key={flow.id} flowId={flow.id} />
+          ))}
+
           <Card className="min-h-[500px]">
             <CardHeader className="border-b">
               <div className="flex justify-between items-center">

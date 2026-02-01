@@ -57,6 +57,7 @@ Any future change requires Responsibility Layer v2.2 proposal.
 **Status:** SEALED  
 **Date Sealed:** 2026-02-01  
 **Canon:** `docs/canon/flowspec/00_execution_core_sealed.md`  
+**Breaking Changes:** `docs/canon/flowspec/25_flowspec_breaking_changes.md`  
 **Epic:** `docs/epics/epic_13_execution_core_seal.md`
 
 **Scope (Done):**
@@ -124,7 +125,7 @@ Any modification requires a Seal Breach Proposal + passing `guard_ws_monopoly_01
 
 ## Subsystems Under Consideration (Not Sealed)
 
-_None at this time._
+- **Manual Progression / Admin Override Policy** (See: `docs/canon/00_open_questions.md`)
 
 ---
 

@@ -1,0 +1,25 @@
+import { NextRequest, NextResponse } from "next/server";
+import { diagnoseFlowStall } from "@/lib/flowspec/analysis";
+import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
+
+/**
+ * GET /api/flowspec/flows/[flowId]/diagnosis
+ * Diagnoses why a flow is stalled.
+ * 
+ * This is a READ-ONLY analysis endpoint.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ flowId: string }> }
+) {
+  try {
+    const { flowId } = await params;
+    await verifyTenantOwnership("Flow", flowId);
+
+    const diagnosis = await diagnoseFlowStall(flowId);
+    
+    return NextResponse.json(diagnosis);
+  } catch (error) {
+    return tenantErrorResponse(error);
+  }
+}

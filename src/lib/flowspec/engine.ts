@@ -69,6 +69,7 @@ import {
 import { checkEvidenceRequirements, validateEvidenceData, type EvidenceSchema } from "./evidence";
 import { executeFanOut } from "./instantiation/fanout";
 import { HookContext } from "./hooks";
+import { MAX_NODE_ITERATIONS } from "./constants";
 
 // =============================================================================
 // FLOW OPERATIONS
@@ -377,6 +378,19 @@ export async function recordOutcome(
   // Transaction succeeded, flush hooks
   await hookCtx.flush();
 
+  // Guard: Max Iteration Limit Check (Guard A)
+  // If any gate result failed due to iteration limit, mark flow as BLOCKED.
+  // This happens outside the transaction to preserve the outcome truth.
+  const limitExceeded = gateResults.some(r => r.error?.code === "ITERATION_LIMIT_EXCEEDED");
+  if (limitExceeded) {
+    console.warn(`[FlowSpec] Iteration limit exceeded for flow ${flowId}. Marking as BLOCKED.`);
+    try {
+      await updateFlowStatus(flowId, FlowStatus.BLOCKED);
+    } catch (err) {
+      console.error("[FlowSpec] Failed to mark flow as BLOCKED after iteration limit:", err);
+    }
+  }
+
   // 4. Side Effects (OUTSIDE_TX)
   // Tighten-up A: Fanout failure MUST NOT roll back core truth.
   if (fanOutIntent) {
@@ -603,6 +617,18 @@ export async function activateNode(
     activationIteration = latestActivation ? latestActivation.iteration + 1 : 1;
   }
 
+  // Guard: Max Iteration Limit (Guard A)
+  if (activationIteration > MAX_NODE_ITERATIONS) {
+    return {
+      success: false,
+      error: {
+        code: "ITERATION_LIMIT_EXCEEDED",
+        message: `Node ${nodeId} has exceeded the maximum allowed iterations (${MAX_NODE_ITERATIONS}). Flow is BLOCKED to prevent infinite loop.`,
+        details: { nodeId, iteration: activationIteration }
+      }
+    };
+  }
+
   // Record NodeActivation in Truth
   const nodeActivation = await recordNodeActivation(
     flowId,
@@ -719,6 +745,7 @@ async function processGateRouting(
         outcomeName: route.outcomeName,
         targetNodeId: route.targetNodeId,
         activated: activationResult.success,
+        error: activationResult.error,
       });
     }
   }

@@ -6,6 +6,7 @@
 **Related Documents:**
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
 - [20_flowspec_invariants.md](./20_flowspec_invariants.md)
+- [25_flowspec_breaking_changes.md](./25_flowspec_breaking_changes.md)
 - [30_flowspec_examples.md](./30_flowspec_examples.md)
 - [40_flowspec_builder_contract.md](./40_flowspec_builder_contract.md)
 - [50_flowspec_builder_ui_api_map.md](./50_flowspec_builder_ui_api_map.md)

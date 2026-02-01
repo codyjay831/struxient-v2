@@ -117,6 +117,8 @@ export default function WorkflowDetailPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [impactReport, setImpactReport] = useState<any | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
 
   // Revert to Draft state
   const [isReverting, setIsReverting] = useState(false);
@@ -208,6 +210,52 @@ export default function WorkflowDetailPage() {
       setValidationOpen(true);
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  const handlePublishClick = async () => {
+    if (!workflow) return;
+    setPublishDialogOpen(true);
+    setImpactLoading(true);
+    setImpactReport(null);
+    setPublishError(null);
+
+    try {
+      // 1. Prepare current draft snapshot
+      const snapshot = {
+        workflowId: workflow.id,
+        name: workflow.name,
+        nodes: workflow.nodes,
+        gates: workflow.gates,
+      };
+
+      // 2. Call impact API
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/impact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot }),
+      });
+
+      if (response.ok) {
+        const report = await response.json();
+        setImpactReport(report);
+      } else {
+        setImpactReport({
+          breakingChanges: [],
+          activeFlowsCount: 0,
+          isAnalysisComplete: false,
+          message: "Impact analysis unavailable"
+        });
+      }
+    } catch (err) {
+      setImpactReport({
+        breakingChanges: [],
+        activeFlowsCount: 0,
+        isAnalysisComplete: false,
+        message: "Impact analysis unavailable (error)"
+      });
+    } finally {
+      setImpactLoading(false);
     }
   };
 
@@ -475,7 +523,7 @@ export default function WorkflowDetailPage() {
               <TooltipTrigger asChild>
                 <span>
                   <Button
-                    onClick={() => setPublishDialogOpen(true)}
+                    onClick={handlePublishClick}
                     disabled={!canPublish || isPublishing}
                   >
                     {isPublishing ? (
@@ -661,7 +709,7 @@ export default function WorkflowDetailPage() {
 
         {/* Publish Confirmation Dialog */}
         <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Publish Workflow</DialogTitle>
               <DialogDescription>
@@ -669,6 +717,46 @@ export default function WorkflowDetailPage() {
                 to create Flows. This action cannot be undone.
               </DialogDescription>
             </DialogHeader>
+
+            {/* Impact Analysis Results */}
+            <div className="py-4 border-y my-4 space-y-4">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                {impactLoading ? (
+                  <Loader2Icon className="size-4 animate-spin text-primary" />
+                ) : (
+                  <CheckCircleIcon className="size-4 text-green-600" />
+                )}
+                In-flight Impact Analysis
+              </h4>
+
+              {impactLoading ? (
+                <p className="text-xs text-muted-foreground italic">Analyzing active jobs and cross-flow dependencies...</p>
+              ) : impactReport ? (
+                <div className="space-y-3">
+                  {impactReport.breakingChanges.length === 0 ? (
+                    <div className="p-3 rounded-md bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs border border-green-100 dark:border-green-900/30">
+                      No breaking changes detected for {impactReport.activeFlowsCount} active jobs.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-destructive font-bold uppercase tracking-wider">⚠️ Breaking Changes Detected</p>
+                      {impactReport.breakingChanges.map((change: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-md bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-xs border border-amber-100 dark:border-amber-900/30 space-y-1">
+                          <p className="font-semibold">{change.message}</p>
+                          <p className="opacity-80">This will stall {change.affectedFlowsCount} active jobs.</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!impactReport.isAnalysisComplete && (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Note: {impactReport.message || "Full impact analysis unavailable. Proceed with caution."}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
             {publishError && (
               <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                 <AlertCircleIcon className="size-4" />
@@ -683,9 +771,13 @@ export default function WorkflowDetailPage() {
               >
                 Cancel
               </Button>
-              <Button onClick={handlePublish} disabled={isPublishing}>
-                {isPublishing && <Loader2Icon className="size-4 animate-spin" />}
-                Publish
+              <Button 
+                onClick={handlePublish} 
+                disabled={isPublishing}
+                variant={impactReport?.breakingChanges?.length > 0 ? "destructive" : "default"}
+              >
+                {isPublishing && <Loader2Icon className="size-4 animate-spin mr-2" />}
+                {impactReport?.breakingChanges?.length > 0 ? "Publish anyway" : "Publish"}
               </Button>
             </DialogFooter>
           </DialogContent>

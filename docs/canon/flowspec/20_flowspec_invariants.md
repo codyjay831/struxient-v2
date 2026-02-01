@@ -6,6 +6,7 @@
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
+- [25_flowspec_breaking_changes.md](./25_flowspec_breaking_changes.md)
 
 ---
 
@@ -468,17 +469,49 @@ Implement write-protection on the `WorkflowTemplate` table at the DB or ORM leve
 
 ### INV-028: Provenance is Write-Once
 
-**Statement:**  
+**Statement:**
 Workflow provenance fields (`templateId`, `templateVersion`, etc.) MUST be set exactly once during template import and MUST NOT be modified thereafter.
 
-**Rationale:**  
+**Rationale:**
 Provenance is a historical record of origin. If a tenant modifies these fields, the audit trail linking the workflow back to the Snapshot Library is broken.
 
-**Violation Example:**  
+**Violation Example:**
 A user updates a Workflow's `templateId` to point to a different template after it was already imported.
 
-**Detection Idea:**  
+**Detection Idea:**
 In the persistence gateway, exclude provenance fields from the update path for Workflows.
+
+---
+
+### INV-029: Execution Step Ceiling
+
+**Statement:**
+A single Node MUST NOT exceed a defined iteration threshold (e.g., `MAX_NODE_ITERATIONS`).
+
+**Rationale:**
+Unbounded loops create infinite audit trails and resource exhaustion. A mechanical ceiling ensures runaway processes are contained while preserving the Truth of outcomes that triggered the loop.
+
+**Violation Example:**
+A Node is activated for the 1,001st time in a single Flow, continuing to record outcomes without intervention.
+
+**Detection Idea:**
+Check NodeActivation iteration counts against the system ceiling in the activation logic.
+
+---
+
+### INV-030: Analysis Purity
+
+**Statement:**
+Diagnostic and impact analysis modules MUST NOT mutate system state and MUST NOT import engine mutation or Truth recording layers.
+
+**Rationale:**
+Isolating "Observation" from "Execution" prevents side-effects during diagnosis and ensures the stability of the core engine.
+
+**Violation Example:**
+An "Impact Analysis" endpoint accidentally updates a workflow version timestamp while scanning for breaking changes.
+
+**Detection Idea:**
+CI guards enforcing import restrictions and read-only database connections for analysis modules.
 
 ---
 
@@ -514,6 +547,8 @@ In the persistence gateway, exclude provenance fields from the update path for W
 | INV-026 | Structural Edits in DRAFT Only | Lifecycle |
 | INV-027 | Template Library Immutability | Templates |
 | INV-028 | Provenance is Write-Once | Templates |
+| INV-029 | Execution Step Ceiling | Execution |
+| INV-030 | Analysis Purity | Boundaries |
 
 ---
 
