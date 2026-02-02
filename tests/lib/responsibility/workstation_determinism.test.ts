@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { filterMyAssignments } from "@/app/(app)/workstation/_lib/filter-logic";
-import type { ActionableTask } from "@/app/(app)/workstation/_components/task-feed";
+import { filterMyAssignments } from "@/app/(app)/(fullbleed)/workstation/_lib/filter-logic";
+import type { ActionableTask } from "@/app/(app)/(fullbleed)/workstation/_components/task-feed";
 
 /**
  * Work Station Determinism Proof (WS-ED-01)
