@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { computePublishImpact } from "@/lib/flowspec/analysis";
 import type { WorkflowSnapshot } from "@/lib/flowspec/types";
 import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
@@ -15,7 +16,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    await verifyTenantOwnership("Workflow", id);
+
+    const workflow = await prisma.workflow.findUnique({ where: { id } });
+    if (!workflow) {
+      return NextResponse.json({ error: "Workflow not found" }, { status: 404 });
+    }
+
+    await verifyTenantOwnership(workflow.companyId);
 
     const body = await request.json();
     const draftSnapshot = body.snapshot as WorkflowSnapshot;

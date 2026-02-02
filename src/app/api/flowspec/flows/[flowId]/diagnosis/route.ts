@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { diagnoseFlowStall } from "@/lib/flowspec/analysis";
+import { getFlow } from "@/lib/flowspec/engine";
 import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
 
 /**
@@ -14,7 +15,13 @@ export async function GET(
 ) {
   try {
     const { flowId } = await params;
-    await verifyTenantOwnership("Flow", flowId);
+
+    const flow = await getFlow(flowId);
+    if (!flow) {
+      return NextResponse.json({ error: "Flow not found" }, { status: 404 });
+    }
+
+    await verifyTenantOwnership(flow.workflow.companyId);
 
     const diagnosis = await diagnoseFlowStall(flowId);
     
