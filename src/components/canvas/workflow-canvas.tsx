@@ -120,7 +120,6 @@ export function WorkflowCanvas({
     const loopColor = isSelected ? "text-blue-500" : "text-primary/40";
 
     const commonProps = {
-      key,
       "data-testid": testId,
       onClick: (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -133,7 +132,7 @@ export function WorkflowCanvas({
       const x = source.x + NODE_WIDTH / 2;
       const y = source.y;
       return (
-        <g {...commonProps}>
+        <g key={key} {...commonProps}>
           {/* Hit Area */}
           <path
             d={`M ${x - 20} ${y} A 30 30 0 1 1 ${x + 20} ${y}`}
@@ -156,7 +155,7 @@ export function WorkflowCanvas({
 
     if (!target) {
       return (
-        <g {...commonProps}>
+        <g key={key} {...commonProps}>
           {/* Hit Area */}
           <line
             x1={source.x + NODE_WIDTH}
@@ -191,7 +190,7 @@ export function WorkflowCanvas({
       const midX = (startX + endX) / 2;
       const midY = Math.max(startY, endY) + 100;
       return (
-        <g {...commonProps}>
+        <g key={key} {...commonProps}>
           {/* Hit Area */}
           <path
             d={`M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`}
@@ -234,7 +233,7 @@ export function WorkflowCanvas({
     const midY = (startY + endY) / 2;
 
     return (
-      <g {...commonProps}>
+      <g key={key} {...commonProps}>
         {/* Hit Area */}
         <line
           x1={startX}
