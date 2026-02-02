@@ -95,6 +95,9 @@ export function WorkflowCanvas({
   const zoomToFit = useCallback(() => {
     if (nodes.length === 0 || !containerRef.current) return;
 
+    const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
+    if (containerWidth === 0 || containerHeight === 0) return;
+
     const coords = Object.values(positions);
     const minX = Math.min(...coords.map(c => c.x)) - 100;
     const minY = Math.min(...coords.map(c => c.y)) - 100;
@@ -103,8 +106,6 @@ export function WorkflowCanvas({
 
     const worldWidth = maxX - minX;
     const worldHeight = maxY - minY;
-    
-    const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
     
     const k = Math.min(
       containerWidth / worldWidth,
@@ -118,9 +119,24 @@ export function WorkflowCanvas({
     setCamera({ x, y, k: Math.max(0.5, Math.min(1.75, k)) });
   }, [nodes, positions, NODE_WIDTH, NODE_HEIGHT]);
 
-  // Initial zoom to fit
+  // Initial zoom to fit and resize handling
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Initial fit
     zoomToFit();
+
+    // Re-fit on container resize (handles sidebar/inspector toggles)
+    // Guard for environments without ResizeObserver (e.g., JSDOM tests)
+    if (typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      zoomToFit();
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
   }, [zoomToFit]);
 
   // Interaction Handlers
@@ -372,12 +388,17 @@ export function WorkflowCanvas({
         <defs>
           <pattern
             id="grid"
-            width={20 * camera.k}
-            height={20 * camera.k}
+            width={30 * camera.k}
+            height={30 * camera.k}
             patternUnits="userSpaceOnUse"
-            patternTransform={`translate(${camera.x % (20 * camera.k)}, ${camera.y % (20 * camera.k)})`}
+            patternTransform={`translate(${camera.x % (30 * camera.k)}, ${camera.y % (30 * camera.k)})`}
           >
-            <circle cx="1" cy="1" r="0.5" fill="currentColor" className="text-muted-foreground/20" />
+            <circle 
+              cx={camera.k} 
+              cy={camera.k} 
+              r={0.75 * camera.k} 
+              fill="var(--flowspec-grid-dot)" 
+            />
           </pattern>
           <marker
             id="arrowhead"

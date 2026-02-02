@@ -490,7 +490,7 @@ export default function WorkflowDetailPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6" data-density="compact">
+      <div className="flex flex-col flex-1 min-h-0 gap-4 p-4" data-density="compact">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -595,7 +595,7 @@ export default function WorkflowDetailPage() {
         )}
 
         {/* Main Content Area */}
-        <div className="relative flex flex-col flex-1 min-h-[600px] border rounded-lg overflow-hidden bg-background">
+        <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden bg-background">
           {/* Canvas - Primary Surface */}
           <div className="absolute inset-0 z-0" data-testid="workflow-canvas-container">
             <WorkflowCanvas 

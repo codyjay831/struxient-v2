@@ -63,6 +63,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.25 0 0);
   --sidebar-ring: oklch(0.623 0.214 259.815);
+
+  /* FlowSpec Canvas Tokens */
+  --flowspec-grid-dot: oklch(0.32 0 0);
 }
 
 /* Light theme */
@@ -116,6 +119,9 @@
   --sidebar-accent-foreground: oklch(0.145 0 0);
   --sidebar-border: oklch(0.87 0 0);
   --sidebar-ring: oklch(0.546 0.245 262.881);
+
+  /* FlowSpec Canvas Tokens */
+  --flowspec-grid-dot: oklch(0.8 0 0);
 }
 
 @theme inline {
