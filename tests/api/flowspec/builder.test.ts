@@ -38,6 +38,9 @@ async function createTestMember(companyId: string, userId: string) {
 }
 
 async function cleanupTestData() {
+  await prisma.taskPolicyOverride.deleteMany({});
+  await prisma.flowGroupPolicy.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});

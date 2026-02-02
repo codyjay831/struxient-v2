@@ -11,6 +11,8 @@ async function createTestCompany(name: string = "Compliance Co") {
 }
 
 async function cleanupTestData() {
+  await prisma.jobAssignment.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
@@ -20,6 +22,7 @@ async function cleanupTestData() {
   await prisma.outcome.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.node.deleteMany({});
+  await prisma.workflowVersion.deleteMany({});
   await prisma.workflow.deleteMany({});
   await prisma.companyMember.deleteMany({});
   await prisma.company.deleteMany({});

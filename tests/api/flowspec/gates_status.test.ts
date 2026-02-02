@@ -21,6 +21,14 @@ vi.mock("@clerk/nextjs/server", () => ({
 import { auth } from "@clerk/nextjs/server";
 
 async function cleanupTestData() {
+  await prisma.jobAssignment.deleteMany({});
+  await prisma.job.deleteMany({});
+  await prisma.evidenceAttachment.deleteMany({});
+  await prisma.taskExecution.deleteMany({});
+  await prisma.nodeActivation.deleteMany({});
+  await prisma.flow.deleteMany({});
+  await prisma.flowGroup.deleteMany({});
+  await prisma.workflowVersion.deleteMany({});
   await prisma.gate.deleteMany({});
   await prisma.task.deleteMany({});
   await prisma.node.deleteMany({});

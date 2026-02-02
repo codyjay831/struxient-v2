@@ -2,7 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Input({ className, type, size = "default", ...props }: React.ComponentProps<"input"> & { size?: "default" | "compact" }) {
+function Input({ className, type, size = "default", ...props }: Omit<React.ComponentProps<"input">, "size"> & { size?: "default" | "compact" }) {
   return (
     <input
       type={type}
