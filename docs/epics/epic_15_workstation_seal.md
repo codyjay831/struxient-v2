@@ -19,6 +19,7 @@ Resolve the "Governance vs. Behavior" split in the Work Station layer by impleme
 - **WS-ED-02 (Monopoly):** Implemented `guard_ws_monopoly_01.mjs` using token intersection (`/api/`, `flowspec`, `/flows/`) + mutation intent to prevent execution bypass.
 - **WS-ED-03 (Side Effects):** Implemented `guard_ws_side_effects_01.mjs` with destination-based scanning to enforce the API allowlist.
 - **WS-ED-04 (Semantics):** Integrated `guard_ui_sem_01` to prevent "permission/authorized" language from drifting into assignment UI.
+- **Chore: Layout Surface promotion (main vs fullbleed):** Relocated `/workstation` to `(fullbleed)` group and extracted root container into `(main)`. Enforced via `docs/canon/ux/layout_surfaces_vs_pages_v1.md`.
 
 ### 2.2 Mechanical Hardening
 - **Refactor:** Unified Work Station execution calls into `execution-adapter.ts` with prefix-based safety naming (`apiStartTask`, etc.) to survive boundary guards.
