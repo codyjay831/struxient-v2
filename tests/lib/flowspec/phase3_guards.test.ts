@@ -5,15 +5,15 @@ import type { WorkflowSnapshot, ActionableTask } from "@/lib/flowspec/types";
 describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
   it("should return tasks sorted by flowId, then taskId, then iteration", () => {
     const mockSnapshot: WorkflowSnapshot = {
-      id: "wf1",
+      workflowId: "wf1",
       name: "Test Workflow",
       nodes: [
         {
           id: "node1",
           name: "Node 1",
           tasks: [
-            { id: "taskB", name: "Task B", outcomes: [{ name: "DONE" }], displayOrder: 0, evidenceRequired: false },
-            { id: "taskA", name: "Task A", outcomes: [{ name: "DONE" }], displayOrder: 1, evidenceRequired: false },
+            { id: "taskB", name: "Task B", outcomes: [{ id: "out1", name: "DONE" }], displayOrder: 0, evidenceRequired: false, instructions: null, evidenceSchema: null },
+            { id: "taskA", name: "Task A", outcomes: [{ id: "out2", name: "DONE" }], displayOrder: 1, evidenceRequired: false, instructions: null, evidenceSchema: null },
           ],
           isEntry: true,
           completionRule: "ALL_TASKS_DONE",
@@ -23,6 +23,7 @@ describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
       gates: [],
       version: 1,
       isNonTerminating: false,
+      description: null,
     };
 
     const mockNodeActivations = [
@@ -39,7 +40,7 @@ describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
     };
 
     // computeActionableTasks returns ONLY the tasks for the LATEST activation of each node.
-    const tasks = computeActionableTasks(mockSnapshot, mockNodeActivations.filter(na => na.flowId === "flow1"), [], flowContext1);
+    const tasks = computeActionableTasks(mockSnapshot, mockNodeActivations.filter((na: any) => na.flowId === "flow1"), [], flowContext1);
 
     // Expected order for flow1 (iteration 2 is latest):
     // taskA, iteration 2

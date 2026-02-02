@@ -48,3 +48,46 @@ export async function apiAttachEvidence(flowId: string, taskId: string, type: st
   }
   return response.json();
 }
+
+/**
+ * Get a signed upload URL for evidence file upload.
+ */
+export async function apiGetSignedUploadUrl(
+  flowId: string,
+  taskId: string,
+  fileName: string,
+  mimeType: string
+): Promise<{ uploadUrl: string; storageKey: string; expiresAt: string; bucket: string }> {
+  const response = await fetch(`/api/tenancy/vault/sign-upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ flowId, taskId, fileName, mimeType }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    const err = new Error(error.message || "Failed to get upload URL");
+    (err as any).code = error.code || error.error?.code;
+    throw err;
+  }
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * Upload a file to S3 using a pre-signed URL.
+ */
+export async function uploadFileToStorage(
+  uploadUrl: string,
+  file: File
+): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: {
+      "Content-Type": file.type,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+  }
+}

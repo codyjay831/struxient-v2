@@ -174,7 +174,7 @@ describe("EPIC-03: FlowSpec Flow Instantiation", () => {
     const scope2 = { type: "job", id: "job-2" };
 
     const result1 = await createFlow(workflow.id, scope1, company.id);
-    const result2 = await createFlow(workflow.id, scope2, company.id, result1.flowGroupId);
+    const result2 = await createFlow(workflow.id, scope2, company.id, { flowGroupId: result1.flowGroupId });
 
     expect(result2.success).toBe(false);
     expect(result2.error?.code).toBe("SCOPE_MISMATCH");

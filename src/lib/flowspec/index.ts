@@ -141,3 +141,24 @@ export {
   evaluateGates,
   getGateRoute,
 } from "./derived";
+
+// =============================================================================
+// POLICY (Timing/Signal Overrides)
+// =============================================================================
+
+export {
+  getFlowGroupPolicy,
+  computeEffectivePolicy,
+  computeTaskSignals,
+  mergeSlaPrecedence,
+  validateTaskOverrides,
+  validateJobPriority,
+  getSnapshotTaskIds,
+  findTaskInSnapshotById,
+} from "./policy";
+export type {
+  EffectivePolicy,
+  EffectiveTaskPolicy,
+  TaskSignals,
+  PolicyValidationResult,
+} from "./policy";

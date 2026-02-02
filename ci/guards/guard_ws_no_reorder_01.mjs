@@ -1,11 +1,11 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '../../');
 
-const TARGET_DIR = 'src/app/(app)/workstation';
+const TARGET_DIRS = ['src/app/(app)/workstation', 'src/app/(app)/(fullbleed)/workstation'];
 
 const FORBIDDEN_REORDER = [
   '.sort(',
@@ -28,6 +28,7 @@ function checkNoReorder() {
   let violations = 0;
 
   function scanDir(dir) {
+    if (!existsSync(dir)) return;
     const files = readdirSync(dir);
     for (const file of files) {
       const fullPath = join(dir, file);
@@ -49,7 +50,7 @@ function checkNoReorder() {
     }
   }
 
-  scanDir(join(ROOT, TARGET_DIR));
+  TARGET_DIRS.forEach(dir => scanDir(join(ROOT, dir)));
 
   if (violations > 0) {
     console.error(`\n❌ guard_ws_no_reorder_01 failed with ${violations} violations.`);

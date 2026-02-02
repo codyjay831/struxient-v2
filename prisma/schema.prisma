@@ -274,6 +274,7 @@ model Task {
   evidenceRequired Boolean @default(false)
   evidenceSchema   Json?   // Schema for required evidence validation
   displayOrder     Int     @default(0)
+  defaultSlaHours  Int?    // Template-level default SLA (hours). Policy can override (B > A > null)
 
   node                  Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
   outcomes              Outcome[]
@@ -363,9 +364,57 @@ model FlowGroup {
 
   job     Job?
   flows   Flow[]
+  policy  FlowGroupPolicy?
   company Company @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, scopeType, scopeId])
+}
+
+// =============================================================================
+// FLOWSPEC: FLOW GROUP POLICY (OPERATIONAL CONFIG)
+// Policy affects timing/signals ONLY, never workflow structure.
+// Policy tables may have @updatedAt since they are mutable config, NOT Truth.
+// =============================================================================
+
+/// Priority levels for job urgency signaling
+/// Used for UI signals only; does NOT affect canonical actionable ordering.
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+/// FlowGroup-level policy for operational overrides (1:1 with FlowGroup)
+/// Policy can override timing/signals but NEVER workflow structure.
+/// This is mutable config, not Truth - has @updatedAt.
+model FlowGroupPolicy {
+  id           String       @id @default(cuid())
+  flowGroupId  String       @unique
+  jobPriority  JobPriority  @default(NORMAL)
+  groupDueAt   DateTime?    // Optional hard deadline for entire group
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  flowGroup     FlowGroup            @relation(fields: [flowGroupId], references: [id], onDelete: Cascade)
+  taskOverrides TaskPolicyOverride[]
+
+  @@index([flowGroupId])
+}
+
+/// Task-level SLA overrides within a FlowGroup
+/// Keyed by [policyId, taskId]. taskId references Task.id in the bound workflow snapshot.
+/// Validation: taskId MUST exist in the FlowGroup's bound workflow version snapshot.
+model TaskPolicyOverride {
+  id                 String @id @default(cuid())
+  flowGroupPolicyId  String
+  taskId             String // References Task.id in workflow snapshot (not FK - snapshot is JSON)
+  slaHours           Int?   // Override SLA in hours. Merge: override > default > null
+
+  policy FlowGroupPolicy @relation(fields: [flowGroupPolicyId], references: [id], onDelete: Cascade)
+
+  @@unique([flowGroupPolicyId, taskId])
+  @@index([flowGroupPolicyId])
 }
 
 /// Flow instance (runtime execution)

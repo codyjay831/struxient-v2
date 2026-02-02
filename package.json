@@ -20,6 +20,8 @@
     "ci:guards": "node ci/run_guards.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.981.0",
+    "@aws-sdk/s3-request-presigner": "^3.981.0",
     "@clerk/nextjs": "^6.36.10",
     "@prisma/client": "^6.19.2",
     "@radix-ui/react-dialog": "^1.1.15",

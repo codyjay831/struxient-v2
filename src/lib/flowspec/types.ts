@@ -98,8 +98,9 @@ export interface SnapshotTask {
   evidenceRequired: boolean;
   evidenceSchema: unknown | null;
   displayOrder: number;
+  defaultSlaHours?: number | null; // Template-level default SLA (A). Policy can override (B > A > null)
   outcomes: SnapshotOutcome[];
-  crossFlowDependencies: SnapshotCrossFlowDependency[];
+  crossFlowDependencies?: SnapshotCrossFlowDependency[];
 }
 
 export interface SnapshotCrossFlowDependency {
@@ -346,7 +347,10 @@ export type EngineErrorCode =
   | "NODE_NOT_FOUND"
   | "WORKFLOW_NOT_PUBLISHED"
   | "ITERATION_LIMIT_EXCEEDED"
-  | "CONCURRENT_MODIFICATION";
+  | "CONCURRENT_MODIFICATION"
+  | "FLOW_BLOCKED"
+  | "INVALID_FILE_POINTER"
+  | "STORAGE_KEY_TENANT_MISMATCH";
 
 export interface EngineError {
   code: EngineErrorCode;

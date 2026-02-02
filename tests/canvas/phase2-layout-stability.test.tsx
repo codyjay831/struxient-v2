@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import WorkflowDetailPage from "@/app/(app)/flowspec/[workflowId]/page";
+import WorkflowDetailPage from "@/app/(app)/(fullbleed)/flowspec/[workflowId]/page";
 import { useParams } from "next/navigation";
 
 // Mock next/navigation

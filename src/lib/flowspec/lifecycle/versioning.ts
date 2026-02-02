@@ -37,6 +37,7 @@ export function createWorkflowSnapshot(
         evidenceRequired: task.evidenceRequired,
         evidenceSchema: task.evidenceSchema,
         displayOrder: task.displayOrder,
+        defaultSlaHours: task.defaultSlaHours ?? null,
         outcomes: task.outcomes.map((outcome) => ({
           id: outcome.id,
           name: outcome.name,

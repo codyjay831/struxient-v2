@@ -59,7 +59,7 @@ describe("Post-Sale Job Provisioning (Phases 1 & 3)", () => {
               name: "Anchor Task",
               displayOrder: 1,
               evidenceRequired: true,
-              evidenceSchema: { type: "structured" },
+              evidenceSchema: { type: "structured", jsonSchema: { type: "object", additionalProperties: true } },
               outcomes: [{ id: "o1", name: "CONTINUE" }],
             },
             {
@@ -67,7 +67,7 @@ describe("Post-Sale Job Provisioning (Phases 1 & 3)", () => {
               name: "Close Sale",
               displayOrder: 2,
               evidenceRequired: true,
-              evidenceSchema: { type: "structured" },
+              evidenceSchema: { type: "structured", jsonSchema: { type: "object", additionalProperties: true } },
               outcomes: [{ id: "o2", name: "SALE_CLOSED" }],
             }
           ]

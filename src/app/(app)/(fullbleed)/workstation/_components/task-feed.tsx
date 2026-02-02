@@ -8,6 +8,9 @@
  * - §4.1.2: Render Tasks in a user-friendly interface
  * 
  * Boundary: Uses API only, no direct FlowSpec engine imports.
+ *
+ * INVARIANT: Canonical ordering unchanged (flowId ASC → taskId ASC → iteration ASC)
+ * Signal chips are READ-ONLY enrichment; they do NOT affect task order.
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -15,8 +18,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle } from "lucide-react";
-import { filterMyAssignments } from "../_lib/filter-logic";
+import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle, Clock, AlertTriangle, Zap } from "lucide-react";
+import { applyAllFilters, type SignalFilters } from "../_lib/filter-logic";
+
+export interface TaskSignals {
+  jobPriority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  effectiveSlaHours: number | null;
+  effectiveDueAt: string | null;
+  isOverdue: boolean;
+  isDueSoon: boolean;
+}
 
 export interface ActionableTask {
   flowId: string;
@@ -44,7 +55,8 @@ export interface ActionableTask {
         role?: string;
       }
     }>
-  }
+  };
+  _signals?: TaskSignals;
 }
 
 interface TaskFeedProps {
@@ -60,6 +72,12 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
   const [tasks, setTasks] = useState<ActionableTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Signal filters (client-side only, no reordering)
+  const [signalFilters, setSignalFilters] = useState<SignalFilters>({
+    showOverdueOnly: false,
+    showHighPriorityOnly: false,
+  });
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -88,9 +106,18 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
   }, [fetchTasks]);
 
   // OPTION_A_SPEC #10: Client-side matching logic
+  // INVARIANT: Filtering never changes canonical order
   const filteredTasks = useMemo(() => {
-    return filterMyAssignments(tasks, !!assignmentFilter, currentMemberId || null);
-  }, [tasks, assignmentFilter, currentMemberId]);
+    return applyAllFilters(tasks, !!assignmentFilter, currentMemberId || null, signalFilters);
+  }, [tasks, assignmentFilter, currentMemberId, signalFilters]);
+
+  // Toggle signal filters
+  const toggleOverdueFilter = () => {
+    setSignalFilters(f => ({ ...f, showOverdueOnly: !f.showOverdueOnly }));
+  };
+  const togglePriorityFilter = () => {
+    setSignalFilters(f => ({ ...f, showHighPriorityOnly: !f.showHighPriorityOnly }));
+  };
 
   const handleViewJob = (e: React.MouseEvent, flowGroupId: string) => {
     e.stopPropagation();
@@ -167,9 +194,41 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
           </Button>
         </div>
         
+        {/* Signal Filter Toggles - client-side filtering only */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={signalFilters.showOverdueOnly ? "destructive" : "outline"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={toggleOverdueFilter}
+          >
+            <AlertTriangle className="mr-1 h-3 w-3" />
+            Overdue Only
+          </Button>
+          <Button
+            variant={signalFilters.showHighPriorityOnly ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={togglePriorityFilter}
+          >
+            <Zap className="mr-1 h-3 w-3" />
+            High Priority
+          </Button>
+          {(signalFilters.showOverdueOnly || signalFilters.showHighPriorityOnly) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => setSignalFilters({ showOverdueOnly: false, showHighPriorityOnly: false })}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
+        
         {/* OPTION_A_SPEC #4: Indicator */}
         <p className="text-sm text-muted-foreground">
-          Showing {filteredTasks.length} assigned tasks of {tasks.length} total actionable
+          Showing {filteredTasks.length} {filteredTasks.length !== tasks.length ? "filtered" : ""} tasks of {tasks.length} total actionable
         </p>
       </div>
 
@@ -226,6 +285,33 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
                     )}
                   </div>
                   <div className="flex flex-col gap-2 items-end">
+                    {/* Signal Chips - READ-ONLY display, no reordering */}
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {task._signals?.isOverdue && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0 h-5">
+                          <AlertTriangle className="mr-1 h-3 w-3" />
+                          Overdue
+                        </Badge>
+                      )}
+                      {task._signals?.isDueSoon && !task._signals?.isOverdue && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-amber-50 text-amber-700 border-amber-200">
+                          <Clock className="mr-1 h-3 w-3" />
+                          Due Soon
+                        </Badge>
+                      )}
+                      {task._signals?.jobPriority === "URGENT" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-purple-50 text-purple-700 border-purple-200">
+                          <Zap className="mr-1 h-3 w-3" />
+                          Urgent
+                        </Badge>
+                      )}
+                      {task._signals?.jobPriority === "HIGH" && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 bg-blue-50 text-blue-700 border-blue-200">
+                          <Zap className="mr-1 h-3 w-3" />
+                          High
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex-shrink-0">
                       {task.startedAt ? (
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">

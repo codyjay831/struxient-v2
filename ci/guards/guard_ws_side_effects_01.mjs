@@ -1,15 +1,16 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '../../');
 
-const TARGET_DIR = 'src/app/(app)/workstation';
+const TARGET_DIRS = ['src/app/(app)/workstation', 'src/app/(app)/(fullbleed)/workstation'];
 
 const ALLOWED_ROOTS = [
   '/api/flowspec/',
   '/api/tenancy/me',
+  '/api/tenancy/vault/',
   '/api/jobs/',
 ];
 
@@ -35,6 +36,7 @@ function checkSideEffects() {
   let violations = 0;
 
   function scanDir(dir) {
+    if (!existsSync(dir)) return;
     const files = readdirSync(dir);
     for (const file of files) {
       const fullPath = join(dir, file);
@@ -49,7 +51,7 @@ function checkSideEffects() {
         // Scenario A: Forbidden Domain Intersection (Destination-based)
         FORBIDDEN_DOMAINS.forEach(domain => {
           // Look for the domain token appearing within an /api/ string literal
-          const regex = new RegExp(`['"\`]\\/api\\/.*\\b${domain}\\b.*['"\`]`, 'i');
+          const regex = new RegExp(`['"\\\`]\\/api\\/.*\\b${domain}\\b.*['"\\\`]`, 'i');
           if (regex.test(content)) {
             console.error(`❌ Violation: Forbidden API destination containing "${domain}" detected in ${relPath}.`);
             violations++;
@@ -74,7 +76,7 @@ function checkSideEffects() {
     }
   }
 
-  scanDir(join(ROOT, TARGET_DIR));
+  TARGET_DIRS.forEach(dir => scanDir(join(ROOT, dir)));
 
   if (violations > 0) {
     console.error(`\n❌ guard_ws_side_effects_01 failed with ${violations} violations.`);

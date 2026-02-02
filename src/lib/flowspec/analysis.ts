@@ -110,7 +110,7 @@ export async function computePublishImpact(
         const snap = f.workflowVersion.snapshot as unknown as WorkflowSnapshot;
         return snap.nodes.some(n => 
           n.tasks.some(t => 
-            t.crossFlowDependencies.some(d => 
+            (t.crossFlowDependencies ?? []).some(d => 
               d.sourceWorkflowId === workflowId && d.requiredOutcome === outcome
             )
           )
@@ -212,8 +212,8 @@ export async function diagnoseFlowStall(flowId: string): Promise<StallDiagnosis>
       if (!node) continue;
 
       for (const task of node.tasks) {
-        if (task.crossFlowDependencies.length > 0) {
-          for (const dep of task.crossFlowDependencies) {
+        if ((task.crossFlowDependencies ?? []).length > 0) {
+          for (const dep of (task.crossFlowDependencies ?? [])) {
             // Check if target workflow exists and has outcomes
             const targetWorkflow = await prisma.workflow.findUnique({
               where: { id: dep.sourceWorkflowId },

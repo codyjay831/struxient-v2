@@ -400,6 +400,7 @@ export async function hydrateSnapshotToWorkflow(
           evidenceRequired: sTask.evidenceRequired,
           evidenceSchema: sTask.evidenceSchema as Prisma.InputJsonValue,
           displayOrder: sTask.displayOrder,
+          defaultSlaHours: sTask.defaultSlaHours ?? null,
         },
       });
       taskIdMap.set(sTask.id, newTask.id);
@@ -415,7 +416,7 @@ export async function hydrateSnapshotToWorkflow(
       }
 
       // Create cross-flow dependencies for the task
-      for (const sDep of sTask.crossFlowDependencies) {
+      for (const sDep of (sTask.crossFlowDependencies ?? [])) {
         await tx.crossFlowDependency.create({
           data: {
             taskId: newTask.id,

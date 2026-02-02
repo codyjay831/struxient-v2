@@ -393,15 +393,23 @@ export async function recordOutcome(
 
   // 4. Side Effects (OUTSIDE_TX)
   // Tighten-up A: Fanout failure MUST NOT roll back core truth.
-  if (fanOutIntent) {
+  const intent = fanOutIntent as {
+    nodeId: string;
+    outcome: string;
+    scope: { type: string; id: string };
+    companyId: string;
+    flowGroupId: string;
+  } | null;
+
+  if (intent) {
     try {
       await executeFanOut(
         flowId,
-        fanOutIntent.nodeId,
-        fanOutIntent.outcome,
-        fanOutIntent.scope,
-        fanOutIntent.companyId,
-        fanOutIntent.flowGroupId
+        intent.nodeId,
+        intent.outcome,
+        intent.scope,
+        intent.companyId,
+        intent.flowGroupId
       );
     } catch (err) {
       console.error("[FlowSpec] Fan-out failure (non-blocking for core truth):", err);
@@ -495,6 +503,41 @@ export async function attachEvidence(
             taskId,
             evidenceSchema: task.evidenceSchema,
           },
+        },
+      };
+    }
+  }
+
+  // INVARIANT: FILE evidence must contain pointer metadata only (no binary data)
+  // Validate FILE pointer shape
+  if (type === "FILE") {
+    // Basic structural validation without importing storage client
+    if (typeof data !== "object" || data === null) {
+      return {
+        error: {
+          code: "INVALID_FILE_POINTER",
+          message: "FILE evidence data must be an object",
+        },
+      };
+    }
+
+    const pointer = data as Record<string, unknown>;
+    if (typeof pointer.storageKey !== "string" || !pointer.storageKey) {
+      return {
+        error: {
+          code: "INVALID_FILE_POINTER",
+          message: "storageKey is required and must be a non-empty string",
+        },
+      };
+    }
+
+    // Validate tenant isolation via key prefix
+    // Format: {companyId}/evidence/...
+    if (!pointer.storageKey.startsWith(`${flow.workflow.companyId}/`)) {
+      return {
+        error: {
+          code: "STORAGE_KEY_TENANT_MISMATCH",
+          message: "Storage key does not belong to this tenant",
         },
       };
     }

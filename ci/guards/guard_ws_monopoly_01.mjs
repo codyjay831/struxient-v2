@@ -7,6 +7,7 @@ const ROOT = join(__dirname, '../../');
 
 const ALLOWED_PATHS = [
   'src/app/(app)/workstation/',
+  'src/app/(app)/(fullbleed)/workstation/',
   'src/lib/flowspec/instantiation/',
   'tests/',
   'ci/guards/'
