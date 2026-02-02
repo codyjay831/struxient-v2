@@ -40,12 +40,12 @@
   --warning: oklch(0.795 0.184 86.047);
   
   /* Borders & Input */
-  --border: oklch(0.25 0 0);
-  --input: oklch(0.25 0 0);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.3 0 0);
   --ring: oklch(0.623 0.214 259.815);
   
   /* Sharp Radii (4-6px) */
-  --radius: 0.375rem; /* 6px base */
+  --radius: 0.25rem; /* 4px base */
   
   /* Charts */
   --chart-1: oklch(0.623 0.214 259.815);

@@ -70,37 +70,37 @@ export function EdgeDetailPanel({
   };
 
   return (
-    <div className="space-y-6" data-testid="edge-inspector">
-      <section className="space-y-4">
+    <div className="space-y-4" data-testid="edge-inspector" data-density="compact">
+      <section className="space-y-3">
         <div className="flex items-center gap-2 text-muted-foreground">
-          <GitBranchIcon className="size-4" />
-          <span className="text-xs font-bold uppercase tracking-widest">Edge Configuration</span>
+          <GitBranchIcon className="size-3" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Edge Configuration</span>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 p-4 rounded-lg bg-muted/30 border">
-          <div className="text-center space-y-1">
-            <div className="text-[10px] text-muted-foreground uppercase font-bold">Source</div>
-            <div className="text-sm font-medium truncate">{sourceNodeName}</div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 p-3 rounded-md bg-muted/30 border">
+          <div className="text-center space-y-0.5">
+            <div className="text-[9px] text-muted-foreground uppercase font-bold">Source</div>
+            <div className="text-xs font-medium truncate">{sourceNodeName}</div>
           </div>
-          <ArrowRightIcon className="size-4 text-muted-foreground" />
-          <div className="text-center space-y-1">
-            <div className="text-[10px] text-muted-foreground uppercase font-bold">Target</div>
-            <div className="text-sm font-medium truncate">{targetNodeName}</div>
+          <ArrowRightIcon className="size-3 text-muted-foreground" />
+          <div className="text-center space-y-0.5">
+            <div className="text-[9px] text-muted-foreground uppercase font-bold">Target</div>
+            <div className="text-xs font-medium truncate">{targetNodeName}</div>
           </div>
         </div>
       </section>
 
-      <section className="space-y-2">
-        <label className="text-[10px] text-muted-foreground uppercase font-bold">Outcome Name</label>
-        <div className="p-3 rounded-md bg-background border font-mono text-sm">
+      <section className="space-y-1">
+        <label className="text-[9px] text-muted-foreground uppercase font-bold">Outcome Name</label>
+        <div className="p-2 rounded-md bg-background border font-mono text-xs">
           {outcomeName}
         </div>
       </section>
 
-      <section className="space-y-2">
-        <label className="text-[10px] text-muted-foreground uppercase font-bold">Routing Type</label>
+      <section className="space-y-1.5">
+        <label className="text-[9px] text-muted-foreground uppercase font-bold">Routing Type</label>
         <div className="flex items-center gap-2">
-          <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+          <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
             edgeType === "loopback" 
               ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
               : edgeType === "self"
@@ -112,10 +112,10 @@ export function EdgeDetailPanel({
         </div>
         
         {edgeType === "loopback" && (
-          <div className="p-4 rounded-lg bg-amber-50 border border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/30 mt-2">
-            <div className="flex gap-3">
-              <InfoIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+          <div className="p-3 rounded-md bg-amber-50 border border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/30">
+            <div className="flex gap-2">
+              <InfoIcon className="size-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-normal">
                 This edge routes to an earlier node (re-entry). The canvas does not imply state removal. Execution semantics are defined by FlowSpec.
               </p>
             </div>
@@ -124,9 +124,9 @@ export function EdgeDetailPanel({
       </section>
 
       {isEditable && (
-        <section className="space-y-3 pt-4 border-t">
-          <label className="text-[10px] text-muted-foreground uppercase font-bold">Modify Target</label>
-          <div className="space-y-2">
+        <section className="space-y-2 pt-3 border-t">
+          <label className="text-[9px] text-muted-foreground uppercase font-bold">Modify Target</label>
+          <div className="space-y-1.5">
             <select
               value={targetNodeId ?? "__terminal__"}
               onChange={(e) => {
@@ -134,7 +134,7 @@ export function EdgeDetailPanel({
                 handleTargetChange(val === "__terminal__" ? null : val);
               }}
               disabled={isUpdating}
-              className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
+              className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
             >
               <option value="__terminal__">(Terminal) - End flow</option>
               {nodes.map(n => (
@@ -142,13 +142,13 @@ export function EdgeDetailPanel({
               ))}
             </select>
             {isUpdating && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground px-0.5">
                 <Loader2Icon className="size-3 animate-spin" />
                 Updating orientation...
               </div>
             )}
             {error && (
-              <div className="flex items-center gap-2 text-xs text-destructive px-1">
+              <div className="flex items-center gap-2 text-[10px] text-destructive px-0.5">
                 <AlertCircleIcon className="size-3" />
                 {error}
               </div>
@@ -158,8 +158,8 @@ export function EdgeDetailPanel({
       )}
 
       {!isEditable && (
-        <div className="p-4 rounded-lg bg-muted/50 border border-dashed text-center">
-          <p className="text-[10px] text-muted-foreground uppercase font-bold italic">
+        <div className="p-3 rounded-md bg-muted/50 border border-dashed text-center">
+          <p className="text-[9px] text-muted-foreground uppercase font-bold italic">
             Routing is read-only for published workflows
           </p>
         </div>

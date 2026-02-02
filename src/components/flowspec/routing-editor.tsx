@@ -239,17 +239,17 @@ export function RoutingEditor({
 
   return (
     <TooltipProvider>
-      <Card>
-        <CardHeader className="pb-3">
+      <Card variant="compact">
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <GitBranchIcon className="size-4" />
+            <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <GitBranchIcon className="size-3" />
               Routing Editor
             </CardTitle>
             <div className="flex items-center gap-3">
               {isEditable && (
                 <Button
-                  size="sm"
+                  size="compact"
                   variant="outline"
                   onClick={() => {
                     setAddGateData({
@@ -260,9 +260,9 @@ export function RoutingEditor({
                     setAddError(null);
                     setIsAddDialogOpen(true);
                   }}
-                  className="h-8 gap-1"
+                  className="h-7 gap-1 text-[10px]"
                 >
-                  <PlusIcon className="size-3.5" />
+                  <PlusIcon className="size-3" />
                   Add Gate
                 </Button>
               )}
@@ -304,20 +304,20 @@ export function RoutingEditor({
                   <div key={node.id} className="space-y-3">
                     {/* Node Header */}
                     <div className="flex items-center justify-between border-b pb-1">
-                      <h3 className="font-semibold text-sm">
+                      <h3 className="font-bold text-[10px] uppercase tracking-tight text-muted-foreground">
                         {node.name}
                       </h3>
                       {nodeTotalCount > 0 && (
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-[10px] font-medium text-muted-foreground/60">
                           Coverage: {nodeRoutedCount} / {nodeTotalCount}
                         </span>
                       )}
                     </div>
 
                     {/* Outcomes Table */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {nodeTotalCount === 0 ? (
-                        <p className="text-xs text-muted-foreground italic py-1">
+                        <p className="text-[10px] text-muted-foreground italic py-0.5">
                           No outcomes defined for this node.
                         </p>
                       ) : (
@@ -348,7 +348,7 @@ export function RoutingEditor({
                           return (
                             <div
                               key={rowKey}
-                              className={`flex flex-col gap-2 p-3 rounded-md border transition-all ${
+                              className={`flex flex-col gap-1.5 p-2 rounded-md border transition-all ${
                                 isRouted 
                                   ? "bg-muted/30 border-border" 
                                   : "bg-amber-50/50 border-amber-200/50 dark:bg-amber-900/10 dark:border-amber-900/30"
@@ -356,17 +356,17 @@ export function RoutingEditor({
                                 isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""
                               }`}
                             >
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-3">
                                 {/* Status Badge */}
-                                <div className="shrink-0 w-24">
+                                <div className="shrink-0 w-20">
                                   {isRouted ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                      <LinkIcon className="size-2.5" />
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                      <LinkIcon className="size-2" />
                                       Routed
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                      <Link2OffIcon className="size-2.5" />
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                      <Link2OffIcon className="size-2" />
                                       Missing
                                     </span>
                                   )}
@@ -374,21 +374,20 @@ export function RoutingEditor({
 
                                 {/* Outcome name */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm truncate">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium text-xs truncate">
                                       {outcomeName}
                                     </span>
                                     {isLoopback && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Badge variant="outline" className="h-5 px-1.5 gap-1 border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50">
-                                            <RefreshCcwIcon className="size-2.5" />
-                                            Loopback
+                                          <Badge variant="outline" className="h-4 px-1 gap-1 border-amber-200 bg-amber-50 text-[9px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50">
+                                            <RefreshCcwIcon className="size-2" />
+                                            Loop
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          <p className="text-xs">Routes to an earlier node in the workflow</p>
-                                          <p className="text-[10px] opacity-70">Visual label only. Does not affect execution.</p>
+                                          <p className="text-[10px]">Routes to an earlier node in the workflow</p>
                                         </TooltipContent>
                                       </Tooltip>
                                     )}
@@ -396,10 +395,10 @@ export function RoutingEditor({
                                 </div>
 
                                 {/* Arrow */}
-                                <ArrowRightIcon className="size-4 text-muted-foreground shrink-0" />
+                                <ArrowRightIcon className="size-3 text-muted-foreground shrink-0" />
 
                                 {/* Target selector or display */}
-                                <div className="w-56 shrink-0 flex items-center gap-2">
+                                <div className="w-48 shrink-0 flex items-center gap-1.5">
                                   <select
                                     value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
                                     onChange={(e) => {
@@ -425,7 +424,7 @@ export function RoutingEditor({
                                       }
                                     }}
                                     disabled={!isEditable || isCurrentLoading}
-                                    className={`w-full h-8 rounded-md border px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                                    className={`w-full h-7 rounded-md border px-1.5 text-[11px] shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
                                       !isRouted 
                                         ? "border-amber-200 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-transparent" 
                                         : "border-input bg-background"
@@ -445,68 +444,21 @@ export function RoutingEditor({
                                         </option>
                                       ))}
                                   </select>
-
-                                  {/* Loading indicator */}
-                                  {isCurrentLoading && (
-                                    <Loader2Icon className="size-4 animate-spin text-muted-foreground shrink-0" />
-                                  )}
-
-                                  {/* Delete button for routed outcomes */}
-                                  {isRouted && isEditable && !isCurrentLoading && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          size="icon-xs"
-                                          variant="ghost"
-                                          onClick={() =>
-                                            setDeleteTarget({
-                                              gate: gate!,
-                                              nodeName: node.name,
-                                              outcomeName,
-                                            })
-                                          }
-                                          className="text-muted-foreground hover:text-destructive shrink-0"
-                                        >
-                                          <TrashIcon className="size-3" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Delete route</TooltipContent>
-                                    </Tooltip>
-                                  )}
-
-                                  {/* Terminal indicator */}
-                                  {gate?.targetNodeId === null && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <CircleStopIcon className="size-4 text-muted-foreground shrink-0" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Terminal route - flow ends here
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
                                 </div>
                               </div>
 
                               {/* Loopback Labeling UI */}
                               {isLoopback && (
-                                <div className="flex items-center gap-2 pl-28 pr-2 py-1.5 mt-1 border-t border-dashed bg-amber-50/30 dark:bg-amber-900/5 rounded-b-md">
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <span className="text-[10px] font-semibold text-amber-700/70 dark:text-amber-400/70 uppercase">Label:</span>
+                                <div className="flex items-center gap-2 pl-24 pr-1.5 py-1 border-t border-dashed bg-amber-50/30 dark:bg-amber-900/5 rounded-b-md">
+                                  <div className="flex items-center gap-1.5 flex-1">
+                                    <span className="text-[9px] font-semibold text-amber-700/70 dark:text-amber-400/70 uppercase">Label:</span>
                                     <Input
+                                      size="compact"
                                       value={loopbackLabel}
                                       placeholder={autoLabel}
                                       onChange={(e) => updateLoopbackLabel(rowKey, e.target.value)}
-                                      className="h-6 text-[11px] bg-background/50 border-amber-200/50 focus-visible:ring-amber-500/30"
+                                      className="h-5 text-[10px] bg-background/50 border-amber-200/50 focus-visible:ring-amber-500/30"
                                     />
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <InfoIcon className="size-3 text-amber-700/40 dark:text-amber-400/40" />
-                                      </TooltipTrigger>
-                                      <TooltipContent className="max-w-[200px] text-[10px]">
-                                        This name is stored locally in your browser and used only for your own visual organization. It does not change the workflow definition.
-                                      </TooltipContent>
-                                    </Tooltip>
                                   </div>
                                 </div>
                               )}

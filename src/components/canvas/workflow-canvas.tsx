@@ -37,10 +37,10 @@ export function WorkflowCanvas({
   const [zoom, setZoom] = useState(initialScale);
   
   // Layout Constants
-  const NODE_WIDTH = 160;
-  const NODE_HEIGHT = 80;
-  const X_GAP = 240;
-  const Y_GAP = 120;
+  const NODE_WIDTH = 140;
+  const NODE_HEIGHT = 60;
+  const X_GAP = 200;
+  const Y_GAP = 100;
 
   // 1. Compute topology metadata
   const depthMap = useMemo(() => computeNodeDepths(nodes, gates), [nodes, gates]);
@@ -116,8 +116,8 @@ export function WorkflowCanvas({
     const testId = `canvas-edge-${gate.sourceNodeId}-${slugify(gate.outcomeName)}-${gate.targetNodeId || 'terminal'}`;
     const isSelected = selectedEdgeKey === edgeKey;
 
-    const edgeColor = isSelected ? "text-blue-500" : "text-neutral-400";
-    const loopColor = isSelected ? "text-blue-500" : "text-blue-500/40";
+    const edgeColor = isSelected ? "text-blue-500" : "text-muted-foreground/60";
+    const loopColor = isSelected ? "text-blue-500" : "text-primary/40";
 
     const commonProps = {
       key,
@@ -174,7 +174,7 @@ export function WorkflowCanvas({
             y2={source.y + NODE_HEIGHT / 2}
             stroke="currentColor"
             strokeWidth={isSelected ? "3" : "2"}
-            className="text-neutral-500"
+            className="text-muted-foreground/40"
             markerEnd="url(#arrowhead)"
           />
         </g>
@@ -219,7 +219,7 @@ export function WorkflowCanvas({
               className="overflow-visible pointer-events-none"
             >
               <div className="flex justify-center items-center h-full">
-                <span className="px-2 py-1 rounded bg-background/90 border border-amber-500/30 text-[10px] font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap shadow-sm backdrop-blur-sm">
+                <span className="px-2 py-1 rounded bg-card/90 border border-amber-500/30 text-[10px] font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap shadow-sm backdrop-blur-sm">
                   ↩ {gate.outcomeName}
                 </span>
               </div>
@@ -265,7 +265,7 @@ export function WorkflowCanvas({
             className="overflow-visible pointer-events-none"
           >
             <div className="flex justify-center items-center h-full">
-              <span className="px-2 py-1 rounded bg-background/90 border border-border text-[10px] font-bold text-neutral-600 dark:text-neutral-400 whitespace-nowrap shadow-sm backdrop-blur-sm">
+              <span className="px-2 py-1 rounded bg-card/90 border border-border text-[10px] font-bold text-muted-foreground whitespace-nowrap shadow-sm backdrop-blur-sm">
                 {gate.outcomeName}
               </span>
             </div>
@@ -280,16 +280,24 @@ export function WorkflowCanvas({
   return (
     <div 
       ref={containerRef} 
-      className="w-full h-full bg-neutral-950 canvas-grid relative overflow-hidden"
+      className="w-full h-full bg-background canvas-grid relative overflow-hidden"
       data-testid="workflow-canvas"
       onClick={() => onBackgroundClick?.()}
     >
       <svg 
         viewBox={viewBox} 
-        className="w-full h-full"
+        className="w-full h-full relative z-10"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
+          <pattern
+            id="grid"
+            width="20"
+            height="20"
+            patternUnits="userSpaceOnUse"
+          >
+            <circle cx="1" cy="1" r="0.5" fill="currentColor" className="text-muted-foreground/20" />
+          </pattern>
           <marker
             id="arrowhead"
             markerWidth="10"
@@ -301,6 +309,9 @@ export function WorkflowCanvas({
             <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
           </marker>
         </defs>
+
+        {/* Background Grid */}
+        <rect width="100%" height="100%" fill="url(#grid)" className="pointer-events-none" />
 
         {/* Edges */}
         <g className="edges-layer">
@@ -328,11 +339,11 @@ export function WorkflowCanvas({
                 <rect
                   width={NODE_WIDTH}
                   height={NODE_HEIGHT}
-                  rx="4"
-                  className={`fill-neutral-900 border transition-all ${
-                    selectedNodeId === node.id ? "stroke-blue-500 stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
-                    isActive ? "stroke-blue-500/50" : "stroke-neutral-800"
-                  } group-hover:stroke-blue-500`}
+                  rx="2"
+                  className={`fill-card border transition-all ${
+                    selectedNodeId === node.id ? "stroke-primary stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
+                    isActive ? "stroke-primary/50" : "stroke-border"
+                  } group-hover:stroke-primary`}
                   strokeWidth={selectedNodeId === node.id ? "2" : "1"}
                 />
                 
@@ -343,7 +354,7 @@ export function WorkflowCanvas({
                     y={NODE_HEIGHT / 2}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    className="fill-neutral-200 text-xs font-medium select-none pointer-events-none"
+                    className="fill-foreground text-[10px] font-medium select-none pointer-events-none"
                     data-zoom-level="detail"
                   >
                     {node.name}
@@ -356,7 +367,7 @@ export function WorkflowCanvas({
                     cx="0"
                     cy={NODE_HEIGHT / 2}
                     r="4"
-                    className="fill-blue-500 shadow-sm"
+                    className="fill-primary shadow-sm"
                   />
                 )}
               </g>

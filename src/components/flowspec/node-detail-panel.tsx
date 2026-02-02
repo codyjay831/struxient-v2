@@ -198,23 +198,24 @@ export function NodeDetailPanel({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-density="compact">
       {/* Node Properties */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <SettingsIcon className="size-4" />
+      <Card variant="compact">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <SettingsIcon className="size-3" />
             Node Properties
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {/* Name */}
-          <div className="space-y-2">
-            <label htmlFor="node-name" className="text-sm font-medium">
+          <div className="space-y-1">
+            <label htmlFor="node-name" className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
               Name
             </label>
             <Input
               id="node-name"
+              size="compact"
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={!isEditable || isSaving}
@@ -223,7 +224,7 @@ export function NodeDetailPanel({
           </div>
 
           {/* Is Entry */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -231,23 +232,23 @@ export function NodeDetailPanel({
                 checked={isEntry}
                 onChange={(e) => handleEntryToggle(e.target.checked)}
                 disabled={!isEditable || isSaving || (!canToggleEntryOff && isEntry)}
-                className="h-4 w-4 rounded border-gray-300"
+                className="h-3.5 w-3.5 rounded border-input"
               />
-              <label htmlFor="node-is-entry" className="text-sm flex items-center gap-1">
+              <label htmlFor="node-is-entry" className="text-xs flex items-center gap-1 font-medium">
                 <FlagIcon className="size-3 text-green-600" />
                 Entry Node
               </label>
             </div>
             {!canToggleEntryOff && node.isEntry && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground leading-tight">
                 Cannot remove entry status — at least one entry node is required.
               </p>
             )}
           </div>
 
           {/* Completion Rule */}
-          <div className="space-y-2">
-            <label htmlFor="completion-rule" className="text-sm font-medium">
+          <div className="space-y-1">
+            <label htmlFor="completion-rule" className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
               Completion Rule
             </label>
             <select
@@ -255,7 +256,7 @@ export function NodeDetailPanel({
               value={completionRule}
               onChange={(e) => setCompletionRule(e.target.value as CompletionRule)}
               disabled={!isEditable || isSaving}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
               {Object.entries(completionRuleLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -263,45 +264,39 @@ export function NodeDetailPanel({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-muted-foreground">
-              {completionRule === "ALL_TASKS_DONE" &&
-                "Node completes when all tasks have recorded an outcome."}
-              {completionRule === "ANY_TASK_DONE" &&
-                "Node completes when any task has recorded an outcome."}
-              {completionRule === "SPECIFIC_TASKS_DONE" &&
-                "Node completes when specific designated tasks have recorded outcomes."}
-            </p>
           </div>
 
           {/* Error Display */}
           {saveError && (
-            <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 text-destructive text-sm">
-              <AlertCircleIcon className="size-4 shrink-0" />
+            <div className="flex items-center gap-2 p-1.5 rounded-md bg-destructive/10 text-destructive text-[10px]">
+              <AlertCircleIcon className="size-3 shrink-0" />
               {saveError}
             </div>
           )}
 
           {/* Actions */}
           {isEditable && (
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-1">
               <Button
                 variant="destructive"
-                size="sm"
+                size="compact"
                 onClick={() => setDeleteDialogOpen(true)}
                 disabled={isSaving || (isLastEntryNode && node.isEntry)}
+                className="h-7 text-[10px]"
               >
-                <TrashIcon className="size-4" />
+                <TrashIcon className="size-3" />
                 Delete Node
               </Button>
               <Button
-                size="sm"
+                size="compact"
                 onClick={handleSave}
                 disabled={!hasChanges || isSaving || !name.trim()}
+                className="h-7 text-[10px]"
               >
                 {isSaving ? (
-                  <Loader2Icon className="size-4 animate-spin" />
+                  <Loader2Icon className="size-3 animate-spin" />
                 ) : (
-                  <SaveIcon className="size-4" />
+                  <SaveIcon className="size-3" />
                 )}
                 Save Changes
               </Button>

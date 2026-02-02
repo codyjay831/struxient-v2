@@ -489,12 +489,12 @@ export default function WorkflowDetailPage() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div className="space-y-6" data-density="compact">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <Link href="/flowspec">
-              <Button variant="ghost" size="sm" className="-ml-2 mb-2">
+              <Button variant="ghost" size="compact" className="-ml-2 mb-2">
                 <ArrowLeftIcon className="size-4" />
                 Back to Workflows
               </Button>
@@ -519,6 +519,7 @@ export default function WorkflowDetailPage() {
                 <span>
                   <Button
                     variant="outline"
+                    size="compact"
                     onClick={handleValidate}
                     disabled={isValidating || workflow.status === "PUBLISHED"}
                   >
@@ -542,6 +543,7 @@ export default function WorkflowDetailPage() {
             {workflow.status === "VALIDATED" && (
               <Button
                 variant="outline"
+                size="compact"
                 onClick={() => setRevertDialogOpen(true)}
                 disabled={isReverting}
               >
@@ -559,6 +561,7 @@ export default function WorkflowDetailPage() {
               <TooltipTrigger asChild>
                 <span>
                   <Button
+                    size="compact"
                     onClick={handlePublishClick}
                     disabled={!canPublish || isPublishing}
                   >
@@ -609,7 +612,7 @@ export default function WorkflowDetailPage() {
           <div className="absolute top-4 left-4 z-20">
             <Button
               variant="outline"
-              size="icon"
+              size="icon-xs"
               onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
               data-testid="sidebar-toggle"
               title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
@@ -625,7 +628,7 @@ export default function WorkflowDetailPage() {
               data-testid="nodes-sidebar"
               aria-expanded="true"
             >
-              <Card className="h-full border-0 rounded-none overflow-y-auto">
+              <Card className="h-full border-0 rounded-none overflow-y-auto" variant="compact">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="flex items-center gap-2 text-sm font-bold">
                     <LayersIcon className="size-4" />
@@ -650,7 +653,7 @@ export default function WorkflowDetailPage() {
                           } ${isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate text-sm">{node.name}</span>
+                            <span className="font-medium truncate text-xs">{node.name}</span>
                             {node.isEntry && <FlagIcon className="size-3 text-green-600" />}
                           </div>
                         </button>
