@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { WorkflowStatusBadge, WorkflowStatus } from "@/components/flowspec/workflow-status-badge";
 import { ValidationResultsDialog, ValidationError, parseValidationPath } from "@/components/flowspec/validation-results-dialog";
