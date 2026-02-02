@@ -18,10 +18,20 @@ import { WorkflowStatusBadge, WorkflowStatus } from "@/components/flowspec/workf
 import { ValidationResultsDialog, ValidationError, parseValidationPath } from "@/components/flowspec/validation-results-dialog";
 import { CreateNodeDialog } from "@/components/flowspec/create-node-dialog";
 import { NodeDetailPanel, CompletionRule } from "@/components/flowspec/node-detail-panel";
+import { EdgeDetailPanel } from "@/components/flowspec/edge-detail-panel";
 import { RoutingEditor } from "@/components/flowspec/routing-editor";
 import { LoopbackIndexPanel } from "@/components/builder/loopback-index-panel";
 import { FanOutRulesEditor } from "@/components/flowspec/fan-out-rules-editor";
 import { WorkflowVersionsCard, WorkflowVersion } from "@/components/flowspec/workflow-versions-card";
+import { WorkflowCanvas } from "@/components/canvas/workflow-canvas";
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle,
+  SheetDescription 
+} from "@/components/ui/sheet";
+import { generateEdgeKey, computeNodeDepths, detectEdgeType } from "@/lib/canvas/layout";
 import {
   Loader2Icon,
   ArrowLeftIcon,
@@ -30,6 +40,12 @@ import {
   AlertCircleIcon,
   LayersIcon,
   FlagIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  SettingsIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  XIcon,
 } from "lucide-react";
 
 interface Outcome {
@@ -100,6 +116,25 @@ export default function WorkflowDetailPage() {
   const [error, setError] = useState<string | null>(null);
   
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isConfigExpanded, setIsConfigExpanded] = useState(false);
+
+  // Selection handlers following mutual exclusivity rule
+  const handleNodeSelect = (id: string | null) => {
+    setSelectedNodeId(id);
+    if (id) setSelectedEdgeKey(null);
+  };
+
+  const handleEdgeSelect = (key: string | null) => {
+    setSelectedEdgeKey(key);
+    if (key) setSelectedNodeId(null);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedNodeId(null);
+    setSelectedEdgeKey(null);
+  };
   
   // Versions state
   const [versions, setVersions] = useState<WorkflowVersion[]>([]);
@@ -555,146 +590,227 @@ export default function WorkflowDetailPage() {
           </div>
         )}
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Nodes List */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="flex items-center gap-2">
-                <LayersIcon className="size-4" />
-                Nodes
-                <span className="text-sm font-normal text-muted-foreground">
-                  ({workflow.nodes.length})
-                </span>
-              </CardTitle>
-              {isEditable && (
-                <CreateNodeDialog
-                  workflowId={workflowId}
-                  onNodeCreated={fetchWorkflow}
-                  disabled={!isEditable}
-                />
-              )}
-            </CardHeader>
-            <CardContent>
-              {workflow.nodes.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No nodes yet.
-                  {isEditable && " Add nodes to build your workflow."}
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {workflow.nodes.map((node) => {
-                    const isHighlighted = highlight?.type === "node" && highlight.nodeId === node.id;
-                    return (
-                      <button
-                        key={node.id}
-                        onClick={() => setSelectedNodeId(node.id)}
-                        className={`w-full text-left px-3 py-2 rounded-md transition-all ${
-                          selectedNodeId === node.id
-                            ? "bg-primary/10 border border-primary/20"
-                            : "hover:bg-muted/50"
-                        } ${isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{node.name}</span>
-                          {node.isEntry && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <FlagIcon className="size-3 text-green-600" />
-                              </TooltipTrigger>
-                              <TooltipContent>Entry Node</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {node.tasks.length} task{node.tasks.length !== 1 ? "s" : ""}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Main Content Area */}
+        <div className="relative flex flex-col flex-1 min-h-[600px] border rounded-lg overflow-hidden bg-background">
+          {/* Canvas - Primary Surface */}
+          <div className="absolute inset-0 z-0" data-testid="workflow-canvas-container">
+            <WorkflowCanvas 
+              nodes={workflow.nodes} 
+              gates={workflow.gates} 
+              onNodeClick={handleNodeSelect}
+              onEdgeClick={handleEdgeSelect}
+              onBackgroundClick={handleClearSelection}
+              selectedNodeId={selectedNodeId}
+              selectedEdgeKey={selectedEdgeKey}
+            />
+          </div>
 
-          {/* Node Detail Panel */}
-          <div className="lg:col-span-2">
-            {!selectedNode ? (
-              <Card>
-                <CardContent className="py-12">
-                  <p className="text-sm text-muted-foreground text-center">
-                    Select a node to view and edit its properties
-                  </p>
+          {/* Sidebar Toggle (Floating Left) */}
+          <div className="absolute top-4 left-4 z-20">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              data-testid="sidebar-toggle"
+              title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+            >
+              {isSidebarExpanded ? <ChevronLeftIcon className="size-4" /> : <ChevronRightIcon className="size-4" />}
+            </Button>
+          </div>
+
+          {/* Nodes Sidebar (Overlay Left) */}
+          {isSidebarExpanded && (
+            <div 
+              className="absolute inset-y-0 left-0 w-64 z-10 bg-background/95 backdrop-blur-sm border-r shadow-xl"
+              data-testid="nodes-sidebar"
+              aria-expanded="true"
+            >
+              <Card className="h-full border-0 rounded-none overflow-y-auto">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                  <CardTitle className="flex items-center gap-2 text-sm font-bold">
+                    <LayersIcon className="size-4" />
+                    Nodes ({workflow.nodes.length})
+                  </CardTitle>
+                  <Button variant="ghost" size="icon-xs" onClick={() => setIsSidebarExpanded(false)}>
+                    <XIcon className="size-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    {workflow.nodes.map((node) => {
+                      const isHighlighted = highlight?.type === "node" && highlight.nodeId === node.id;
+                      return (
+                        <button
+                          key={node.id}
+                          onClick={() => handleNodeSelect(node.id)}
+                          className={`w-full text-left px-3 py-2 rounded-md transition-all ${
+                            selectedNodeId === node.id
+                              ? "bg-primary/10 border border-primary/20"
+                              : "hover:bg-muted/50"
+                          } ${isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate text-sm">{node.name}</span>
+                            {node.isEntry && <FlagIcon className="size-3 text-green-600" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
-            ) : (
-              <NodeDetailPanel
-                workflowId={workflowId}
-                node={selectedNode}
-                gates={workflow.gates}
-                isEditable={isEditable}
-                isLastEntryNode={isLastEntryNode && selectedNode.isEntry}
-                onNodeUpdated={fetchWorkflow}
-                onNodeDeleted={handleNodeDeleted}
-                highlightTaskId={
-                  (highlight?.type === "task" || highlight?.type === "outcome") &&
-                  highlight.nodeId === selectedNode.id
-                    ? highlight.taskId
-                    : undefined
-                }
-                highlightOutcome={
-                  highlight?.type === "outcome" && highlight.nodeId === selectedNode.id
-                    ? { taskId: highlight.taskId, outcomeName: highlight.outcomeName }
-                    : undefined
-                }
-              />
+            </div>
+          )}
+
+          {/* Inspector Overlay (Sheet) */}
+          <Sheet 
+            open={!!selectedNodeId || !!selectedEdgeKey} 
+            onOpenChange={(open) => {
+              if (!open) handleClearSelection();
+            }}
+          >
+            <SheetContent 
+              side="right" 
+              className="w-96 sm:w-[450px] p-0 overflow-y-auto"
+              data-testid="inspector-root"
+            >
+              <SheetHeader className="p-4 border-b bg-muted/30 sticky top-0 z-10">
+                <SheetTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+                  {selectedNodeId ? "Node Inspector" : "Edge Inspector"}
+                </SheetTitle>
+                <SheetDescription className="hidden">
+                  Configuration surface for the selected workflow element.
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="p-6">
+                {selectedNodeId && selectedNode && (
+                  <div data-testid="node-inspector">
+                    <NodeDetailPanel
+                      workflowId={workflowId}
+                      node={selectedNode}
+                      gates={workflow.gates}
+                      isEditable={isEditable}
+                      isLastEntryNode={isLastEntryNode && selectedNode.isEntry}
+                      onNodeUpdated={fetchWorkflow}
+                      onNodeDeleted={handleNodeDeleted}
+                      highlightTaskId={
+                        (highlight?.type === "task" || highlight?.type === "outcome") &&
+                        highlight.nodeId === selectedNode.id
+                          ? highlight.taskId
+                          : undefined
+                      }
+                      highlightOutcome={
+                        highlight?.type === "outcome" && highlight.nodeId === selectedNode.id
+                          ? { taskId: highlight.taskId, outcomeName: highlight.outcomeName }
+                          : undefined
+                      }
+                    />
+                  </div>
+                )}
+
+                {selectedEdgeKey && (
+                  <div data-testid="edge-inspector-container">
+                    {(() => {
+                      const [sourceId, outcomeName, targetId] = selectedEdgeKey.split("::");
+                      const sourceNode = workflow.nodes.find(n => n.id === sourceId);
+                      const targetNode = workflow.nodes.find(n => n.id === targetId) || null;
+                      const gate = workflow.gates.find(g => 
+                        g.sourceNodeId === sourceId && 
+                        g.outcomeName === outcomeName && 
+                        (g.targetNodeId === targetId || (g.targetNodeId === null && targetId === "terminal"))
+                      );
+                      
+                      const depthMap = computeNodeDepths(workflow.nodes, workflow.gates);
+                      const edgeType = detectEdgeType(sourceId, targetId === "terminal" ? null : targetId, depthMap);
+
+                      if (!sourceNode || !gate) return <p className="text-sm text-muted-foreground">Edge data unavailable</p>;
+
+                      return (
+                        <EdgeDetailPanel
+                          workflowId={workflowId}
+                          gateId={gate.id}
+                          sourceNodeName={sourceNode.name}
+                          outcomeName={outcomeName}
+                          targetNodeId={gate.targetNodeId}
+                          targetNodeName={targetNode?.name || "(Terminal)"}
+                          edgeType={edgeType}
+                          nodes={workflow.nodes}
+                          isEditable={isEditable}
+                          onUpdated={fetchWorkflow}
+                        />
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Configuration Toggle (Floating Bottom Right) */}
+          <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+            {isConfigExpanded && (
+              <div 
+                className="w-[600px] max-h-[400px] overflow-y-auto bg-background/95 backdrop-blur-sm border rounded-lg shadow-2xl p-4 space-y-6 mb-2"
+                data-testid="config-drawer"
+              >
+                <div className="flex justify-between items-center pb-2 border-b">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <SettingsIcon className="size-4" />
+                    Workflow Configuration
+                  </h3>
+                  <Button variant="ghost" size="icon-xs" onClick={() => setIsConfigExpanded(false)}>
+                    <ChevronDownIcon className="size-4" />
+                  </Button>
+                </div>
+                
+                <RoutingEditor
+                  workflowId={workflowId}
+                  nodes={workflow.nodes}
+                  gates={workflow.gates}
+                  isEditable={isEditable}
+                  onRoutingUpdated={fetchWorkflow}
+                  highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
+                  highlightOutcome={
+                    highlight?.type === "outcome"
+                      ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
+                      : undefined
+                  }
+                />
+
+                <LoopbackIndexPanel
+                  workflowId={workflowId}
+                  nodes={workflow.nodes}
+                  gates={workflow.gates}
+                />
+
+                <FanOutRulesEditor
+                  workflowId={workflowId}
+                  nodes={workflow.nodes}
+                  fanOutRules={workflow.fanOutRules}
+                  isEditable={isEditable}
+                  onRulesUpdated={fetchWorkflow}
+                />
+
+                <WorkflowVersionsCard
+                  workflowId={workflowId}
+                  versions={versions}
+                  isLoading={versionsLoading}
+                  error={versionsError}
+                />
+              </div>
             )}
+            <Button
+              variant="secondary"
+              className="gap-2 shadow-lg"
+              onClick={() => setIsConfigExpanded(!isConfigExpanded)}
+              data-testid="config-toggle"
+            >
+              <SettingsIcon className="size-4" />
+              {isConfigExpanded ? "Hide Configuration" : "Show Configuration"}
+              {isConfigExpanded ? <ChevronUpIcon className="size-4" /> : <ChevronDownIcon className="size-4" />}
+            </Button>
           </div>
-        </div>
-
-        {/* Routing Editor */}
-        <div id="routing-editor">
-          <RoutingEditor
-            workflowId={workflowId}
-            nodes={workflow.nodes}
-            gates={workflow.gates}
-            isEditable={isEditable}
-            onRoutingUpdated={fetchWorkflow}
-            highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
-            highlightOutcome={
-              highlight?.type === "outcome"
-                ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
-                : undefined
-            }
-          />
-        </div>
-
-        {/* Loopback Index Panel (UX Enhancement) */}
-        <LoopbackIndexPanel
-          workflowId={workflowId}
-          nodes={workflow.nodes}
-          gates={workflow.gates}
-        />
-
-        {/* Fan-Out Rules Editor */}
-        <div id="fan-out-rules">
-          <FanOutRulesEditor
-            workflowId={workflowId}
-            nodes={workflow.nodes}
-            fanOutRules={workflow.fanOutRules}
-            isEditable={isEditable}
-            onRulesUpdated={fetchWorkflow}
-          />
-        </div>
-
-        {/* Versions Section */}
-        <div id="versions">
-          <WorkflowVersionsCard
-            workflowId={workflowId}
-            versions={versions}
-            isLoading={versionsLoading}
-            error={versionsError}
-          />
         </div>
 
         {/* Validation Results Dialog */}

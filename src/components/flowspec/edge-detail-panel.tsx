@@ -1,0 +1,169 @@
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { 
+  GitBranchIcon, 
+  ArrowRightIcon, 
+  RefreshCcwIcon, 
+  InfoIcon,
+  Loader2Icon,
+  CheckCircle2Icon,
+  AlertCircleIcon
+} from "lucide-react";
+import { EdgeType } from "@/lib/canvas/layout";
+
+interface EdgeDetailPanelProps {
+  workflowId: string;
+  sourceNodeName: string;
+  outcomeName: string;
+  targetNodeId: string | null;
+  targetNodeName: string;
+  edgeType: EdgeType;
+  nodes: Array<{ id: string; name: string }>;
+  isEditable: boolean;
+  gateId: string;
+  onUpdated: () => void;
+}
+
+export function EdgeDetailPanel({
+  workflowId,
+  sourceNodeName,
+  outcomeName,
+  targetNodeId,
+  targetNodeName,
+  edgeType,
+  nodes,
+  isEditable,
+  gateId,
+  onUpdated
+}: EdgeDetailPanelProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleTargetChange = async (newTargetId: string | null) => {
+    setIsUpdating(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/flowspec/workflows/${workflowId}/gates/${gateId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetNodeId: newTargetId }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error?.message || "Failed to update route");
+      }
+
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update route");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6" data-testid="edge-inspector">
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <GitBranchIcon className="size-4" />
+          <span className="text-xs font-bold uppercase tracking-widest">Edge Configuration</span>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 p-4 rounded-lg bg-muted/30 border">
+          <div className="text-center space-y-1">
+            <div className="text-[10px] text-muted-foreground uppercase font-bold">Source</div>
+            <div className="text-sm font-medium truncate">{sourceNodeName}</div>
+          </div>
+          <ArrowRightIcon className="size-4 text-muted-foreground" />
+          <div className="text-center space-y-1">
+            <div className="text-[10px] text-muted-foreground uppercase font-bold">Target</div>
+            <div className="text-sm font-medium truncate">{targetNodeName}</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <label className="text-[10px] text-muted-foreground uppercase font-bold">Outcome Name</label>
+        <div className="p-3 rounded-md bg-background border font-mono text-sm">
+          {outcomeName}
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <label className="text-[10px] text-muted-foreground uppercase font-bold">Routing Type</label>
+        <div className="flex items-center gap-2">
+          <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+            edgeType === "loopback" 
+              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+              : edgeType === "self"
+              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+              : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+          }`}>
+            {edgeType}
+          </div>
+        </div>
+        
+        {edgeType === "loopback" && (
+          <div className="p-4 rounded-lg bg-amber-50 border border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/30 mt-2">
+            <div className="flex gap-3">
+              <InfoIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                This edge routes to an earlier node (re-entry). The canvas does not imply state removal. Execution semantics are defined by FlowSpec.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {isEditable && (
+        <section className="space-y-3 pt-4 border-t">
+          <label className="text-[10px] text-muted-foreground uppercase font-bold">Modify Target</label>
+          <div className="space-y-2">
+            <select
+              value={targetNodeId ?? "__terminal__"}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleTargetChange(val === "__terminal__" ? null : val);
+              }}
+              disabled={isUpdating}
+              className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
+            >
+              <option value="__terminal__">(Terminal) - End flow</option>
+              {nodes.map(n => (
+                <option key={n.id} value={n.id}>{n.name}</option>
+              ))}
+            </select>
+            {isUpdating && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                <Loader2Icon className="size-3 animate-spin" />
+                Updating orientation...
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-destructive px-1">
+                <AlertCircleIcon className="size-3" />
+                {error}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {!isEditable && (
+        <div className="p-4 rounded-lg bg-muted/50 border border-dashed text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold italic">
+            Routing is read-only for published workflows
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}

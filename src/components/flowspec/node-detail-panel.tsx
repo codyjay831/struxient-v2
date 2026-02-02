@@ -109,7 +109,7 @@ export function NodeDetailPanel({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Reset form when node changes
+  // Clear form when node changes
   useEffect(() => {
     setName(node.name);
     setIsEntry(node.isEntry);

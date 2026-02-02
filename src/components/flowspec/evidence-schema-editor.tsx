@@ -242,7 +242,7 @@ export function EvidenceSchemaEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset when initialSchema changes
+  // Clear when initialSchema changes
   useEffect(() => {
     setState(parseInitialSchema(initialSchema));
     setError(null);

@@ -33,7 +33,7 @@ export function ViewVersionDialog({
     if (open && versionId) {
       fetchVersion();
     } else {
-      // Reset state when closed
+      // Clear state when closed
       if (!open) {
         setVersion(null);
         setError(null);

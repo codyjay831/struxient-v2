@@ -95,7 +95,7 @@ export function TaskDetailPanel({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Reset form when task changes
+  // Clear form when task changes
   useEffect(() => {
     setName(task.name);
     setInstructions(task.instructions || "");
