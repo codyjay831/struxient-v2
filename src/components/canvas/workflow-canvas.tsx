@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Node, 
   Gate, 
@@ -34,7 +35,12 @@ export function WorkflowCanvas({
   scale: initialScale = 1
 }: WorkflowCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(initialScale);
+  
+  // Camera State
+  const [camera, setCamera] = useState({ x: 0, y: 0, k: initialScale });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const cameraStart = useRef({ x: 0, y: 0 });
   
   // Layout Constants
   const NODE_WIDTH = 140;
@@ -85,23 +91,85 @@ export function WorkflowCanvas({
     return pos;
   }, [nodes, depthMap, spine]);
 
-  // 3. Zoom-to-fit calculation
-  const [viewBox, setViewBox] = useState("0 0 800 600");
-
-  useEffect(() => {
-    if (nodes.length === 0) return;
+  // 3. Zoom-to-fit logic
+  const zoomToFit = useCallback(() => {
+    if (nodes.length === 0 || !containerRef.current) return;
 
     const coords = Object.values(positions);
-    const minX = Math.min(...coords.map(c => c.x)) - 50;
-    const minY = Math.min(...coords.map(c => c.y)) - 50;
-    const maxX = Math.max(...coords.map(c => c.x)) + NODE_WIDTH + 50;
-    const maxY = Math.max(...coords.map(c => c.y)) + NODE_HEIGHT + 50;
+    const minX = Math.min(...coords.map(c => c.x)) - 100;
+    const minY = Math.min(...coords.map(c => c.y)) - 100;
+    const maxX = Math.max(...coords.map(c => c.x)) + NODE_WIDTH + 100;
+    const maxY = Math.max(...coords.map(c => c.y)) + NODE_HEIGHT + 100;
 
-    const width = maxX - minX;
-    const height = maxY - minY;
+    const worldWidth = maxX - minX;
+    const worldHeight = maxY - minY;
     
-    setViewBox(`${minX} ${minY} ${width} ${height}`);
-  }, [nodes, positions]);
+    const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
+    
+    const k = Math.min(
+      containerWidth / worldWidth,
+      containerHeight / worldHeight,
+      1.25 // Don't over-zoom on small workflows
+    );
+
+    const x = (containerWidth - worldWidth * k) / 2 - minX * k;
+    const y = (containerHeight - worldHeight * k) / 2 - minY * k;
+
+    setCamera({ x, y, k: Math.max(0.5, Math.min(1.75, k)) });
+  }, [nodes, positions, NODE_WIDTH, NODE_HEIGHT]);
+
+  // Initial zoom to fit
+  useEffect(() => {
+    zoomToFit();
+  }, [zoomToFit]);
+
+  // Interaction Handlers
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const zoomSpeed = 0.001;
+    const delta = -e.deltaY;
+    const zoomFactor = Math.pow(1.1, delta / 100);
+    
+    const newK = Math.max(0.5, Math.min(1.75, camera.k * zoomFactor));
+    
+    // Zoom relative to mouse position
+    const worldX = (mouseX - camera.x) / camera.k;
+    const worldY = (mouseY - camera.y) / camera.k;
+    
+    const newX = mouseX - worldX * newK;
+    const newY = mouseY - worldY * newK;
+
+    setCamera({ x: newX, y: newY, k: newK });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Left click only
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    cameraStart.current = { x: camera.x, y: camera.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    
+    setCamera(prev => ({
+      ...prev,
+      x: cameraStart.current.x + dx,
+      y: cameraStart.current.y + dy
+    }));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   // 4. Render helpers
   const renderEdge = (gate: Gate) => {
@@ -186,6 +254,8 @@ export function WorkflowCanvas({
     const endX = target.x;
     const endY = target.y + NODE_HEIGHT / 2;
 
+    const labelOpacity = camera.k < 0.6 ? 0 : (camera.k - 0.6) / 0.4;
+
     if (isLoopback) {
       const midX = (startX + endX) / 2;
       const midY = Math.max(startY, endY) + 100;
@@ -209,16 +279,17 @@ export function WorkflowCanvas({
             markerEnd="url(#arrowhead)"
           />
           {/* Hover/Selection Label */}
-          {(isSelected || zoom > 0.5) && (
+          {(isSelected || camera.k > 0.5) && (
             <foreignObject
               x={midX - 60}
-              y={midY - 20}
+              y={midY + 10} // Offset from edge
               width="120"
-              height="40"
+              height="20"
               className="overflow-visible pointer-events-none"
+              style={{ opacity: isSelected ? 1 : labelOpacity }}
             >
               <div className="flex justify-center items-center h-full">
-                <span className="px-2 py-1 rounded bg-card/90 border border-amber-500/30 text-[10px] font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap shadow-sm backdrop-blur-sm">
+                <span className="px-1.5 py-0.5 rounded bg-card/90 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 whitespace-nowrap shadow-sm backdrop-blur-sm">
                   ↩ {gate.outcomeName}
                 </span>
               </div>
@@ -255,16 +326,17 @@ export function WorkflowCanvas({
           markerEnd="url(#arrowhead)"
         />
         {/* Hover/Selection Label */}
-        {(isSelected || zoom > 0.5) && (
+        {(isSelected || camera.k > 0.5) && (
           <foreignObject
             x={midX - 60}
-            y={midY - 25}
+            y={midY - 22} // Offset from edge
             width="120"
-            height="40"
+            height="20"
             className="overflow-visible pointer-events-none"
+            style={{ opacity: isSelected ? 1 : labelOpacity }}
           >
             <div className="flex justify-center items-center h-full">
-              <span className="px-2 py-1 rounded bg-card/90 border border-border text-[10px] font-bold text-muted-foreground whitespace-nowrap shadow-sm backdrop-blur-sm">
+              <span className="px-1.5 py-0.5 rounded bg-card/90 border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap shadow-sm backdrop-blur-sm">
                 {gate.outcomeName}
               </span>
             </div>
@@ -274,26 +346,36 @@ export function WorkflowCanvas({
     );
   };
 
-  const isLowZoom = zoom < 0.5;
+  const isLowZoom = camera.k < 0.6;
 
   return (
     <div 
       ref={containerRef} 
-      className="w-full h-full bg-background canvas-grid relative overflow-hidden"
+      className={`w-full h-full bg-background canvas-grid relative overflow-hidden select-none ${isDragging ? "cursor-grabbing" : "cursor-default"}`}
       data-testid="workflow-canvas"
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onDoubleClick={(e) => {
+        if (e.target === e.currentTarget || (e.target as Element).id === "background-rect") {
+          zoomToFit();
+        }
+      }}
       onClick={() => onBackgroundClick?.()}
     >
       <svg 
-        viewBox={viewBox} 
         className="w-full h-full relative z-10"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
           <pattern
             id="grid"
-            width="20"
-            height="20"
+            width={20 * camera.k}
+            height={20 * camera.k}
             patternUnits="userSpaceOnUse"
+            patternTransform={`translate(${camera.x % (20 * camera.k)}, ${camera.y % (20 * camera.k)})`}
           >
             <circle cx="1" cy="1" r="0.5" fill="currentColor" className="text-muted-foreground/20" />
           </pattern>
@@ -310,73 +392,91 @@ export function WorkflowCanvas({
         </defs>
 
         {/* Background Grid */}
-        <rect width="100%" height="100%" fill="url(#grid)" className="pointer-events-none" />
+        <rect 
+          id="background-rect"
+          width="100%" 
+          height="100%" 
+          fill="url(#grid)" 
+          className="pointer-events-auto cursor-grab active:cursor-grabbing" 
+        />
 
-        {/* Edges */}
-        <g className="edges-layer">
-          {gates.map(renderEdge)}
-        </g>
+        {/* Camera Group */}
+        <g transform={`translate(${camera.x}, ${camera.y}) scale(${camera.k})`}>
+          {/* Edges */}
+          <g className="edges-layer">
+            {gates.map(renderEdge)}
+          </g>
 
-        {/* Nodes */}
-        <g className="nodes-layer">
-          {nodes.map(node => {
-            const pos = positions[node.id];
-            if (!pos) return null;
-            const isActive = spine.includes(node.id);
+          {/* Nodes */}
+          <g className="nodes-layer">
+            {nodes.map(node => {
+              const pos = positions[node.id];
+              if (!pos) return null;
+              const isActive = spine.includes(node.id);
+              const isSelected = selectedNodeId === node.id;
 
-            return (
-              <g 
-                key={node.id} 
-                transform={`translate(${pos.x}, ${pos.y})`}
-                className="cursor-pointer group"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNodeClick?.(node.id);
-                }}
-                data-testid="canvas-node"
-              >
-                <rect
-                  width={NODE_WIDTH}
-                  height={NODE_HEIGHT}
-                  rx="2"
-                  className={`fill-card border transition-all ${
-                    selectedNodeId === node.id ? "stroke-primary stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
-                    isActive ? "stroke-primary/50" : "stroke-border"
-                  } group-hover:stroke-primary`}
-                  strokeWidth={selectedNodeId === node.id ? "2" : "1"}
-                />
-                
-                {/* Node Label - Hidden at low zoom */}
-                {!isLowZoom && (
-                  <text
-                    x={NODE_WIDTH / 2}
-                    y={NODE_HEIGHT / 2}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    className="fill-foreground text-[10px] font-medium select-none pointer-events-none"
-                    data-zoom-level="detail"
-                  >
-                    {node.name}
-                  </text>
-                )}
+              return (
+                <TooltipProvider key={node.id}>
+                  <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                      <g 
+                        transform={`translate(${pos.x}, ${pos.y})`}
+                        className="cursor-pointer group"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNodeClick?.(node.id);
+                        }}
+                        data-testid="canvas-node"
+                      >
+                        <rect
+                          width={NODE_WIDTH}
+                          height={NODE_HEIGHT}
+                          rx="4"
+                          className={`fill-card border transition-all ${
+                            isSelected ? "stroke-primary stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
+                            isActive ? "stroke-primary/50" : "stroke-border"
+                          } group-hover:stroke-primary`}
+                          strokeWidth={isSelected ? "2" : "1"}
+                        />
+                        
+                        {/* Node Label - Hidden at very low zoom or truncated */}
+                        {!isLowZoom && (
+                          <text
+                            x={NODE_WIDTH / 2}
+                            y={NODE_HEIGHT / 2}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            className="fill-foreground text-[11px] font-semibold select-none pointer-events-none"
+                            data-zoom-level="detail"
+                          >
+                            {node.name.length > 18 ? `${node.name.slice(0, 16)}...` : node.name}
+                          </text>
+                        )}
 
-                {/* Entry Indicator */}
-                {node.isEntry && (
-                  <circle
-                    cx="0"
-                    cy={NODE_HEIGHT / 2}
-                    r="4"
-                    className="fill-primary shadow-sm"
-                  />
-                )}
-              </g>
-            );
-          })}
+                        {/* Entry Indicator */}
+                        {node.isEntry && (
+                          <circle
+                            cx="0"
+                            cy={NODE_HEIGHT / 2}
+                            r="4"
+                            className="fill-primary shadow-sm"
+                          />
+                        )}
+                      </g>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs font-medium">{node.name}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
+          </g>
         </g>
       </svg>
       
       {/* Zoom info for testing */}
-      <div className="hidden" data-testid="zoom-level">{zoom}</div>
+      <div className="hidden" data-testid="zoom-level">{camera.k}</div>
     </div>
   );
 }
