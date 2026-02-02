@@ -85,49 +85,49 @@ export default function WorkStationPage() {
     <div className="container mx-auto py-8 space-y-8 max-w-4xl">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight">Work Station</h1>
-            <p className="text-muted-foreground mt-2">
-              Execution surface for actionable tasks within your tenant.
-            </p>
-          </div>
-
-          {!selectedTask && (
-            <div className="flex items-center gap-2">
-              {assignmentFilter && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={clearAssignmentFilter}
-                  className="animate-in fade-in slide-in-from-right-2"
-                >
-                  Show All Tasks
-                </Button>
-              )}
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={assignmentFilter ? "default" : "outline"}
-                      size="sm"
-                      onClick={toggleAssignmentFilter}
-                    >
-                      <Filter className="mr-2 h-4 w-4" />
-                      Filter: My Assignments
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[300px]">
-                    <p>
-                      View filter only. This narrows your view to tasks where you are assigned but does not affect your ability to execute any task.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Work Station</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Execution surface for actionable tasks within your tenant.
+              </p>
             </div>
-          )}
-        </div>
+
+            {!selectedTask && (
+              <div className="flex items-center gap-2">
+                {assignmentFilter && (
+                  <Button 
+                    variant="outline" 
+                    size="compact" 
+                    onClick={clearAssignmentFilter}
+                    className="animate-in fade-in slide-in-from-right-2"
+                  >
+                    Show All Tasks
+                  </Button>
+                )}
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={assignmentFilter ? "default" : "outline"}
+                        size="compact"
+                        onClick={toggleAssignmentFilter}
+                      >
+                        <Filter className="mr-2 h-3.5 w-3.5" />
+                        Filter: My Assignments
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[300px]">
+                      <p className="text-xs">
+                        View filter only. This narrows your view to tasks where you are assigned but does not affect your ability to execute any task.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+          </div>
 
         {jobId && !selectedTask && (
           <div className="space-y-4">

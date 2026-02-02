@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { 
   GitBranchIcon, 
   ArrowRightIcon, 
@@ -72,33 +73,33 @@ export function EdgeDetailPanel({
   return (
     <div className="space-y-4" data-testid="edge-inspector" data-density="compact">
       <section className="space-y-3">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <GitBranchIcon className="size-3" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Edge Configuration</span>
+        <div className="flex items-center gap-2">
+          <GitBranchIcon className="size-3 text-muted-foreground" />
+          <Label variant="metadata">Edge Configuration</Label>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 p-3 rounded-md bg-muted/30 border">
           <div className="text-center space-y-0.5">
-            <div className="text-[9px] text-muted-foreground uppercase font-bold">Source</div>
+            <Label variant="metadata" className="opacity-70">Source</Label>
             <div className="text-xs font-medium truncate">{sourceNodeName}</div>
           </div>
           <ArrowRightIcon className="size-3 text-muted-foreground" />
           <div className="text-center space-y-0.5">
-            <div className="text-[9px] text-muted-foreground uppercase font-bold">Target</div>
+            <Label variant="metadata" className="opacity-70">Target</Label>
             <div className="text-xs font-medium truncate">{targetNodeName}</div>
           </div>
         </div>
       </section>
 
       <section className="space-y-1">
-        <label className="text-[9px] text-muted-foreground uppercase font-bold">Outcome Name</label>
+        <Label variant="metadata">Outcome Name</Label>
         <div className="p-2 rounded-md bg-background border font-mono text-xs">
           {outcomeName}
         </div>
       </section>
 
       <section className="space-y-1.5">
-        <label className="text-[9px] text-muted-foreground uppercase font-bold">Routing Type</label>
+        <Label variant="metadata">Routing Type</Label>
         <div className="flex items-center gap-2">
           <div className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
             edgeType === "loopback" 
@@ -125,7 +126,7 @@ export function EdgeDetailPanel({
 
       {isEditable && (
         <section className="space-y-2 pt-3 border-t">
-          <label className="text-[9px] text-muted-foreground uppercase font-bold">Modify Target</label>
+          <Label variant="metadata">Modify Target</Label>
           <div className="space-y-1.5">
             <select
               value={targetNodeId ?? "__terminal__"}
@@ -134,7 +135,7 @@ export function EdgeDetailPanel({
                 handleTargetChange(val === "__terminal__" ? null : val);
               }}
               disabled={isUpdating}
-              className="w-full h-8 rounded-md border bg-background px-2 text-xs focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
+              className="w-full h-8 rounded-md border bg-background px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
             >
               <option value="__terminal__">(Terminal) - End flow</option>
               {nodes.map(n => (

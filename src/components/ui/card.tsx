@@ -10,7 +10,7 @@ function Card({ className, variant = "default", ...props }: React.ComponentProps
       className={cn(
         "bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm group/card",
         variant === "default" && "gap-6 py-6",
-        variant === "compact" && "gap-4 py-4",
+        variant === "compact" && "gap-3 py-3",
         className
       )}
       {...props}
@@ -24,7 +24,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="card-header"
       className={cn(
         "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
-        "group-data-[variant=compact]/card:px-4 group-data-[variant=compact]/card:gap-1.5",
+        "group-data-[variant=compact]/card:px-3 group-data-[variant=compact]/card:gap-1",
         className
       )}
       {...props}
@@ -71,7 +71,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="card-content"
       className={cn(
         "px-6",
-        "group-data-[variant=compact]/card:px-4",
+        "group-data-[variant=compact]/card:px-3",
         className
       )}
       {...props}

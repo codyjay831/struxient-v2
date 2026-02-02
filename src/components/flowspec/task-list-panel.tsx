@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { CreateTaskDialog } from "./create-task-dialog";
 import { TaskDetailPanel } from "./task-detail-panel";
 import {
@@ -168,13 +169,13 @@ export function TaskListPanel({
   return (
     <div className="space-y-4">
       {/* Task List */}
-      <Card>
+      <Card variant="compact">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2">
               <ListTodoIcon className="size-4" />
-              Tasks in "{nodeName}"
-              <span className="text-sm font-normal text-muted-foreground">
+              <Label variant="metadata">Tasks in "{nodeName}"</Label>
+              <span className="text-[10px] font-normal text-muted-foreground">
                 ({localTasks.length})
               </span>
             </CardTitle>

@@ -20,6 +20,7 @@ import {
   SettingsIcon,
   AlertCircleIcon,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { TaskListPanel } from "./task-list-panel";
 
 export type CompletionRule = "ALL_TASKS_DONE" | "ANY_TASK_DONE" | "SPECIFIC_TASKS_DONE";
@@ -202,17 +203,17 @@ export function NodeDetailPanel({
       {/* Node Properties */}
       <Card variant="compact">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <CardTitle className="flex items-center gap-2">
             <SettingsIcon className="size-3" />
-            Node Properties
+            <Label variant="metadata">Node Properties</Label>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Name */}
           <div className="space-y-1">
-            <label htmlFor="node-name" className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
+            <Label variant="metadata" htmlFor="node-name">
               Name
-            </label>
+            </Label>
             <Input
               id="node-name"
               size="compact"
@@ -232,12 +233,12 @@ export function NodeDetailPanel({
                 checked={isEntry}
                 onChange={(e) => handleEntryToggle(e.target.checked)}
                 disabled={!isEditable || isSaving || (!canToggleEntryOff && isEntry)}
-                className="h-3.5 w-3.5 rounded border-input"
+                className="h-3.5 w-3.5 rounded border-input bg-background accent-primary"
               />
-              <label htmlFor="node-is-entry" className="text-xs flex items-center gap-1 font-medium">
+              <Label htmlFor="node-is-entry" className="flex items-center gap-1">
                 <FlagIcon className="size-3 text-green-600" />
                 Entry Node
-              </label>
+              </Label>
             </div>
             {!canToggleEntryOff && node.isEntry && (
               <p className="text-[10px] text-muted-foreground leading-tight">
@@ -248,15 +249,15 @@ export function NodeDetailPanel({
 
           {/* Completion Rule */}
           <div className="space-y-1">
-            <label htmlFor="completion-rule" className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
+            <Label variant="metadata" htmlFor="completion-rule">
               Completion Rule
-            </label>
+            </Label>
             <select
               id="completion-rule"
               value={completionRule}
               onChange={(e) => setCompletionRule(e.target.value as CompletionRule)}
               disabled={!isEditable || isSaving}
-              className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             >
               {Object.entries(completionRuleLabels).map(([value, label]) => (
                 <option key={value} value={value}>

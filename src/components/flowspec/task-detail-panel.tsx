@@ -20,6 +20,7 @@ import {
   FileTextIcon,
   ClipboardCheckIcon,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { OutcomesEditor } from "./outcomes-editor";
 import { EvidenceSchemaEditor } from "./evidence-schema-editor";
 import { CrossFlowDepsEditor } from "./cross-flow-deps-editor";
@@ -176,23 +177,24 @@ export function TaskDetailPanel({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2">
             <FileTextIcon className="size-4" />
-            Task Details
+            <Label variant="metadata">Task Details</Label>
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button variant="ghost" size="compact" onClick={onClose}>
             Close
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Name */}
-        <div className="space-y-2">
-          <label htmlFor="task-name" className="text-sm font-medium">
+        <div className="space-y-1">
+          <Label variant="metadata" htmlFor="task-name">
             Name
-          </label>
+          </Label>
           <Input
             id="task-name"
+            size="compact"
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={!isEditable || isSaving}
@@ -201,10 +203,10 @@ export function TaskDetailPanel({
         </div>
 
         {/* Instructions */}
-        <div className="space-y-2">
-          <label htmlFor="task-instructions" className="text-sm font-medium">
+        <div className="space-y-1">
+          <Label variant="metadata" htmlFor="task-instructions">
             Instructions
-          </label>
+          </Label>
           <textarea
             id="task-instructions"
             value={instructions}
@@ -217,7 +219,7 @@ export function TaskDetailPanel({
         </div>
 
         {/* Evidence Required Toggle */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -225,14 +227,14 @@ export function TaskDetailPanel({
               checked={evidenceRequired}
               onChange={(e) => setEvidenceRequired(e.target.checked)}
               disabled={!isEditable || isSaving}
-              className="h-4 w-4 rounded border-gray-300"
+              className="h-4 w-4 rounded border-gray-300 accent-primary"
             />
-            <label htmlFor="evidence-required" className="text-sm flex items-center gap-1">
+            <Label htmlFor="evidence-required" className="flex items-center gap-1">
               <ClipboardCheckIcon className="size-3 text-blue-600" />
               Require Evidence
-            </label>
+            </Label>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground leading-tight">
             When enabled, this task requires evidence to be attached when recording an outcome.
           </p>
         </div>

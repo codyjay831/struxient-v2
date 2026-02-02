@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Label } from "@/components/ui/label";
 import { WorkflowStatusBadge, WorkflowStatus } from "@/components/flowspec/workflow-status-badge";
 import { ValidationResultsDialog, ValidationError, parseValidationPath } from "@/components/flowspec/validation-results-dialog";
 import { CreateNodeDialog } from "@/components/flowspec/create-node-dialog";
@@ -672,21 +672,24 @@ export default function WorkflowDetailPage() {
               if (!open) handleClearSelection();
             }}
           >
-            <SheetContent 
-              side="right" 
-              className="w-96 sm:w-[450px] p-0 overflow-y-auto"
-              data-testid="inspector-root"
-            >
-              <SheetHeader className="p-4 border-b bg-muted/30 sticky top-0 z-10">
-                <SheetTitle className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-between">
+          <SheetContent 
+            side="right" 
+            variant="compact"
+            className="w-96 sm:w-[450px] p-0 overflow-y-auto"
+            data-testid="inspector-root"
+          >
+            <SheetHeader className="p-4 border-b bg-muted/30 sticky top-0 z-10">
+              <SheetTitle className="flex items-center justify-between">
+                <Label variant="metadata">
                   {selectedNodeId ? "Node Inspector" : "Edge Inspector"}
-                </SheetTitle>
-                <SheetDescription className="hidden">
-                  Configuration surface for the selected workflow element.
-                </SheetDescription>
-              </SheetHeader>
+                </Label>
+              </SheetTitle>
+              <SheetDescription className="hidden">
+                Configuration surface for the selected workflow element.
+              </SheetDescription>
+            </SheetHeader>
 
-              <div className="p-6">
+            <div className="p-4">
                 {selectedNodeId && selectedNode && (
                   <div data-testid="node-inspector">
                     <NodeDetailPanel
