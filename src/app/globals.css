@@ -68,6 +68,12 @@
   --flowspec-grid-dot: oklch(0.32 0 0);
 }
 
+/* Canvas Grid Pattern - CSS-based dots using semantic token */
+.canvas-grid {
+  background-image: radial-gradient(circle, var(--flowspec-grid-dot) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
 /* Light theme */
 .light {
   --background: oklch(0.985 0 0);

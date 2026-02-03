@@ -53,7 +53,7 @@ export function WorkflowCanvas({
   const spine = useMemo(() => computeDeterministicSpine(nodes, gates), [nodes, gates]);
 
   // 2. Assign coordinates
-  const positions = useMemo(() => {
+  const basePositions = useMemo(() => {
     const pos: Record<string, { x: number; y: number }> = {};
     const spineSet = new Set(spine);
     
@@ -90,6 +90,22 @@ export function WorkflowCanvas({
 
     return pos;
   }, [nodes, depthMap, spine]);
+
+  // 2.5 State for manual position overrides
+  const [positionOverrides, setPositionOverrides] = useState<Record<string, { x: number; y: number }>>({});
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [draggingCandidateNodeId, setDraggingCandidateNodeId] = useState<string | null>(null);
+  const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const DRAG_THRESHOLD_PX = 5;
+
+  // Combine base positions with overrides
+  const positions = useMemo(() => {
+    const combined = { ...basePositions };
+    Object.entries(positionOverrides).forEach(([id, override]) => {
+      combined[id] = override;
+    });
+    return combined;
+  }, [basePositions, positionOverrides]);
 
   // 3. Zoom-to-fit logic
   const zoomToFit = useCallback(() => {
@@ -147,7 +163,6 @@ export function WorkflowCanvas({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const zoomSpeed = 0.001;
     const delta = -e.deltaY;
     const zoomFactor = Math.pow(1.1, delta / 100);
     
@@ -163,14 +178,53 @@ export function WorkflowCanvas({
     setCamera({ x: newX, y: newY, k: newK });
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return; // Left click only
+    
+    // Robust pan gating: start pan only if event target is NOT within a node
+    // and not currently dragging a node
+    const target = e.target as Element;
+    const isNode = target.closest('[data-testid="canvas-node"]');
+    if (isNode || draggingNodeId || draggingCandidateNodeId) return;
+
     setIsDragging(true);
     dragStart.current = { x: e.clientX, y: e.clientY };
     cameraStart.current = { x: camera.x, y: camera.y };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.PointerEvent) => {
+    if (draggingCandidateNodeId && !draggingNodeId) {
+      if (pressStartRef.current) {
+        const dist = Math.sqrt(
+          Math.pow(e.clientX - pressStartRef.current.x, 2) +
+          Math.pow(e.clientY - pressStartRef.current.y, 2)
+        );
+        if (dist > DRAG_THRESHOLD_PX) {
+          setDraggingNodeId(draggingCandidateNodeId);
+        }
+      }
+    }
+
+    if (draggingNodeId) {
+      const dx = (e.clientX - dragStart.current.x) / camera.k;
+      const dy = (e.clientY - dragStart.current.y) / camera.k;
+      
+      setPositionOverrides(prev => {
+        const startPos = basePositions[draggingNodeId] || { x: 0, y: 0 };
+        const currentPos = prev[draggingNodeId] || startPos;
+        return {
+          ...prev,
+          [draggingNodeId]: {
+            x: currentPos.x + dx,
+            y: currentPos.y + dy
+          }
+        };
+      });
+      
+      dragStart.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
     if (!isDragging) return;
     
     const dx = e.clientX - dragStart.current.x;
@@ -183,8 +237,26 @@ export function WorkflowCanvas({
     }));
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.PointerEvent) => {
+    if (draggingCandidateNodeId && !draggingNodeId) {
+      // This was a click, not a drag
+      onNodeClick?.(draggingCandidateNodeId);
+    }
+    
     setIsDragging(false);
+    setDraggingNodeId(null);
+    setDraggingCandidateNodeId(null);
+    pressStartRef.current = null;
+  };
+
+  const handleNodePointerDown = (e: React.PointerEvent, nodeId: string) => {
+    if (e.button !== 0) return; // Left click only
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    
+    setDraggingCandidateNodeId(nodeId);
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    dragStart.current = { x: e.clientX, y: e.clientY };
   };
 
   // 4. Render helpers
@@ -367,58 +439,61 @@ export function WorkflowCanvas({
   return (
     <div 
       ref={containerRef} 
-      className={`w-full h-full bg-background canvas-grid relative overflow-hidden select-none ${isDragging ? "cursor-grabbing" : "cursor-default"}`}
+      className={`w-full h-full bg-background canvas-grid relative overflow-hidden select-none ${isDragging || draggingNodeId ? "cursor-grabbing" : "cursor-default"}`}
       data-testid="workflow-canvas"
       onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onPointerDown={handleMouseDown}
+      onPointerMove={handleMouseMove}
+      onPointerUp={handleMouseUp}
+      onPointerLeave={handleMouseUp}
       onDoubleClick={(e) => {
         if (e.target === e.currentTarget || (e.target as Element).id === "background-rect") {
           zoomToFit();
         }
       }}
-      onClick={() => onBackgroundClick?.()}
+      onClick={(e) => {
+        const target = e.target as Element;
+        // Guard: only fire background click if click originated from true background
+        if (target.closest('[data-testid="canvas-node"]')) return;
+        if (target.closest('[data-testid^="canvas-edge-"]')) return;
+        onBackgroundClick?.();
+      }}
     >
       <svg 
         className="w-full h-full relative z-10"
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <pattern
-            id="grid"
-            width={30 * camera.k}
-            height={30 * camera.k}
-            patternUnits="userSpaceOnUse"
-            patternTransform={`translate(${camera.x % (30 * camera.k)}, ${camera.y % (30 * camera.k)})`}
-          >
-            <circle 
-              cx={camera.k} 
-              cy={camera.k} 
-              r={0.75 * camera.k} 
-              fill="var(--flowspec-grid-dot)" 
-            />
-          </pattern>
           <marker
-            id="arrowhead"
+            id="arrowhead-muted"
             markerWidth="10"
             markerHeight="7"
             refX="9"
             refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--sx-elev-1)" />
+          </marker>
+          <marker
+            id="arrowhead-accent"
+            markerWidth="10"
+            markerHeight="7"
+            refX="9"
+            refY="3.5"
+            orient="auto"
+          >
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--sx-accent-0)" />
           </marker>
         </defs>
 
-        {/* Background Grid */}
+        {/* Background Click Layer (for panning) */}
         <rect 
           id="background-rect"
           width="100%" 
           height="100%" 
-          fill="url(#grid)" 
-          className="pointer-events-auto cursor-grab active:cursor-grabbing" 
+          fill="none" 
+          pointerEvents="all"
+          className="cursor-grab active:cursor-grabbing" 
         />
 
         {/* Camera Group */}
@@ -443,10 +518,7 @@ export function WorkflowCanvas({
                       <g 
                         transform={`translate(${pos.x}, ${pos.y})`}
                         className="cursor-pointer group"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onNodeClick?.(node.id);
-                        }}
+                        onPointerDown={(e) => handleNodePointerDown(e, node.id)}
                         data-testid="canvas-node"
                       >
                         <rect
@@ -495,9 +567,6 @@ export function WorkflowCanvas({
           </g>
         </g>
       </svg>
-      
-      {/* Zoom info for testing */}
-      <div className="hidden" data-testid="zoom-level">{camera.k}</div>
     </div>
   );
 }
