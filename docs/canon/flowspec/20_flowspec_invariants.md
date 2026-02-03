@@ -566,6 +566,40 @@ CI guards (`guard_fs_iso_01.mjs`, `guard_fs_join_01.mjs`) monitoring imports and
 | INV-029 | Execution Step Ceiling | Execution |
 | INV-030 | Analysis Purity | Boundaries |
 | INV-031 | Responsibility Isolation | Boundaries |
+| INV-032 | Policy Only Affects Signals | Policy |
+| INV-033 | Policy Scoped to FlowGroup | Policy |
+
+---
+
+### INV-032: Policy Only Affects Signals
+
+**Statement:**  
+Policy overrides (SLA, priority, due dates) MUST NOT modify workflow structure (Nodes, Gates, Outcomes) or Task Actionability.
+
+**Rationale:**  
+Policy is operational configuration, not execution logic. Conflating them breaks the "Graph IS the execution model" principle and creates hidden side-effects.
+
+**Violation Example:**  
+An SLA override of 0 hours causes a Task to become Actionable before its dependencies are met.
+
+**Detection Idea:**  
+Assert that `getActionableTasks` result set is identical regardless of Policy configuration.
+
+---
+
+### INV-033: Policy Scoped to FlowGroup + taskId (v1)
+
+**Statement:**  
+In v1, Policy overrides are keyed by `(FlowGroupPolicy, taskId)`. An override for a `taskId` MUST apply uniformly to all flows within the FlowGroup that contain that `taskId`.
+
+**Rationale:**  
+Simplifies management for the primary unit of work (Job). Per-flow granularity within a FlowGroup is deferred to prevent combinatorial complexity in early phases.
+
+**Violation Example:**  
+Creating two different SLA overrides for the same `taskId` in different flows of the same `FlowGroup`.
+
+**Detection Idea:**  
+Schema unique constraint `@@unique([flowGroupPolicyId, taskId])` on `TaskPolicyOverride`.
 
 ---
 

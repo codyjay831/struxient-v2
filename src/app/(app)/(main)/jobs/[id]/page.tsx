@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ArrowLeft, User, MapPin, Clock, History, FileText, CheckCircle2, Play, ExternalLink, AlertCircle, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { JobPolicyPanel } from "./_components/job-policy-panel";
 
 /**
  * Deterministic Stall Diagnosis Panel
@@ -236,6 +237,8 @@ export default function JobCardPage() {
               </div>
             </CardContent>
           </Card>
+
+          <JobPolicyPanel flowGroupId={job.flowGroupId} />
 
           <Card className="bg-muted/30">
             <CardContent className="p-4">

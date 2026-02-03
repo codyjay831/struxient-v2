@@ -18,8 +18,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle, Clock, AlertTriangle, Zap } from "lucide-react";
-import { applyAllFilters, type SignalFilters } from "../_lib/filter-logic";
+import { Loader2, RefreshCw, AlertCircle, Briefcase, UserCircle, Clock, AlertTriangle, Zap, LayoutGrid } from "lucide-react";
+import { applyAllFilters, type SignalFilters, type TaskView } from "../_lib/filter-logic";
+import { TaskSignalSummary } from "./task-signal-summary";
+import { TaskViewSelector } from "./task-view-selector";
 
 export interface TaskSignals {
   jobPriority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
@@ -57,6 +59,24 @@ export interface ActionableTask {
     }>
   };
   _signals?: TaskSignals;
+  diagnostics?: {
+    evidence?: {
+      required: boolean;
+      status: "missing" | "present" | "unknown";
+      reason?: string;
+    };
+  };
+  context?: {
+    jobId?: string;
+    customerId?: string;
+  };
+  recommendations?: Array<{
+    kind: "open_task" | "open_job" | "open_customer" | "open_settings";
+    label: string;
+    href?: string;
+    reason: string;
+    severity?: "info" | "warn" | "block";
+  }>;
 }
 
 interface TaskFeedProps {
@@ -77,7 +97,12 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
   const [signalFilters, setSignalFilters] = useState<SignalFilters>({
     showOverdueOnly: false,
     showHighPriorityOnly: false,
+    view: "all",
   });
+
+  const setView = (view: TaskView) => {
+    setSignalFilters(f => ({ ...f, view }));
+  };
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -193,38 +218,22 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
         </div>
-        
-        {/* Signal Filter Toggles - client-side filtering only */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={signalFilters.showOverdueOnly ? "destructive" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={toggleOverdueFilter}
-          >
-            <AlertTriangle className="mr-1 h-3 w-3" />
-            Overdue Only
-          </Button>
-          <Button
-            variant={signalFilters.showHighPriorityOnly ? "default" : "outline"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={togglePriorityFilter}
-          >
-            <Zap className="mr-1 h-3 w-3" />
-            High Priority
-          </Button>
-          {(signalFilters.showOverdueOnly || signalFilters.showHighPriorityOnly) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs text-muted-foreground"
-              onClick={() => setSignalFilters({ showOverdueOnly: false, showHighPriorityOnly: false })}
-            >
-              Clear Filters
-            </Button>
-          )}
-        </div>
+
+        {/* View Selector - Slice B */}
+        <TaskViewSelector 
+          currentView={signalFilters.view || "all"} 
+          onViewChange={setView} 
+        />
+
+        {/* Signal Summary Header - Slice A */}
+        <TaskSignalSummary 
+          tasks={tasks}
+          filters={signalFilters}
+          onToggleOverdue={toggleOverdueFilter}
+          onTogglePriority={togglePriorityFilter}
+          onViewChange={setView}
+          onClearFilters={() => setSignalFilters({ showOverdueOnly: false, showHighPriorityOnly: false, view: "all" })}
+        />
         
         {/* OPTION_A_SPEC #4: Indicator */}
         <p className="text-sm text-muted-foreground">

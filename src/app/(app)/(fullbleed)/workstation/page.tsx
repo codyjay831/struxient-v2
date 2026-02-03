@@ -17,6 +17,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TaskFeed, type ActionableTask } from "./_components/task-feed";
 import { TaskExecution } from "./_components/task-execution";
+import { QuickFixPanel } from "./_components/quick-fix-panel";
 import { JobHeader } from "./_components/job-header";
 import { Button } from "@/components/ui/button";
 import { X, Filter, Info } from "lucide-react";
@@ -147,13 +148,20 @@ export default function WorkStationPage() {
       </div>
 
       {/* Content */}
-      <div>
+      <div className="min-h-[600px]">
         {selectedTask ? (
-          <TaskExecution
-            task={selectedTask}
-            onBack={handleBack}
-            onComplete={handleComplete}
-          />
+          <div className="flex flex-col md:flex-row gap-0 border rounded-xl overflow-hidden shadow-sm bg-card">
+            <div className="flex-1 p-6 overflow-y-auto max-h-[800px]">
+              <TaskExecution
+                task={selectedTask}
+                onBack={handleBack}
+                onComplete={handleComplete}
+              />
+            </div>
+            <div className="w-full md:w-72 flex-shrink-0">
+              <QuickFixPanel task={selectedTask} />
+            </div>
+          </div>
         ) : (
           <TaskFeed
             key={`${refreshKey}-${jobId}`}

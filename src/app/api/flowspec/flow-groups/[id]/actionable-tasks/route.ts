@@ -15,6 +15,8 @@ import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiList, apiError } from "@/lib/api-utils";
 import { getActionableTasks } from "@/lib/flowspec/engine";
 import { computeEffectivePolicy, computeTaskSignals } from "@/lib/flowspec/policy";
+import { checkEvidenceRequirements } from "@/lib/flowspec/evidence";
+import { buildRecommendations } from "@/lib/flowspec/recommendations";
 import type { WorkflowSnapshot } from "@/lib/flowspec/types";
 import type { NodeActivation } from "@prisma/client";
 import { NextRequest } from "next/server";
@@ -36,7 +38,12 @@ export async function GET(request: NextRequest, { params }: Props) {
     const flowGroup = await prisma.flowGroup.findUnique({
       where: { id: flowGroupId },
       include: {
-        job: { select: { id: true } }
+        job: { 
+          select: { 
+            id: true,
+            customerId: true
+          } 
+        }
       }
     });
 
@@ -55,6 +62,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       include: {
         workflowVersion: true,
         nodeActivations: true,
+        evidenceAttachments: true,
       },
     });
 
@@ -103,7 +111,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       effectivePolicy = await computeEffectivePolicy(flowGroupId, mergedSnapshot);
     }
 
-    // Enrich tasks with _metadata.assignments and _signals
+    // Enrich tasks with _metadata.assignments, _signals, and diagnostics
     // INVARIANT: Do NOT reorder - signals are read-only enrichment
     const enrichedTasks = groupTasks.map(task => {
       // Find the flow for this task
@@ -126,7 +134,29 @@ export async function GET(request: NextRequest, { params }: Props) {
             isDueSoon: false,
           };
 
-      return {
+      // Compute diagnostics (Slice C Patch 2)
+      const taskEvidence = flow?.evidenceAttachments.filter(
+        ev => ev.taskId === task.taskId
+      ) || [];
+      
+      const evidenceReq = checkEvidenceRequirements(task as any, taskEvidence);
+      
+      const diagnostics = {
+        evidence: {
+          required: task.evidenceRequired,
+          status: evidenceReq.satisfied 
+            ? ("present" as const) 
+            : ("missing" as const),
+          reason: evidenceReq.error
+        }
+      };
+
+      const context = flowGroup.job?.id ? {
+        jobId: flowGroup.job.id,
+        customerId: flowGroup.job.customerId
+      } : undefined;
+
+      const enrichedTask = {
         ...task,
         _metadata: {
           assignments: assignments.map((a: any) => ({
@@ -135,7 +165,14 @@ export async function GET(request: NextRequest, { params }: Props) {
             assignee: a.member || a.externalParty
           }))
         },
-        _signals: signals
+        _signals: signals,
+        diagnostics,
+        context
+      };
+
+      return {
+        ...enrichedTask,
+        recommendations: buildRecommendations(enrichedTask as any)
       };
     });
 

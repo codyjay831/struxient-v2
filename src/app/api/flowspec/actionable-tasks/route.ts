@@ -15,6 +15,8 @@ import { getActorTenantContext, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiList } from "@/lib/api-utils";
 import { getActionableTasks } from "@/lib/flowspec/engine";
 import { computeEffectivePolicy, computeTaskSignals } from "@/lib/flowspec/policy";
+import { checkEvidenceRequirements } from "@/lib/flowspec/evidence";
+import { buildRecommendations } from "@/lib/flowspec/recommendations";
 import type { WorkflowSnapshot } from "@/lib/flowspec/types";
 import type { NodeActivation } from "@prisma/client";
 import { NextRequest } from "next/server";
@@ -38,10 +40,14 @@ export async function GET(request: NextRequest) {
       include: {
         workflowVersion: true,
         nodeActivations: true,
+        evidenceAttachments: true,
         flowGroup: {
           include: {
             job: {
-              select: { id: true }
+              select: { 
+                id: true,
+                customerId: true
+              }
             }
           }
         }
@@ -98,21 +104,26 @@ export async function GET(request: NextRequest) {
     // Build a lookup for flow data
     const flowDataMap = new Map<string, { 
       jobId: string | undefined; 
+      customerId: string | undefined;
       nodeActivations: NodeActivation[];
+      evidenceAttachments: any[];
     }>();
     for (const flow of activeFlows) {
       flowDataMap.set(flow.id, {
         jobId: flow.flowGroup.job?.id,
+        customerId: flow.flowGroup.job?.customerId,
         nodeActivations: flow.nodeActivations,
+        evidenceAttachments: flow.evidenceAttachments,
       });
     }
 
-    // 5. Enrich tasks with _metadata.assignments and _signals
+    // 5. Enrich tasks with _metadata.assignments, _signals, and diagnostics
     // INVARIANT: Do NOT reorder - signals are read-only enrichment
     const enrichedTasks = allActionableTasks.map(task => {
       // Find the flow data
       const flowData = flowDataMap.get(task.flowId);
       const jobId = flowData?.jobId;
+      const customerId = flowData?.customerId;
       const assignments = jobId ? assignmentsByJob.get(jobId) || [] : [];
 
       // Get effective policy for this flow group
@@ -135,7 +146,26 @@ export async function GET(request: NextRequest) {
             isDueSoon: false,
           };
 
-      return {
+      // Compute diagnostics (Slice C Patch 2)
+      const taskEvidence = flowData?.evidenceAttachments.filter(
+        ev => ev.taskId === task.taskId
+      ) || [];
+      
+      const evidenceReq = checkEvidenceRequirements(task as any, taskEvidence);
+      
+      const diagnostics = {
+        evidence: {
+          required: task.evidenceRequired,
+          status: evidenceReq.satisfied 
+            ? ("present" as const) 
+            : ("missing" as const),
+          reason: evidenceReq.error
+        }
+      };
+
+      const context = jobId ? { jobId, customerId } : undefined;
+
+      const enrichedTask = {
         ...task,
         _metadata: {
           assignments: assignments.map((a: any) => ({
@@ -144,7 +174,14 @@ export async function GET(request: NextRequest) {
             assignee: a.member || a.externalParty
           }))
         },
-        _signals: signals
+        _signals: signals,
+        diagnostics,
+        context
+      };
+
+      return {
+        ...enrichedTask,
+        recommendations: buildRecommendations(enrichedTask as any)
       };
     });
 

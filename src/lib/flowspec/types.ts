@@ -261,6 +261,31 @@ export interface ActionableTask {
   iteration: number;
   domainHint: "execution" | "finance" | "sales";
   startedAt: Date | null;
+  diagnostics?: {
+    evidence?: {
+      required: boolean;
+      status: "missing" | "present" | "unknown";
+      reason?: string;
+    };
+  };
+  context?: {
+    jobId?: string;
+    customerId?: string;
+  };
+  _signals?: {
+    jobPriority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+    effectiveSlaHours: number | null;
+    effectiveDueAt: string | null;
+    isOverdue: boolean;
+    isDueSoon: boolean;
+  };
+  recommendations?: Array<{
+    kind: "open_task" | "open_job" | "open_customer" | "open_settings";
+    label: string;
+    href?: string;
+    reason: string;
+    severity?: "info" | "warn" | "block";
+  }>;
 }
 
 // =============================================================================

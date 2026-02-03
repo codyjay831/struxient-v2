@@ -34,9 +34,12 @@ export function filterMyAssignments(
  * Filter configuration for signal-based filtering.
  * All filters are client-side only; canonical ordering unchanged.
  */
+export type TaskView = "all" | "overdue" | "dueSoon" | "priority";
+
 export interface SignalFilters {
   showOverdueOnly: boolean;
   showHighPriorityOnly: boolean;
+  view?: TaskView;
 }
 
 /**
@@ -49,6 +52,28 @@ export function filterBySignals(
 ): ActionableTask[] {
   let result = tasks;
 
+  // View-based base filtering
+  if (filters.view && filters.view !== "all") {
+    switch (filters.view) {
+      case "overdue":
+        result = result.filter(task => task._signals?.isOverdue === true);
+        break;
+      case "dueSoon":
+        result = result.filter(task => 
+          task._signals?.isDueSoon === true && 
+          task._signals?.isOverdue !== true
+        );
+        break;
+      case "priority":
+        result = result.filter(task => 
+          task._signals?.jobPriority === "HIGH" || 
+          task._signals?.jobPriority === "URGENT"
+        );
+        break;
+    }
+  }
+
+  // Legacy/Advanced toggles (additional narrowing)
   if (filters.showOverdueOnly) {
     result = result.filter(task => task._signals?.isOverdue === true);
   }
