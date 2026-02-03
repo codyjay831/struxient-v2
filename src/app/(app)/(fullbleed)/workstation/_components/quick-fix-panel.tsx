@@ -109,11 +109,9 @@ export function QuickFixPanel({ task }: QuickFixPanelProps) {
 
                 if (rec.href) {
                   return (
-                    <Link key={idx} href={rec.href} passHref legacyBehavior>
-                      <Button variant="outline" size="sm" className="w-full h-auto py-2 px-3 justify-start items-start" asChild>
-                        <a>{content}</a>
-                      </Button>
-                    </Link>
+                    <Button key={idx} variant="outline" size="sm" className="w-full h-auto py-2 px-3 justify-start items-start" asChild>
+                      <Link href={rec.href}>{content}</Link>
+                    </Button>
                   );
                 }
 
@@ -132,38 +130,32 @@ export function QuickFixPanel({ task }: QuickFixPanelProps) {
           <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Safe Navigation</p>
           <div className="grid gap-2">
             {task.context?.jobId && (
-              <Link href={`/jobs/${task.context.jobId}`} passHref legacyBehavior>
-                <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
-                  <a>
-                    <Briefcase className="mr-2 h-3.5 w-3.5" />
-                    Open Job Profile
-                    <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
-                  </a>
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
+                <Link href={`/jobs/${task.context.jobId}`}>
+                  <Briefcase className="mr-2 h-3.5 w-3.5" />
+                  Open Job Profile
+                  <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
+                </Link>
+              </Button>
             )}
 
             {task.context?.customerId && (
-              <Link href={`/customers/${task.context.customerId}`} passHref legacyBehavior>
-                <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
-                  <a>
-                    <User className="mr-2 h-3.5 w-3.5" />
-                    Open Customer
-                    <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
-                  </a>
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
+                <Link href={`/customers/${task.context.customerId}`}>
+                  <User className="mr-2 h-3.5 w-3.5" />
+                  Open Customer
+                  <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
+                </Link>
+              </Button>
             )}
             
-            <Link href="/settings" passHref legacyBehavior>
-              <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
-                <a>
-                  <Settings className="mr-2 h-3.5 w-3.5" />
-                  Capability Settings
-                  <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
-                </a>
-              </Button>
-            </Link>
+            <Button variant="outline" size="sm" className="w-full justify-start text-xs h-8" asChild>
+              <Link href="/settings">
+                <Settings className="mr-2 h-3.5 w-3.5" />
+                Capability Settings
+                <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
+              </Link>
+            </Button>
 
             {!task.context?.jobId && !task.context?.customerId && (
               <p className="text-[10px] text-muted-foreground bg-muted/30 p-2 rounded text-center">

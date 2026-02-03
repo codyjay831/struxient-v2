@@ -9,6 +9,7 @@ export interface Node {
   id: string;
   name: string;
   isEntry: boolean;
+  position?: { x: number; y: number } | null;
 }
 
 export interface Gate {
@@ -159,4 +160,39 @@ export function slugify(text: string): string {
     .trim()
     .replace(/\s+/g, "-") // Replace spaces with -
     .replace(/--+/g, "-"); // Replace multiple - with single -
+}
+
+/**
+ * Computes the intersection point of a line segment (from center to target)
+ * with the perimeter of a rectangle.
+ */
+export function getPerimeterPoint(
+  fromX: number,
+  fromY: number,
+  rectX: number,
+  rectY: number,
+  width: number,
+  height: number,
+  padding = 0
+): { x: number; y: number } {
+  const centerX = rectX + width / 2;
+  const centerY = rectY + height / 2;
+  
+  const dx = fromX - centerX;
+  const dy = fromY - centerY;
+  
+  if (dx === 0 && dy === 0) return { x: centerX, y: centerY };
+  
+  const halfWidth = width / 2 + padding;
+  const halfHeight = height / 2 + padding;
+  
+  const scaleX = Math.abs(halfWidth / dx);
+  const scaleY = Math.abs(halfHeight / dy);
+  
+  const scale = Math.min(scaleX, scaleY);
+  
+  return {
+    x: centerX + dx * scale,
+    y: centerY + dy * scale
+  };
 }

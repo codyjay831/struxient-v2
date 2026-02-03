@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeft, Menu } from "lucide-react";
+import { PanelLeftClose, Menu } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -163,7 +163,7 @@ function MobileSidebar() {
 }
 
 export function AppSidebar() {
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, setCollapsed, toggle } = useSidebar();
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -184,56 +184,55 @@ export function AppSidebar() {
             collapsed ? "justify-center px-2" : "justify-between px-4"
           )}
         >
-          {!collapsed && (
-            <Link href="/workstation" className="flex items-center gap-2">
-              <Image
-                src="/struxient_brand_assets/struxient-mark-32.png"
-                alt="Struxient"
-                width={24}
-                height={24}
-                className="h-6 w-6"
-              />
+          <button
+            type="button"
+            className={cn(
+              "flex items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm transition-all",
+              collapsed ? "cursor-pointer" : "cursor-default"
+            )}
+            onClick={() => collapsed && setCollapsed(false)}
+            onKeyDown={(e) => {
+              if (collapsed && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                setCollapsed(false);
+              }
+            }}
+            aria-label={collapsed ? "Expand sidebar" : "Struxient Home"}
+            aria-disabled={!collapsed}
+            data-testid="sidebar-logo"
+          >
+            <Image
+              src="/struxient_brand_assets/struxient-mark-32.png"
+              alt="Struxient"
+              width={24}
+              height={24}
+              className="h-6 w-6"
+            />
+            {!collapsed && (
               <span className="font-semibold text-sidebar-foreground">
                 Struxient
               </span>
-            </Link>
-          )}
-          {collapsed && (
-            <Link href="/workstation">
-              <Image
-                src="/struxient_brand_assets/struxient-mark-32.png"
-                alt="Struxient"
-                width={24}
-                height={24}
-                className="h-6 w-6"
-              />
-            </Link>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggle}
-                className={cn(
-                  "h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  collapsed && "absolute right-0 translate-x-1/2 bg-sidebar border border-sidebar-border rounded-full shadow-sm z-10"
-                )}
-              >
-                {collapsed ? (
-                  <PanelLeft className="h-4 w-4" />
-                ) : (
+            )}
+          </button>
+          {/* Collapse toggle - only shown when expanded (logo handles expansion when collapsed) */}
+          {!collapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggle}
+                  className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
                   <PanelLeftClose className="h-4 w-4" />
-                )}
-                <span className="sr-only">
-                  {collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{collapsed ? "Expand sidebar" : "Collapse sidebar"}</p>
-            </TooltipContent>
-          </Tooltip>
+                  <span className="sr-only">Collapse sidebar</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Collapse sidebar</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         <SidebarContent collapsed={collapsed} />

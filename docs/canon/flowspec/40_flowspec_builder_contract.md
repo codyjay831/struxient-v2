@@ -255,6 +255,35 @@ This section defines canvas interaction semantics. These interactions are purely
 - Execution order is determined by Gates and Outcomes only.
 - Canvas layout helps humans understand; it does not instruct the engine.
 
+### 5.5.8 Persisted Spatial Layout (Draft Only)
+
+**Invariant — Persisted Spatial Layout (Draft Only)**
+Node spatial positions are persisted as design-time metadata for Draft workflows. Manual layout changes MUST survive reloads and sessions. Spatial layout MUST NOT affect execution semantics and MUST NOT be mutated for Published or Validated workflows.
+
+**The "Why"**
+The FlowSpec Builder is an Orienting Surface. Manual spatial arrangement is a deliberate act of design that encodes how a human should read the workflow topology. Persistence ensures this "mental map" remains stable, preventing disorientation and accidental layout loss across sessions.
+
+**Implementation Anchors:**
+- `src/components/canvas/workflow-canvas.tsx` (Coordinates preference logic)
+- `src/app/(app)/(fullbleed)/flowspec/[workflowId]/page.tsx` (Drag-end persistence gate)
+- `Node.position` schema field (Authoritative storage)
+
+### 5.5.9 Loopback Edge Directionality & Perimeter Anchoring
+
+**Invariant — Loopback Arrowheads**
+Loopback edges (blue dashed) MUST render with visible arrowheads to indicate directionality. This is a requirement for the Builder's role as an Orienting Surface. Forward-flowing edges remain arrowless to reduce visual noise.
+
+**Invariant — Perimeter Anchoring**
+Loopback edge path endpoints MUST NOT be fixed to node centers or a single side. Endpoints MUST be computed as the intersection point of the edge path with the node's rectangular perimeter. This ensures the edge enters/leaves the node at a natural angle regardless of relative node positions.
+
+**Invariant — Visibility Padding**
+Target endpoints for loopback edges MUST be padded outward from the node perimeter (recommended: 6px). This ensures the SVG arrowhead marker is fully visible and not clipped or hidden under the node's visual rectangle.
+
+**Implementation Anchors:**
+- `src/lib/canvas/layout.ts` (`getPerimeterPoint` utility)
+- `src/components/canvas/workflow-canvas.tsx` (`renderEdge` loopback branch using `getPerimeterPoint` + padding)
+- `src/components/canvas/workflow-canvas.tsx` (`<marker id="arrowhead-special">` definitions)
+
 ---
 
 ## 5.6 Structured Builder Interaction Contract (Phase 1)

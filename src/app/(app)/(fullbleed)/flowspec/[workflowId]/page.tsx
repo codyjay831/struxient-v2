@@ -78,6 +78,7 @@ interface Node {
   isEntry: boolean;
   completionRule: CompletionRule;
   tasks: Task[];
+  position?: { x: number; y: number } | null;
 }
 
 interface Gate {
@@ -135,6 +136,26 @@ export default function WorkflowDetailPage() {
   const handleClearSelection = () => {
     setSelectedNodeId(null);
     setSelectedEdgeKey(null);
+  };
+
+  const handleNodeDragEnd = async (nodeId: string, position: { x: number; y: number }) => {
+    if (workflow?.status !== "DRAFT") return;
+
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/nodes/${nodeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ position }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to persist node position");
+      }
+      // Note: We don't refresh the full workflow here to avoid layout jank during interaction.
+      // The local position state in WorkflowCanvas handles visual consistency.
+    } catch (err) {
+      console.error("Error persisting node position", err);
+    }
   };
   
   // Versions state
@@ -604,6 +625,7 @@ export default function WorkflowDetailPage() {
               onNodeClick={handleNodeSelect}
               onEdgeClick={handleEdgeSelect}
               onBackgroundClick={handleClearSelection}
+              onNodeDragEnd={handleNodeDragEnd}
               selectedNodeId={selectedNodeId}
               selectedEdgeKey={selectedEdgeKey}
             />
@@ -635,9 +657,17 @@ export default function WorkflowDetailPage() {
                     <LayersIcon className="size-4" />
                     Nodes ({workflow.nodes.length})
                   </CardTitle>
-                  <Button variant="ghost" size="icon-xs" onClick={() => setIsSidebarExpanded(false)}>
-                    <XIcon className="size-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {isEditable && (
+                      <CreateNodeDialog 
+                        workflowId={workflowId} 
+                        onNodeCreated={fetchWorkflow} 
+                      />
+                    )}
+                    <Button variant="ghost" size="icon-xs" onClick={() => setIsSidebarExpanded(false)}>
+                      <XIcon className="size-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-1">

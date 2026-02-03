@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useEffect, useRef, useState, useCallback } from "react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Node, 
   Gate, 
@@ -10,7 +9,8 @@ import {
   computeDeterministicSpine,
   EdgeType,
   generateEdgeKey,
-  slugify
+  slugify,
+  getPerimeterPoint
 } from "@/lib/canvas/layout";
 
 interface WorkflowCanvasProps {
@@ -19,6 +19,7 @@ interface WorkflowCanvasProps {
   onNodeClick?: (nodeId: string) => void;
   onEdgeClick?: (edgeKey: string) => void;
   onBackgroundClick?: () => void;
+  onNodeDragEnd?: (nodeId: string, position: { x: number; y: number }) => void;
   selectedNodeId?: string | null;
   selectedEdgeKey?: string | null;
   scale?: number; // Injectable for testing
@@ -27,12 +28,13 @@ interface WorkflowCanvasProps {
 export function WorkflowCanvas({ 
   nodes, 
   gates, 
-  onNodeClick,
-  onEdgeClick,
+  onNodeClick, 
+  onEdgeClick, 
   onBackgroundClick,
-  selectedNodeId,
-  selectedEdgeKey,
-  scale: initialScale = 1
+  onNodeDragEnd,
+  selectedNodeId, 
+  selectedEdgeKey, 
+  scale: initialScale = 1 
 }: WorkflowCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -57,13 +59,22 @@ export function WorkflowCanvas({
     const pos: Record<string, { x: number; y: number }> = {};
     const spineSet = new Set(spine);
     
-    // Position spine nodes along Y=0
-    spine.forEach((id, index) => {
-      pos[id] = { x: index * X_GAP, y: 0 };
+    // Fill in explicit positions from database first
+    nodes.forEach(node => {
+      if (node.position) {
+        pos[node.id] = { x: node.position.x, y: node.position.y };
+      }
     });
 
-    // Position non-spine nodes based on their depth and alphabetical order at that depth
-    const nonSpineNodes = nodes.filter(n => !spineSet.has(n.id));
+    // Position spine nodes along Y=0 (only if not explicitly positioned)
+    spine.forEach((id, index) => {
+      if (!pos[id]) {
+        pos[id] = { x: index * X_GAP, y: 0 };
+      }
+    });
+
+    // Position non-spine nodes based on their depth and alphabetical order at that depth (only if not explicitly positioned)
+    const nonSpineNodes = nodes.filter(n => !spineSet.has(n.id) && !pos[n.id]);
     const nodesByDepth: Record<number, string[]> = {};
     
     nonSpineNodes.forEach(node => {
@@ -82,8 +93,8 @@ export function WorkflowCanvas({
       });
     });
 
-    // Handle unreachable nodes at the end
-    const unreachable = nodes.filter(n => depthMap[n.id] === Infinity);
+    // Handle unreachable nodes at the end (only if not explicitly positioned)
+    const unreachable = nodes.filter(n => depthMap[n.id] === Infinity && !pos[n.id]);
     unreachable.sort((a, b) => a.id.localeCompare(b.id)).forEach((node, index) => {
       pos[node.id] = { x: 0, y: (index + 1) * Y_GAP + 300 }; // Far below
     });
@@ -241,6 +252,12 @@ export function WorkflowCanvas({
     if (draggingCandidateNodeId && !draggingNodeId) {
       // This was a click, not a drag
       onNodeClick?.(draggingCandidateNodeId);
+    } else if (draggingNodeId) {
+      // This was a drag end
+      const finalPos = positions[draggingNodeId];
+      if (finalPos) {
+        onNodeDragEnd?.(draggingNodeId, finalPos);
+      }
     }
     
     setIsDragging(false);
@@ -303,7 +320,6 @@ export function WorkflowCanvas({
             stroke="currentColor"
             strokeWidth={isSelected ? "3" : "2"}
             className={loopColor}
-            markerEnd="url(#arrowhead)"
           />
         </g>
       );
@@ -330,17 +346,38 @@ export function WorkflowCanvas({
             stroke="currentColor"
             strokeWidth={isSelected ? "3" : "2"}
             className="text-muted-foreground/40"
-            markerEnd="url(#arrowhead)"
           />
         </g>
       );
     }
 
     const isLoopback = edgeType === "loopback";
-    const startX = source.x + NODE_WIDTH;
-    const startY = source.y + NODE_HEIGHT / 2;
-    const endX = target.x;
-    const endY = target.y + NODE_HEIGHT / 2;
+    
+    // Geometry calculation: anchor points to node perimeters
+    let startX = source.x + NODE_WIDTH;
+    let startY = source.y + NODE_HEIGHT / 2;
+    let endX = target ? target.x : startX + 40;
+    let endY = target ? target.y + NODE_HEIGHT / 2 : startY;
+
+    if (isLoopback && target) {
+      // For loopbacks, we dip below the nodes. 
+      // We compute perimeter points relative to this dip point so the curve
+      // enters/leaves the nodes at the correct angle.
+      const sCenter = { x: source.x + NODE_WIDTH / 2, y: source.y + NODE_HEIGHT / 2 };
+      const tCenter = { x: target.x + NODE_WIDTH / 2, y: target.y + NODE_HEIGHT / 2 };
+      
+      const dipX = (sCenter.x + tCenter.x) / 2;
+      const dipY = Math.max(sCenter.y, tCenter.y) + 120;
+      
+      // Padding of 6px on target perimeter to keep arrowhead tip outside node border
+      const startP = getPerimeterPoint(dipX, dipY, source.x, source.y, NODE_WIDTH, NODE_HEIGHT);
+      const endP = getPerimeterPoint(dipX, dipY, target.x, target.y, NODE_WIDTH, NODE_HEIGHT, 6);
+      
+      startX = startP.x;
+      startY = startP.y;
+      endX = endP.x;
+      endY = endP.y;
+    }
 
     const labelOpacity = camera.k < 0.6 ? 0 : (camera.k - 0.6) / 0.4;
 
@@ -364,7 +401,7 @@ export function WorkflowCanvas({
             strokeWidth={isSelected ? "3" : "2"}
             strokeDasharray="5,5"
             className={loopColor}
-            markerEnd="url(#arrowhead)"
+            markerEnd={isSelected ? "url(#arrowhead-special-selected)" : "url(#arrowhead-special)"}
           />
           {/* Hover/Selection Label */}
           {(isSelected || camera.k > 0.5) && (
@@ -411,7 +448,6 @@ export function WorkflowCanvas({
           stroke="currentColor"
           strokeWidth={isSelected ? "3" : "2"}
           className={edgeColor}
-          markerEnd="url(#arrowhead)"
         />
         {/* Hover/Selection Label */}
         {(isSelected || camera.k > 0.5) && (
@@ -465,24 +501,35 @@ export function WorkflowCanvas({
       >
         <defs>
           <marker
-            id="arrowhead-muted"
+            id="arrowhead-special"
             markerWidth="10"
             markerHeight="7"
-            refX="9"
+            refX="10"
             refY="3.5"
             orient="auto"
+            markerUnits="strokeWidth"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="var(--sx-elev-1)" />
+            <polygon 
+              points="0 0, 10 3.5, 0 7" 
+              fill="currentColor" 
+              className="text-primary"
+              fillOpacity="0.8"
+            />
           </marker>
           <marker
-            id="arrowhead-accent"
+            id="arrowhead-special-selected"
             markerWidth="10"
             markerHeight="7"
-            refX="9"
+            refX="10"
             refY="3.5"
             orient="auto"
+            markerUnits="strokeWidth"
           >
-            <polygon points="0 0, 10 3.5, 0 7" fill="var(--sx-accent-0)" />
+            <polygon 
+              points="0 0, 10 3.5, 0 7" 
+              fill="currentColor"
+              className="text-primary"
+            />
           </marker>
         </defs>
 
@@ -512,56 +559,48 @@ export function WorkflowCanvas({
               const isSelected = selectedNodeId === node.id;
 
               return (
-                <TooltipProvider key={node.id}>
-                  <Tooltip delayDuration={300}>
-                    <TooltipTrigger asChild>
-                      <g 
-                        transform={`translate(${pos.x}, ${pos.y})`}
-                        className="cursor-pointer group"
-                        onPointerDown={(e) => handleNodePointerDown(e, node.id)}
-                        data-testid="canvas-node"
-                      >
-                        <rect
-                          width={NODE_WIDTH}
-                          height={NODE_HEIGHT}
-                          rx="4"
-                          className={`fill-card border transition-all ${
-                            isSelected ? "stroke-primary stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
-                            isActive ? "stroke-primary/50" : "stroke-border"
-                          } group-hover:stroke-primary`}
-                          strokeWidth={isSelected ? "2" : "1"}
-                        />
-                        
-                        {/* Node Label - Hidden at very low zoom or truncated */}
-                        {!isLowZoom && (
-                          <text
-                            x={NODE_WIDTH / 2}
-                            y={NODE_HEIGHT / 2}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            className="fill-foreground text-[11px] font-semibold select-none pointer-events-none"
-                            data-zoom-level="detail"
-                          >
-                            {node.name.length > 18 ? `${node.name.slice(0, 16)}...` : node.name}
-                          </text>
-                        )}
+                <g 
+                  key={node.id}
+                  transform={`translate(${pos.x}, ${pos.y})`}
+                  className="cursor-pointer group"
+                  onPointerDown={(e) => handleNodePointerDown(e, node.id)}
+                  data-testid="canvas-node"
+                >
+                  <rect
+                    width={NODE_WIDTH}
+                    height={NODE_HEIGHT}
+                    rx="4"
+                    className={`fill-card border transition-all ${
+                      isSelected ? "stroke-primary stroke-2 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
+                      isActive ? "stroke-primary/50" : "stroke-border"
+                    } group-hover:stroke-primary`}
+                    strokeWidth={isSelected ? "2" : "1"}
+                  />
+                  
+                  {/* Node Label - Hidden at very low zoom or truncated */}
+                  {!isLowZoom && (
+                    <text
+                      x={NODE_WIDTH / 2}
+                      y={NODE_HEIGHT / 2}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      className="fill-foreground text-[11px] font-semibold select-none pointer-events-none"
+                      data-zoom-level="detail"
+                    >
+                      {node.name.length > 18 ? `${node.name.slice(0, 16)}...` : node.name}
+                    </text>
+                  )}
 
-                        {/* Entry Indicator */}
-                        {node.isEntry && (
-                          <circle
-                            cx="0"
-                            cy={NODE_HEIGHT / 2}
-                            r="4"
-                            className="fill-primary shadow-sm"
-                          />
-                        )}
-                      </g>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      <p className="text-xs font-medium">{node.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                  {/* Entry Indicator */}
+                  {node.isEntry && (
+                    <circle
+                      cx="0"
+                      cy={NODE_HEIGHT / 2}
+                      r="4"
+                      className="fill-primary shadow-sm"
+                    />
+                  )}
+                </g>
               );
             })}
           </g>
