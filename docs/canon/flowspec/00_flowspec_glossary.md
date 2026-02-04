@@ -2,7 +2,7 @@
 
 **Document ID:** 00_flowspec_glossary  
 **Status:** CANONICAL  
-**Last Updated:** 2026-01-28  
+**Last Updated:** 2026-02-03  
 **Related Documents:**
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
 - [20_flowspec_invariants.md](./20_flowspec_invariants.md)
@@ -254,6 +254,34 @@ scope: { type: "job", id: "job-12345" }
 
 ---
 
+### 2.9 Correction Detour
+
+**Definition:** A Correction Detour is a bounded, temporary excursion from the primary workflow spine to address a specific error or omission, returning to a "Stable Resume" point.
+
+**Clarification:**
+- Detours are used for "repairs" that do not change the fundamental workflow path.
+- Detours do NOT re-evaluate gates; they return to a checkpoint's successor.
+- Detours can be Blocking (halt spine) or Non-Blocking (parallel work).
+
+---
+
+### 2.10 Remediation Loop
+
+**Definition:** A Remediation Loop is a full structural cycle (iteration increment) used when a correction is fundamental enough to require re-evaluating the workflow path.
+
+**Clarification:**
+- Contrast with Detour: Loops use Gate routing; Detours use Stable Resume.
+- Loops increment the node iteration; Detours use a validity overlay.
+- "Detour-Unsafe" outcomes (routing-critical) MUST use Remediation Loops.
+
+---
+
+### 2.11 Checkpoint
+
+**Definition:** A Checkpoint is the specific node activation (iteration context) where a Correction Detour was initiated. It defines the "Stable Resume" point for the workflow.
+
+---
+
 ## 3. State and Truth Definitions
 
 ### 3.1 Truth
@@ -304,7 +332,7 @@ FlowSpec Truth rather than owning it.
 - A Task is Actionable when ALL of the following are true:
   1. The Task's containing Node is active (via Entry or Gate routing)
   2. All Actionability Constraints on the Task are satisfied (see §3.4)
-  3. The Task has not yet recorded an Outcome
+  3. The Task has no recorded Outcome OR its latest recorded Outcome is marked `INVALID` (creating a new iteration context)
 - External domains query for Actionable Tasks; they do NOT compute this themselves.
 
 **Rule:** FlowSpec is the sole authority on Actionability. External domains MUST NOT infer, compute, or override Actionability.
@@ -366,6 +394,23 @@ it is a Projection Surface.
 - Projection Surfaces read Truth (via FlowSpec APIs)
 - Projection Surfaces never write Truth
 - Projection Surfaces may display Derived State
+
+---
+
+### 3.7 Validity State (Overlay)
+
+**Definition:** Validity State is an overlay on Task Outcomes { `VALID` | `PROVISIONAL` | `INVALID` } that determines whether an outcome satisfies completion rules.
+
+**Clarification:**
+- Validity is NOT Truth; it is a mutable overlay record linked to a Detour.
+- Only `VALID` outcomes (or null/default) allow a Node to complete.
+- Mutating Validity does NOT violate INV-007 (Outcome Immutability).
+
+---
+
+### 3.8 Stable Resume
+
+**Definition:** Stable Resume is the default detour behavior where execution returns exactly to the successor of the node that triggered the detour (the Checkpoint), ignoring any routing changes.
 
 ---
 
@@ -453,30 +498,35 @@ The following terms are PROHIBITED in FlowSpec documentation and implementation 
 
 ## 8. Glossary Index (Alphabetical)
 
-| Term | Section |
-|------|---------|
-| Actionable | 3.3 |
-| Actionability Constraint | 3.4 |
-| Cross-Flow Dependency | 3.5 |
-| Derived State | 3.2 |
-| Draft | 4.1 |
-| Evidence | 2.6 |
-| Flow | 2.3 |
-| Flow Group | 2.3.2 |
-| Scope (Flow Group Scope) | 2.3.3 |
-| Flow Start vs Task Actionability | 2.3.1 |
-| FlowSpec | 2.1 |
-| Gate | 2.8 |
-| Node | 2.4 |
-| Outcome | 2.7 |
-| Publish | 4.4 |
-| Published | 4.3 |
-| Signals | 3.2 |
-| Task | 2.5 |
-| Truth | 3.1 |
-| Projection Surface | 3.6 |
-| Validated | 4.2 |
-| Workflow | 2.2 |
+|| Term | Section |
+||------|---------|
+|| Actionable | 3.3 |
+|| Actionability Constraint | 3.4 |
+|| Checkpoint | 2.11 |
+|| Correction Detour | 2.9 |
+|| Cross-Flow Dependency | 3.5 |
+|| Derived State | 3.2 |
+|| Draft | 4.1 |
+|| Evidence | 2.6 |
+|| Flow | 2.3 |
+|| Flow Group | 2.3.2 |
+|| Scope (Flow Group Scope) | 2.3.3 |
+|| Flow Start vs Task Actionability | 2.3.1 |
+|| FlowSpec | 2.1 |
+|| Gate | 2.8 |
+|| Node | 2.4 |
+|| Outcome | 2.7 |
+|| Publish | 4.4 |
+|| Published | 4.3 |
+|| Remediation Loop | 2.10 |
+|| Signals | 3.2 |
+|| Stable Resume | 3.8 |
+|| Task | 2.5 |
+|| Truth | 3.1 |
+|| Projection Surface | 3.6 |
+|| Validated | 4.2 |
+|| Validity State | 3.7 |
+|| Workflow | 2.2 |
 
 ---
 

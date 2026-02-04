@@ -2,7 +2,7 @@
 
 **Document ID:** 20_flowspec_invariants  
 **Status:** CANONICAL  
-**Last Updated:** 2026-01-28  
+**Last Updated:** 2026-02-03  
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
@@ -568,6 +568,10 @@ CI guards (`guard_fs_iso_01.mjs`, `guard_fs_join_01.mjs`) monitoring imports and
 | INV-031 | Responsibility Isolation | Boundaries |
 | INV-032 | Policy Only Affects Signals | Policy |
 | INV-033 | Policy Scoped to FlowGroup | Policy |
+| INV-034 | No Silenced Corrections | Detours |
+| INV-035 | No Completion with Active Detours | Detours |
+| INV-036 | No Nested Detours (v1) | Detours |
+| INV-037 | Blocking Detour Priority | Detours |
 
 ---
 
@@ -600,6 +604,46 @@ Creating two different SLA overrides for the same `taskId` in different flows of
 
 **Detection Idea:**  
 Schema unique constraint `@@unique([flowGroupPolicyId, taskId])` on `TaskPolicyOverride`.
+
+---
+
+### INV-034: No Silenced Corrections
+
+**Statement:**  
+A Detour-Unsafe outcome (routing-critical) MUST NOT be converted into a detour; it MUST trigger a Remediation Loop.
+
+**Rationale:**  
+Detours use Stable Resume, which bypasses gate re-evaluation. If a correction fundamentally changes the workflow path, skipping the gate would create a branching-truth paradox where the recorded data contradicts the active path.
+
+---
+
+### INV-035: No Completion with Active Detours
+
+**Statement:**  
+A Flow MUST NOT transition to `COMPLETED` if any `DetourRecord` associated with that flow remains `ACTIVE`.
+
+**Rationale:**  
+A flow is not "done" if there are outstanding corrections. Allowing completion would bypass the quality/compliance guardrails that detours are intended to enforce.
+
+---
+
+### INV-036: No Nested Detours (v1)
+
+**Statement:**  
+A node activation MUST NOT be the subject of a new Correction Detour while an existing detour referencing that node activation is `ACTIVE`.
+
+**Rationale:**  
+Nested detours create recursive validity logic that is deferred from v1 to ensure system stability and avoid user confusion.
+
+---
+
+### INV-037: Blocking Detour Priority
+
+**Statement:**  
+A `BLOCKING` detour MUST prevent actionability for all direct successors of the checkpoint node.
+
+**Rationale:**  
+If a correction is marked as blocking, it implies that downstream work is unsafe or invalid until the fix is applied. Preventing actionability ensures physical and logical safety.
 
 ---
 

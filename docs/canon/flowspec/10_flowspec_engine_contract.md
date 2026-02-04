@@ -2,7 +2,7 @@
 
 **Document ID:** 10_flowspec_engine_contract  
 **Status:** CANONICAL  
-**Last Updated:** 2026-01-28  
+**Last Updated:** 2026-02-03  
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [20_flowspec_invariants.md](./20_flowspec_invariants.md)
@@ -81,7 +81,7 @@ Flow (Instance)
 5. An **Outcome** is recorded on a Task, marking it done.
 6. **Gates** evaluate the Outcome and determine next Node(s) to activate.
 7. Steps 3-6 repeat until the Workflow's **Terminal Condition** is met.
-8. The Flow is complete.
+8. The Flow is complete ONLY if all terminal conditions are met AND no `DetourRecord` remains `ACTIVE`.
 
 ### 4.3 Graph Structure
 
@@ -364,6 +364,21 @@ All Evidence Schemas MUST have a `type` field. Additional fields depend on the t
 3. The engine MAY implement a configurable execution step limit as a safety measure.
 4. If a step limit is exceeded, the Flow is suspended (not terminated) with an error state.
 5. If implemented, a step limit MUST preserve Truth (recorded Outcomes) and transition the Flow to a fail-closed **BLOCKED** state.
+
+---
+
+### 6.4 Cycles vs. Detours
+
+**Rule:** The engine distinguishes between structural cycles and correction detours.
+- **Remediation Loops (Cycles)**: Triggered by routing-critical outcomes. Increments iteration counter. Re-evaluates all gates.
+- **Correction Detours**: Triggered by repairs or omissions. Uses a validity overlay. Employs Stable Resume (no re-routing).
+
+### 6.5 Stable Resume Semantics
+
+**Rule:** By default, detours return to the "Stable Resume" point (the checkpoint's successor).
+- The engine "remembers" the intended path from the checkpoint.
+- Corrections do not re-trigger gate evaluation for the checkpoint node.
+- If a correction requires a different path, a Remediation Loop MUST be used instead of a Detour.
 
 ---
 
