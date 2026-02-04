@@ -59,6 +59,7 @@ interface TaskDetailPanelProps {
   workflowId: string;
   nodeId: string;
   task: Task;
+  nodes: any[];
   gates: Gate[];
   isEditable: boolean;
   onTaskUpdated: () => void;
@@ -72,6 +73,7 @@ export function TaskDetailPanel({
   workflowId,
   nodeId,
   task,
+  nodes,
   gates,
   isEditable,
   onTaskUpdated,
@@ -267,6 +269,7 @@ export function TaskDetailPanel({
           nodeId={nodeId}
           taskId={task.id}
           outcomes={task.outcomes}
+          nodes={nodes}
           gates={gates}
           isEditable={isEditable}
           onOutcomesUpdated={onTaskUpdated}

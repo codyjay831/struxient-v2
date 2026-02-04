@@ -726,6 +726,7 @@ export default function WorkflowDetailPage() {
                     <NodeDetailPanel
                       workflowId={workflowId}
                       node={selectedNode}
+                      nodes={workflow.nodes}
                       gates={workflow.gates}
                       isEditable={isEditable}
                       isLastEntryNode={isLastEntryNode && selectedNode.isEntry}

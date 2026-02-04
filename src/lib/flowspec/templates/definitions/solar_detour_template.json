@@ -1,0 +1,789 @@
+{
+  "workflowId": "solar-detour-template-v1",
+  "version": 1,
+  "name": "Solar Residential - Detour Demonstration",
+  "description": "Full lifecycle solar installation template with forward-only compensating detours for real-world exceptions.",
+  "isNonTerminating": false,
+  "nodes": [
+    {
+      "id": "node_intake_start",
+      "name": "Project Intake & Initiation",
+      "isEntry": true,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_intake_docs",
+          "name": "Verify Sales Contract & Finance",
+          "instructions": "Confirm all signed documents are in the vault.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "application/pdf"
+            ],
+            "description": "Signed contract and finance approval."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o1",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_survey_primary",
+      "name": "On-Site Survey (Primary)",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_survey_standard",
+          "name": "Standard Field Measurement",
+          "instructions": "Capture roof and electrical panel photos.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photos of roof and electrical panel."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o2",
+              "name": "FULL_ACCESS_OBTAINED"
+            },
+            {
+              "id": "o3",
+              "name": "PARTIAL_ACCESS_DETOUR_NEEDED"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "FOLLOWUP_SURVEY_CAPTURE",
+      "name": "DETOUR: Attic/Panel Access Follow-up",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_survey",
+          "name": "Secondary Site Visit",
+          "instructions": "Capture missing attic/panel photos identified in primary survey.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Missing access photos."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o4",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_design_engineering",
+      "name": "System Design & Engineering",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_design_packet",
+          "name": "Draft Plan Set",
+          "instructions": "Generate CAD drawings and structural calcs.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "application/pdf"
+            ],
+            "description": "Engineering plan set."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o5",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_permit_submission",
+      "name": "AHJ Permit Submission",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_permit_upload",
+          "name": "Upload to AHJ Portal",
+          "instructions": "Submit engineering packet to local jurisdiction.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "text",
+            "description": "Permit application ID or confirmation number."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o6",
+              "name": "SUBMITTED"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_permit_review_gate",
+      "name": "AHJ Review Result",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_permit_status",
+          "name": "Record Review Outcome",
+          "instructions": "Did the AHJ approve or require corrections?",
+          "evidenceRequired": false,
+          "evidenceSchema": {
+            "type": "text",
+            "description": "Not required"
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o7",
+              "name": "APPROVED"
+            },
+            {
+              "id": "o8",
+              "name": "CORRECTIONS_DETOUR_NEEDED"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "CORR_PERMIT_RESUBMISSION",
+      "name": "DETOUR: AHJ Permit Corrections",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_permit",
+          "name": "Execute Plan Revisions",
+          "instructions": "Update plans per AHJ comments and re-upload.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "application/pdf"
+            ],
+            "description": "Revised plan set."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o9",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_procurement_prep",
+      "name": "Procurement & Material Staging",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_inventory_pull",
+          "name": "Pull Warehouse Inventory",
+          "instructions": "Scan BOM items for the job.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "text",
+            "description": "Warehouse pull confirmation code."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o10",
+              "name": "BOM_SATISFIED"
+            },
+            {
+              "id": "o11",
+              "name": "SHORTAGE_DETOUR_NEEDED"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "ADD_MATERIAL_SUBSTITUTION",
+      "name": "DETOUR: Material Substitution Approval",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_material",
+          "name": "Source Alternative Components",
+          "instructions": "Identify equivalent parts and obtain engineering sign-off for substitution.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "application/pdf",
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Substitution approval or spec sheet."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o12",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_install_safety",
+      "name": "Installation: Safety & Setup",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_tailboard",
+          "name": "Safety Tailboard Meeting",
+          "instructions": "Crew briefing and fall protection setup.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of safety tailboard meeting."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o13",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_install_racking",
+      "name": "Installation: Racking & Mounting",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_standoffs",
+          "name": "Mount Standoffs & Rails",
+          "instructions": "Secure racking to roof structure.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of racking installation."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o14",
+              "name": "PROGRESS_NORMAL"
+            },
+            {
+              "id": "o15",
+              "name": "STRUCTURAL_CONSTRAINT_DETOUR"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "ADD_REMEDIATION_WORK",
+      "name": "DETOUR: Structural Remediation",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_remedial",
+          "name": "Execute Structural Repair",
+          "instructions": "Reinforce rafters or replace decking as required by discovery.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of structural repair."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o16",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_install_electrical",
+      "name": "Installation: Electrical & Inverter",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_electrical_install",
+          "name": "Wire Inverter & Conduit",
+          "instructions": "Run AC/DC conduit and mount inverter.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of electrical installation."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o17",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_install_panels",
+      "name": "Installation: PV Module Mounting",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_panel_mount",
+          "name": "Secure PV Modules",
+          "instructions": "Final array mounting and wire management.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of final array mounting."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o18",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_inspect_field",
+      "name": "Field Inspection (AHJ/Utility)",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_inspection_visit",
+          "name": "City/County Inspector Visit",
+          "instructions": "Record results of field inspection.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png",
+              "application/pdf"
+            ],
+            "description": "Photo of inspection card or approval notice."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o19",
+              "name": "PASSED"
+            },
+            {
+              "id": "o20",
+              "name": "FAILED_FIELD_CORRECTIONS"
+            },
+            {
+              "id": "o21",
+              "name": "FAILED_PLAN_MISMATCH"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "CORR_FIELD_REPAIR",
+      "name": "DETOUR: Field Rework/Corrections",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_field_fix",
+          "name": "Execute Field Fixes",
+          "instructions": "Correct violations cited by inspector.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of corrected field issues."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o22",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "CORR_PLAN_SET_REVISION",
+      "name": "DETOUR: As-Built Engineering Revision",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_detour_asbuilt",
+          "name": "Generate As-Built Plans",
+          "instructions": "Update plans to match field reality and obtain engineering re-stamp.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "application/pdf"
+            ],
+            "description": "As-built engineering plans."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o23",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_inspect_revisit",
+      "name": "Final Inspection Clearance",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_final_signoff",
+          "name": "Obtain Job Card Signature",
+          "instructions": "Capture photo of signed permit card.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "file",
+            "mimeTypes": [
+              "image/jpeg",
+              "image/png"
+            ],
+            "description": "Photo of signed permit card."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o24",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_pto_submission",
+      "name": "Permission to Operate (PTO)",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_utility_pto",
+          "name": "Utility Interconnection Packet",
+          "instructions": "Submit final documentation to utility.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "text",
+            "description": "PTO submission confirmation number."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o25",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    },
+    {
+      "id": "node_closeout",
+      "name": "Project Closeout",
+      "isEntry": false,
+      "completionRule": "ALL_TASKS_DONE",
+      "specificTasks": [],
+      "tasks": [
+        {
+          "id": "task_owner_docs",
+          "name": "Homeowner Final Handover",
+          "instructions": "Deliver warranty docs and system overview.",
+          "evidenceRequired": true,
+          "evidenceSchema": {
+            "type": "text",
+            "description": "Final closeout summary notes."
+          },
+          "displayOrder": 1,
+          "outcomes": [
+            {
+              "id": "o26",
+              "name": "COMPLETE"
+            }
+          ],
+          "crossFlowDependencies": []
+        }
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "g1",
+      "sourceNodeId": "node_intake_start",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_survey_primary"
+    },
+    {
+      "id": "g2",
+      "sourceNodeId": "node_survey_primary",
+      "outcomeName": "FULL_ACCESS_OBTAINED",
+      "targetNodeId": "node_design_engineering"
+    },
+    {
+      "id": "g3",
+      "sourceNodeId": "node_survey_primary",
+      "outcomeName": "PARTIAL_ACCESS_DETOUR_NEEDED",
+      "targetNodeId": "FOLLOWUP_SURVEY_CAPTURE"
+    },
+    {
+      "id": "g4",
+      "sourceNodeId": "FOLLOWUP_SURVEY_CAPTURE",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_design_engineering"
+    },
+    {
+      "id": "g5",
+      "sourceNodeId": "node_design_engineering",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_permit_submission"
+    },
+    {
+      "id": "g6",
+      "sourceNodeId": "node_permit_submission",
+      "outcomeName": "SUBMITTED",
+      "targetNodeId": "node_permit_review_gate"
+    },
+    {
+      "id": "g7",
+      "sourceNodeId": "node_permit_review_gate",
+      "outcomeName": "APPROVED",
+      "targetNodeId": "node_procurement_prep"
+    },
+    {
+      "id": "g8",
+      "sourceNodeId": "node_permit_review_gate",
+      "outcomeName": "CORRECTIONS_DETOUR_NEEDED",
+      "targetNodeId": "CORR_PERMIT_RESUBMISSION"
+    },
+    {
+      "id": "g9",
+      "sourceNodeId": "CORR_PERMIT_RESUBMISSION",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_procurement_prep"
+    },
+    {
+      "id": "g10",
+      "sourceNodeId": "node_procurement_prep",
+      "outcomeName": "BOM_SATISFIED",
+      "targetNodeId": "node_install_safety"
+    },
+    {
+      "id": "g11",
+      "sourceNodeId": "node_procurement_prep",
+      "outcomeName": "SHORTAGE_DETOUR_NEEDED",
+      "targetNodeId": "ADD_MATERIAL_SUBSTITUTION"
+    },
+    {
+      "id": "g12",
+      "sourceNodeId": "ADD_MATERIAL_SUBSTITUTION",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_install_safety"
+    },
+    {
+      "id": "g13",
+      "sourceNodeId": "node_install_safety",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_install_racking"
+    },
+    {
+      "id": "g14",
+      "sourceNodeId": "node_install_racking",
+      "outcomeName": "PROGRESS_NORMAL",
+      "targetNodeId": "node_install_electrical"
+    },
+    {
+      "id": "g15",
+      "sourceNodeId": "node_install_racking",
+      "outcomeName": "STRUCTURAL_CONSTRAINT_DETOUR",
+      "targetNodeId": "ADD_REMEDIATION_WORK"
+    },
+    {
+      "id": "g16",
+      "sourceNodeId": "ADD_REMEDIATION_WORK",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_install_electrical"
+    },
+    {
+      "id": "g17",
+      "sourceNodeId": "node_install_electrical",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_install_panels"
+    },
+    {
+      "id": "g18",
+      "sourceNodeId": "node_install_panels",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_inspect_field"
+    },
+    {
+      "id": "g19",
+      "sourceNodeId": "node_inspect_field",
+      "outcomeName": "PASSED",
+      "targetNodeId": "node_inspect_revisit"
+    },
+    {
+      "id": "g20",
+      "sourceNodeId": "node_inspect_field",
+      "outcomeName": "FAILED_FIELD_CORRECTIONS",
+      "targetNodeId": "CORR_FIELD_REPAIR"
+    },
+    {
+      "id": "g21",
+      "sourceNodeId": "node_inspect_field",
+      "outcomeName": "FAILED_PLAN_MISMATCH",
+      "targetNodeId": "CORR_PLAN_SET_REVISION"
+    },
+    {
+      "id": "g22",
+      "sourceNodeId": "CORR_FIELD_REPAIR",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_inspect_revisit"
+    },
+    {
+      "id": "g23",
+      "sourceNodeId": "CORR_PLAN_SET_REVISION",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_inspect_revisit"
+    },
+    {
+      "id": "g24",
+      "sourceNodeId": "node_inspect_revisit",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_pto_submission"
+    },
+    {
+      "id": "g25",
+      "sourceNodeId": "node_pto_submission",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": "node_closeout"
+    },
+    {
+      "id": "g26",
+      "sourceNodeId": "node_closeout",
+      "outcomeName": "COMPLETE",
+      "targetNodeId": null
+    }
+  ]
+}

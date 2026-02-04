@@ -250,8 +250,7 @@ export function WorkflowCanvas({
 
   const handleMouseUp = (e: React.PointerEvent) => {
     if (draggingCandidateNodeId && !draggingNodeId) {
-      // This was a click, not a drag
-      onNodeClick?.(draggingCandidateNodeId);
+      // This was a click, not a drag - selection is handled by onClick for test compatibility
     } else if (draggingNodeId) {
       // This was a drag end
       const finalPos = positions[draggingNodeId];
@@ -264,6 +263,13 @@ export function WorkflowCanvas({
     setDraggingNodeId(null);
     setDraggingCandidateNodeId(null);
     pressStartRef.current = null;
+  };
+
+  const handleNodeClick = (e: React.MouseEvent, nodeId: string) => {
+    e.stopPropagation();
+    if (!draggingNodeId) {
+      onNodeClick?.(nodeId);
+    }
   };
 
   const handleNodePointerDown = (e: React.PointerEvent, nodeId: string) => {
@@ -283,13 +289,24 @@ export function WorkflowCanvas({
     
     if (!source) return null;
 
+    const sourceNode = nodes.find(n => n.id === gate.sourceNodeId);
+    const targetNode = gate.targetNodeId ? nodes.find(n => n.id === gate.targetNodeId) : null;
+
+    const isDetourNode = (node: any) => 
+      node && (node.name.startsWith("DETOUR:") || node.id.startsWith("ADD_") || node.id.startsWith("CORR_") || node.id.startsWith("FOLLOWUP_"));
+
+    const isDetourEntry = !isDetourNode(sourceNode) && isDetourNode(targetNode);
+    const isDetourExit = isDetourNode(sourceNode) && !isDetourNode(targetNode);
+    const isDetourInternal = isDetourNode(sourceNode) && isDetourNode(targetNode);
+    const isDetourEdge = isDetourEntry || isDetourExit || isDetourInternal;
+
     const edgeType = detectEdgeType(gate.sourceNodeId, gate.targetNodeId, depthMap);
     const key = `edge-${gate.id}`;
     const edgeKey = generateEdgeKey(gate.sourceNodeId, gate.outcomeName, gate.targetNodeId);
     const testId = `canvas-edge-${gate.sourceNodeId}-${slugify(gate.outcomeName)}-${gate.targetNodeId || 'terminal'}`;
     const isSelected = selectedEdgeKey === edgeKey;
 
-    const edgeColor = isSelected ? "text-blue-500" : "text-muted-foreground/60";
+    const edgeColor = isSelected ? "text-blue-500" : (isDetourEdge ? "text-muted-foreground/40" : "text-muted-foreground/60");
     const loopColor = isSelected ? "text-blue-500" : "text-primary/40";
 
     const commonProps = {
@@ -320,6 +337,7 @@ export function WorkflowCanvas({
             stroke="currentColor"
             strokeWidth={isSelected ? "3" : "2"}
             className={loopColor}
+            markerEnd={isSelected ? "url(#arrowhead-special-selected)" : "url(#arrowhead-special)"}
           />
         </g>
       );
@@ -346,6 +364,7 @@ export function WorkflowCanvas({
             stroke="currentColor"
             strokeWidth={isSelected ? "3" : "2"}
             className="text-muted-foreground/40"
+            markerEnd={isSelected ? "url(#arrowhead-selected)" : "url(#arrowhead)"}
           />
         </g>
       );
@@ -361,18 +380,23 @@ export function WorkflowCanvas({
 
     if (isLoopback && target) {
       // For loopbacks, we dip below the nodes. 
-      // We compute perimeter points relative to this dip point so the curve
-      // enters/leaves the nodes at the correct angle.
       const sCenter = { x: source.x + NODE_WIDTH / 2, y: source.y + NODE_HEIGHT / 2 };
       const tCenter = { x: target.x + NODE_WIDTH / 2, y: target.y + NODE_HEIGHT / 2 };
       
       const dipX = (sCenter.x + tCenter.x) / 2;
       const dipY = Math.max(sCenter.y, tCenter.y) + 120;
       
-      // Padding of 6px on target perimeter to keep arrowhead tip outside node border
       const startP = getPerimeterPoint(dipX, dipY, source.x, source.y, NODE_WIDTH, NODE_HEIGHT);
       const endP = getPerimeterPoint(dipX, dipY, target.x, target.y, NODE_WIDTH, NODE_HEIGHT, 6);
       
+      startX = startP.x;
+      startY = startP.y;
+      endX = endP.x;
+      endY = endP.y;
+    } else if (target) {
+      // For forward edges, compute perimeter points for cleaner arrowheads
+      const startP = getPerimeterPoint(target.x + NODE_WIDTH/2, target.y + NODE_HEIGHT/2, source.x, source.y, NODE_WIDTH, NODE_HEIGHT);
+      const endP = getPerimeterPoint(source.x + NODE_WIDTH/2, source.y + NODE_HEIGHT/2, target.x, target.y, NODE_WIDTH, NODE_HEIGHT, 6);
       startX = startP.x;
       startY = startP.y;
       endX = endP.x;
@@ -447,7 +471,9 @@ export function WorkflowCanvas({
           y2={endY}
           stroke="currentColor"
           strokeWidth={isSelected ? "3" : "2"}
+          strokeDasharray={isDetourEdge ? "5,5" : "none"}
           className={edgeColor}
+          markerEnd={isSelected ? "url(#arrowhead-selected)" : "url(#arrowhead)"}
         />
         {/* Hover/Selection Label */}
         {(isSelected || camera.k > 0.5) && (
@@ -459,8 +485,18 @@ export function WorkflowCanvas({
             className="overflow-visible pointer-events-none"
             style={{ opacity: isSelected ? 1 : labelOpacity }}
           >
-            <div className="flex justify-center items-center h-full">
-              <span className="px-1.5 py-0.5 rounded bg-card/90 border border-border text-[9px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap shadow-sm backdrop-blur-sm">
+            <div className="flex flex-col items-center justify-center h-full gap-1">
+              {isDetourEntry && (
+                <span className="px-1 py-0.5 rounded bg-blue-500 text-white text-[7px] font-bold uppercase tracking-tighter shadow-sm">
+                  Detour
+                </span>
+              )}
+              {isDetourExit && (
+                <span className="px-1 py-0.5 rounded bg-green-500 text-white text-[7px] font-bold uppercase tracking-tighter shadow-sm">
+                  Resume
+                </span>
+              )}
+              <span className={`px-1.5 py-0.5 rounded bg-card/90 border ${isDetourEdge ? 'border-dashed border-muted-foreground/30' : 'border-border'} text-[9px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap shadow-sm backdrop-blur-sm`}>
                 {gate.outcomeName}
               </span>
             </div>
@@ -500,6 +536,34 @@ export function WorkflowCanvas({
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
+          <marker
+            id="arrowhead"
+            markerWidth="10"
+            markerHeight="7"
+            refX="10"
+            refY="3.5"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon 
+              points="0 0, 10 3.5, 0 7" 
+              fill="currentColor" 
+            />
+          </marker>
+          <marker
+            id="arrowhead-selected"
+            markerWidth="10"
+            markerHeight="7"
+            refX="10"
+            refY="3.5"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <polygon 
+              points="0 0, 10 3.5, 0 7" 
+              fill="currentColor"
+            />
+          </marker>
           <marker
             id="arrowhead-special"
             markerWidth="10"
@@ -564,6 +628,7 @@ export function WorkflowCanvas({
                   transform={`translate(${pos.x}, ${pos.y})`}
                   className="cursor-pointer group"
                   onPointerDown={(e) => handleNodePointerDown(e, node.id)}
+                  onClick={(e) => handleNodeClick(e, node.id)}
                   data-testid="canvas-node"
                 >
                   <rect

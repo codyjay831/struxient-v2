@@ -47,6 +47,7 @@ interface TaskListPanelProps {
   nodeId: string;
   nodeName: string;
   tasks: Task[];
+  nodes: Node[];
   gates: Gate[];
   isEditable: boolean;
   onTasksUpdated: () => void;
@@ -60,6 +61,7 @@ export function TaskListPanel({
   nodeId,
   nodeName,
   tasks,
+  nodes,
   gates,
   isEditable,
   onTasksUpdated,
@@ -280,6 +282,7 @@ export function TaskListPanel({
           workflowId={workflowId}
           nodeId={nodeId}
           task={selectedTask}
+          nodes={nodes}
           gates={gates}
           isEditable={isEditable}
           onTaskUpdated={onTasksUpdated}

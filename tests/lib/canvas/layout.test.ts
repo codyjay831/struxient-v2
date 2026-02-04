@@ -3,6 +3,7 @@ import {
   computeNodeDepths, 
   detectEdgeType, 
   computeDeterministicSpine,
+  getPerimeterPoint,
   Node,
   Gate 
 } from "@/lib/canvas/layout";
@@ -96,6 +97,36 @@ describe("Canvas Layout Utilities", () => {
       // Alphabetical tie-break should pick "a,b"
       const spine = computeDeterministicSpine(branchingNodes, branchingGates);
       expect(spine).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("getPerimeterPoint", () => {
+    it("returns correct point on right edge", () => {
+      // Node at 0,0, size 100x100. Center is 50,50.
+      // Line from (200, 50) towards center.
+      const p = getPerimeterPoint(200, 50, 0, 0, 100, 100);
+      expect(p.x).toBe(100);
+      expect(p.y).toBe(50);
+    });
+
+    it("returns correct point on top edge", () => {
+      const p = getPerimeterPoint(50, -100, 0, 0, 100, 100);
+      expect(p.x).toBe(50);
+      expect(p.y).toBe(0);
+    });
+
+    it("respects padding", () => {
+      const p = getPerimeterPoint(200, 50, 0, 0, 100, 100, 10);
+      expect(p.x).toBe(110);
+      expect(p.y).toBe(50);
+    });
+
+    it("is deterministic", () => {
+      for (let i = 0; i < 100; i++) {
+        const p = getPerimeterPoint(150, 150, 0, 0, 100, 100);
+        expect(p.x).toBe(100);
+        expect(p.y).toBe(100);
+      }
     });
   });
 });

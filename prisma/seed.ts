@@ -22,6 +22,13 @@ async function main() {
       description: "Realistic workflow with loopbacks and correction cycles for testing Builder UX.",
       tags: ["complex", "loops", "demo"],
     },
+    {
+      file: "solar_detour_template.json",
+      tradeKey: "SOLAR",
+      category: "FULL_CYCLE",
+      description: "Full lifecycle residential solar installation workflow demonstrating forward-only compensating detours.",
+      tags: ["detour", "realistic", "solar"],
+    },
   ];
 
   for (const templateInfo of templatesToSeed) {
@@ -39,27 +46,26 @@ async function main() {
       version: definition.version,
     };
 
-    // B.1.7: Non-destructive seeding for templates
-    const existingTemplate = await prisma.workflowTemplate.findUnique({
+    // B.1.7: Non-destructive seeding for templates (updated to upsert)
+    const template = await prisma.workflowTemplate.upsert({
       where: {
         tradeKey_name_version: templateKey,
       },
+      update: {
+        category: templateInfo.category,
+        description: templateInfo.description,
+        definition: definition as any,
+        tags: templateInfo.tags,
+      },
+      create: {
+        ...templateKey,
+        category: templateInfo.category,
+        description: templateInfo.description,
+        definition: definition as any,
+        tags: templateInfo.tags,
+      },
     });
-
-    if (!existingTemplate) {
-      const template = await prisma.workflowTemplate.create({
-        data: {
-          ...templateKey,
-          category: templateInfo.category,
-          description: templateInfo.description,
-          definition: definition as any,
-          tags: templateInfo.tags,
-        },
-      });
-      console.log(`Created template: ${template.name} (ID: ${template.id})`);
-    } else {
-      console.log(`Template already exists, skipping update: ${existingTemplate.name} (ID: ${existingTemplate.id})`);
-    }
+    console.log(`Seeded template: ${template.name} (ID: ${template.id})`);
   }
 }
 

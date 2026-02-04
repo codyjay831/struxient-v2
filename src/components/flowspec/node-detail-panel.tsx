@@ -66,6 +66,7 @@ interface Gate {
 interface NodeDetailPanelProps {
   workflowId: string;
   node: Node;
+  nodes: Node[];
   gates: Gate[];
   isEditable: boolean;
   isLastEntryNode: boolean;
@@ -85,6 +86,7 @@ const completionRuleLabels: Record<CompletionRule, string> = {
 export function NodeDetailPanel({
   workflowId,
   node,
+  nodes,
   gates,
   isEditable,
   isLastEntryNode,
@@ -318,6 +320,7 @@ export function NodeDetailPanel({
         nodeId={node.id}
         nodeName={node.name}
         tasks={node.tasks}
+        nodes={nodes}
         gates={gates}
         isEditable={isEditable}
         onTasksUpdated={onNodeUpdated}

@@ -12,8 +12,9 @@ export async function apiStartTask(flowId: string, taskId: string) {
   });
   if (!response.ok) {
     const error = await response.json();
-    const err = new Error(error.message || "Failed to start task");
-    (err as any).code = error.code || error.error?.code;
+    const message = error.error?.message || error.message || "Failed to start task";
+    const err = new Error(message);
+    (err as any).code = error.error?.code || error.code;
     throw err;
   }
   return response.json();
@@ -27,8 +28,9 @@ export async function apiRecordOutcome(flowId: string, taskId: string, outcome: 
   });
   if (!response.ok) {
     const error = await response.json();
-    const err = new Error(error.message || "Failed to record outcome");
-    (err as any).code = error.code || error.error?.code;
+    const message = error.error?.message || error.message || "Failed to record outcome";
+    const err = new Error(message);
+    (err as any).code = error.error?.code || error.code;
     throw err;
   }
   return response.json();
@@ -42,8 +44,9 @@ export async function apiAttachEvidence(flowId: string, taskId: string, type: st
   });
   if (!response.ok) {
     const error = await response.json();
-    const err = new Error(error.message || "Failed to attach evidence");
-    (err as any).code = error.code || error.error?.code;
+    const message = error.error?.message || error.message || "Failed to attach evidence";
+    const err = new Error(message);
+    (err as any).code = error.error?.code || error.code;
     throw err;
   }
   return response.json();
@@ -65,12 +68,13 @@ export async function apiGetSignedUploadUrl(
   });
   if (!response.ok) {
     const error = await response.json();
-    const err = new Error(error.message || "Failed to get upload URL");
-    (err as any).code = error.code || error.error?.code;
+    const message = error.error?.message || error.message || "Failed to get upload URL";
+    const err = new Error(message);
+    (err as any).code = error.error?.code || error.code;
     throw err;
   }
   const result = await response.json();
-  return result.data;
+  return result;
 }
 
 /**
