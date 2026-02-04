@@ -26,6 +26,10 @@ import type { ActionableTask } from "./task-feed";
 import { EvidenceList } from "./evidence-list";
 import { EvidenceForm } from "./evidence-form";
 import { JobHeader } from "./job-header";
+import { DetourBanner } from "./detour-banner";
+import { OpenDetourDialog } from "./open-detour-dialog";
+import { DetourControls } from "./detour-controls";
+import { DetourDebugPanel } from "./detour-debug-panel";
 
 interface TaskExecutionProps {
   task: ActionableTask;
@@ -73,7 +77,7 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
     setError(null);
 
     try {
-      await apiRecordOutcome(task.flowId, task.taskId, outcome);
+      await apiRecordOutcome(task.flowId, task.taskId, outcome, (task as any)._detour?.id);
 
       setState("success");
 
@@ -111,6 +115,8 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
 
       <JobHeader flowGroupId={task.flowGroupId} />
 
+      {task._detour && <DetourBanner detour={task._detour} />}
+
       <Card className="shadow-lg border-2">
         {/* Header */}
         <CardHeader className="border-b bg-muted/30">
@@ -133,6 +139,29 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
                   Evidence Required
                 </Badge>
               )}
+              
+              {/* ADMIN CONTROLS */}
+              <div className="pt-2 flex flex-col gap-2 items-end">
+                {!task._detour && task.latestTaskExecutionId && (
+                  <OpenDetourDialog 
+                    flowId={task.flowId}
+                    nodeId={task.nodeId}
+                    nodeName={task.nodeName}
+                    checkpointTaskExecutionId={task.latestTaskExecutionId}
+                    possibleResumeNodes={(task as any)._metadata?.possibleResumeNodes || []}
+                    onDetourOpened={onComplete}
+                  />
+                )}
+                {task._detour && (
+                  <DetourControls 
+                    detourId={task._detour.id as string}
+                    flowId={task.flowId}
+                    type={task._detour.type}
+                    status={task._detour.status}
+                    onUpdated={onComplete}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -237,6 +266,8 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
           )}
         </CardFooter>
       </Card>
+
+      <DetourDebugPanel flowId={task.flowId} />
     </div>
   );
 }

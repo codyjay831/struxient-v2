@@ -19,11 +19,11 @@ export async function apiStartTask(flowId: string, taskId: string) {
   return response.json();
 }
 
-export async function apiRecordOutcome(flowId: string, taskId: string, outcome: string) {
+export async function apiRecordOutcome(flowId: string, taskId: string, outcome: string, detourId?: string) {
   const response = await fetch(`/api/flowspec/flows/${flowId}/tasks/${taskId}/outcome`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ outcome }),
+    body: JSON.stringify({ outcome, detourId }),
   });
   if (!response.ok) {
     const error = await response.json();

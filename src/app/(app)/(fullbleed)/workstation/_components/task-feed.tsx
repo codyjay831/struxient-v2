@@ -46,6 +46,7 @@ export interface ActionableTask {
   evidenceSchema: { type?: string; description?: string } | null;
   domainHint: "execution" | "finance" | "sales";
   startedAt: string | null;
+  latestTaskExecutionId?: string | null;
   _metadata?: {
     assignments: Array<{
       slotKey: string;
@@ -59,6 +60,13 @@ export interface ActionableTask {
     }>
   };
   _signals?: TaskSignals;
+  _detour?: {
+    id: string;
+    status: 'ACTIVE' | 'RESOLVED' | 'CONVERTED';
+    type: 'NON_BLOCKING' | 'BLOCKING';
+    reasonCode?: string;
+    message?: string;
+  };
   diagnostics?: {
     evidence?: {
       required: boolean;
@@ -274,6 +282,16 @@ export function TaskFeed({ onSelectTask, jobId, assignmentFilter, currentMemberI
                     <p className="text-xs text-muted-foreground">
                       Job: {task.flowGroupId.slice(0, 8)}...
                     </p>
+
+                    {/* DETOUR STATUS */}
+                    {task._detour && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <AlertCircle className={`h-3.5 w-3.5 ${task._detour.type === 'BLOCKING' ? 'text-red-500' : 'text-blue-500'}`} />
+                        <span className={`text-xs font-medium ${task._detour.type === 'BLOCKING' ? 'text-red-600' : 'text-blue-600'}`}>
+                          Correction: {task._detour.type}
+                        </span>
+                      </div>
+                    )}
 
                     {/* OPTION_A_SPEC #7 & #8: Assignment Badges */}
                     {task._metadata?.assignments && task._metadata.assignments.length > 0 && (
