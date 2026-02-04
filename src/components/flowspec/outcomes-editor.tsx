@@ -24,6 +24,7 @@ import {
   Link2OffIcon,
   ArrowRightIcon,
 } from "lucide-react";
+import { CreateNextNodeDialog } from "./create-next-node-dialog";
 
 interface Outcome {
   id: string;
@@ -33,6 +34,7 @@ interface Outcome {
 interface Node {
   id: string;
   name: string;
+  position?: { x: number; y: number } | null;
 }
 
 interface Gate {
@@ -89,6 +91,13 @@ export function OutcomesEditor({
   const [routeDeleteTarget, setRouteDeleteTarget] = useState<{
     gate: Gate;
     outcomeName: string;
+  } | null>(null);
+
+  // Create next node state
+  const [isCreateNextNodeOpen, setIsCreateNextNodeOpen] = useState(false);
+  const [createNextNodeContext, setCreateNextNodeContext] = useState<{
+    outcomeName: string;
+    mode: "standard" | "assisted";
   } | null>(null);
 
   // Helper to find a gate for a specific outcome
@@ -503,11 +512,21 @@ export function OutcomesEditor({
                     <div className="flex items-center gap-2 mt-1 border-t border-dashed pt-2">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <ArrowRightIcon className="size-3 text-muted-foreground shrink-0" />
-                        <span className="text-[10px] text-muted-foreground font-medium uppercase shrink-0">Target:</span>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase shrink-0">Next node:</span>
                         <select
                           value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
                           onChange={(e) => {
                             const value = e.target.value;
+                            if (value === "__create_standard__" || value === "__create_assisted__") {
+                              setCreateNextNodeContext({ 
+                                outcomeName: outcome.name,
+                                mode: value === "__create_assisted__" ? "assisted" : "standard"
+                              });
+                              setIsCreateNextNodeOpen(true);
+                              // Restore the select value visually so it doesn't stay on "Create..."
+                              e.target.value = gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__");
+                              return;
+                            }
                             if (value === "__none__") {
                               if (gate) setRouteDeleteTarget({ gate, outcomeName: outcome.name });
                             } else {
@@ -521,9 +540,11 @@ export function OutcomesEditor({
                               : "border-input bg-background"
                           }`}
                         >
-                          {!isRouted && <option value="__none__">Select target...</option>}
+                          <option value="__create_standard__">+ Create next node...</option>
+                          <option value="__create_assisted__">✨ Assisted create & route...</option>
+                          {!isRouted && <option value="__none__">Select next node...</option>}
                           {isRouted && <option value="__none__">None (Clear route)</option>}
-                          <option value="__terminal__">(Terminal) - End flow</option>
+                          <option value="__terminal__">End flow (terminal)</option>
                           {nodes
                             .filter((n) => n.id !== nodeId)
                             .map((node) => (
@@ -593,7 +614,7 @@ export function OutcomesEditor({
               <DialogDescription>
                 Are you sure you want to remove the route for outcome "
                 {routeDeleteTarget?.outcomeName}"?
-                The outcome will become orphaned.
+                The outcome will become orphaned (no valid next node).
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -615,6 +636,24 @@ export function OutcomesEditor({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Next Node Dialog */}
+        {createNextNodeContext && (
+          <CreateNextNodeDialog
+            workflowId={workflowId}
+            sourceNodeId={nodeId}
+            sourceNodeName={nodes.find((n) => n.id === nodeId)?.name || "Unknown"}
+            outcomeName={createNextNodeContext.outcomeName}
+            sourcePosition={nodes.find((n) => n.id === nodeId)?.position}
+            open={isCreateNextNodeOpen}
+            onOpenChange={setIsCreateNextNodeOpen}
+            onCreated={() => {
+              onOutcomesUpdated();
+              setIsCreateNextNodeOpen(false);
+            }}
+            mode={createNextNodeContext.mode}
+          />
+        )}
       </div>
     </TooltipProvider>
   );

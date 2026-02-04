@@ -769,7 +769,9 @@ export default function WorkflowDetailPage() {
                         <EdgeDetailPanel
                           workflowId={workflowId}
                           gateId={gate.id}
+                          sourceNodeId={sourceId}
                           sourceNodeName={sourceNode.name}
+                          sourcePosition={sourceNode.position}
                           outcomeName={outcomeName}
                           targetNodeId={gate.targetNodeId}
                           targetNodeName={targetNode?.name || "(Terminal)"}

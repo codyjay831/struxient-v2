@@ -26,6 +26,7 @@ import {
   RefreshCcwIcon,
   InfoIcon,
 } from "lucide-react";
+import { CreateNextNodeDialog } from "./create-next-node-dialog";
 import { getWorkflowLoopbacks } from "@/lib/builder/utils/loopback-detection";
 import { useLoopbackMetadata } from "@/components/builder/hooks/useLoopbackMetadata";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,7 @@ interface Node {
   name: string;
   isEntry: boolean;
   tasks: Task[];
+  position?: { x: number; y: number } | null;
 }
 
 interface Gate {
@@ -139,6 +141,14 @@ export function RoutingEditor({
     targetNodeId: null,
   });
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Create next node state
+  const [isCreateNextNodeOpen, setIsCreateNextNodeOpen] = useState(false);
+  const [createNextNodeContext, setCreateNextNodeContext] = useState<{
+    sourceNodeId: string;
+    outcomeName: string;
+    mode: "standard" | "assisted";
+  } | null>(null);
 
   // Get node name by ID
   const getNodeName = (nodeId: string | null): string => {
@@ -274,7 +284,7 @@ export function RoutingEditor({
                 {orphanedCount > 0 && (
                   <span className="flex items-center gap-1 text-amber-600">
                     <Link2OffIcon className="size-3" />
-                    {orphanedCount} orphaned
+                    {orphanedCount} orphaned (missing target)
                   </span>
                 )}
               </div>
@@ -403,6 +413,16 @@ export function RoutingEditor({
                                     value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
                                     onChange={(e) => {
                                       const value = e.target.value;
+                                      if (value === "__create__") {
+                                        setCreateNextNodeContext({
+                                          sourceNodeId: node.id,
+                                          outcomeName: outcomeName,
+                                        });
+                                        setIsCreateNextNodeOpen(true);
+                                        // Restore the select value visually
+                                        e.target.value = gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__");
+                                        return;
+                                      }
                                       const targetId =
                                         value === "__terminal__"
                                           ? null
@@ -430,11 +450,14 @@ export function RoutingEditor({
                                         : "border-input bg-background"
                                     }`}
                                   >
+                                    <option value="__create__">+ Create next node...</option                                  >
+                                    <option value="__create_standard__">+ Create next node...</option>
+                                    <option value="__create_assisted__">✨ Assisted create & route...</option>
                                     {!isRouted && (
-                                      <option value="__none__">Select target...</option>
+                                      <option value="__none__">Select next node...</option>
                                     )}
                                     <option value="__terminal__">
-                                      (Terminal) - End flow
+                                      End flow (terminal)
                                     </option>
                                     {nodes
                                       .filter((n) => n.id !== node.id) // Can't route to self
@@ -491,7 +514,7 @@ export function RoutingEditor({
               <DialogDescription>
                 Are you sure you want to delete the route for outcome "
                 {deleteTarget?.outcomeName}" in node "{deleteTarget?.nodeName}"?
-                The outcome will become orphaned.
+                The outcome will become orphaned (no valid next node).
               </DialogDescription>
             </DialogHeader>
             {deleteError && (
@@ -610,6 +633,23 @@ export function RoutingEditor({
                   value={addGateData.targetNodeId ?? "__terminal__"}
                   onChange={(e) => {
                     const value = e.target.value;
+                    if (value === "__create_standard__" || value === "__create_assisted__") {
+                      if (!addGateData.sourceNodeId || !addGateData.outcomeName) {
+                        setAddError("Select source node and outcome first to use creation affordances");
+                        // Restore select
+                        e.target.value = addGateData.targetNodeId ?? "__terminal__";
+                        return;
+                      }
+                      setCreateNextNodeContext({
+                        sourceNodeId: addGateData.sourceNodeId,
+                        outcomeName: addGateData.outcomeName,
+                        mode: value === "__create_assisted__" ? "assisted" : "standard"
+                      });
+                      setIsCreateNextNodeOpen(true);
+                      // Restore select
+                      e.target.value = addGateData.targetNodeId ?? "__terminal__";
+                      return;
+                    }
                     setAddGateData({
                       ...addGateData,
                       targetNodeId: value === "__terminal__" ? null : value,
@@ -617,7 +657,9 @@ export function RoutingEditor({
                   }}
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="__terminal__">(Terminal) - End flow</option>
+                  <option value="__create_standard__">+ Create next node...</option>
+                  <option value="__create_assisted__">✨ Assisted create & route...</option>
+                  <option value="__terminal__">End flow (terminal)</option>
                   {nodes
                     .filter((n) => n.id !== addGateData.sourceNodeId)
                     .map((node) => (
@@ -694,6 +736,25 @@ export function RoutingEditor({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Next Node Dialog */}
+        {createNextNodeContext && (
+          <CreateNextNodeDialog
+            workflowId={workflowId}
+            sourceNodeId={createNextNodeContext.sourceNodeId}
+            sourceNodeName={nodes.find((n) => n.id === createNextNodeContext.sourceNodeId)?.name || "Unknown"}
+            outcomeName={createNextNodeContext.outcomeName}
+            sourcePosition={nodes.find((n) => n.id === createNextNodeContext.sourceNodeId)?.position}
+            open={isCreateNextNodeOpen}
+            onOpenChange={setIsCreateNextNodeOpen}
+            onCreated={() => {
+              onRoutingUpdated();
+              setIsCreateNextNodeOpen(false);
+              setIsAddDialogOpen(false); // If we were in Add Gate dialog, close it too
+            }}
+            mode={createNextNodeContext.mode}
+          />
+        )}
       </Card>
     </TooltipProvider>
   );

@@ -14,15 +14,18 @@ import {
   AlertCircleIcon
 } from "lucide-react";
 import { EdgeType } from "@/lib/canvas/layout";
+import { CreateNextNodeDialog } from "./create-next-node-dialog";
 
 interface EdgeDetailPanelProps {
   workflowId: string;
+  sourceNodeId: string;
   sourceNodeName: string;
+  sourcePosition?: { x: number; y: number } | null;
   outcomeName: string;
   targetNodeId: string | null;
   targetNodeName: string;
   edgeType: EdgeType;
-  nodes: Array<{ id: string; name: string }>;
+  nodes: Array<{ id: string; name: string; position?: { x: number; y: number } | null }>;
   isEditable: boolean;
   gateId: string;
   onUpdated: () => void;
@@ -30,7 +33,9 @@ interface EdgeDetailPanelProps {
 
 export function EdgeDetailPanel({
   workflowId,
+  sourceNodeId,
   sourceNodeName,
+  sourcePosition,
   outcomeName,
   targetNodeId,
   targetNodeName,
@@ -42,6 +47,10 @@ export function EdgeDetailPanel({
 }: EdgeDetailPanelProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Create next node state
+  const [isCreateNextNodeOpen, setIsCreateNextNodeOpen] = useState(false);
+  const [createNextNodeMode, setCreateNextNodeMode] = useState<"standard" | "assisted">("standard");
 
   const handleTargetChange = async (newTargetId: string | null) => {
     setIsUpdating(true);
@@ -126,18 +135,27 @@ export function EdgeDetailPanel({
 
       {isEditable && (
         <section className="space-y-2 pt-3 border-t">
-          <Label variant="metadata">Modify Target</Label>
+          <Label variant="metadata">Next Node</Label>
           <div className="space-y-1.5">
             <select
               value={targetNodeId ?? "__terminal__"}
               onChange={(e) => {
                 const val = e.target.value;
+                if (val === "__create_standard__" || val === "__create_assisted__") {
+                  setCreateNextNodeMode(val === "__create_assisted__" ? "assisted" : "standard");
+                  setIsCreateNextNodeOpen(true);
+                  // Restore select visually
+                  e.target.value = targetNodeId ?? "__terminal__";
+                  return;
+                }
                 handleTargetChange(val === "__terminal__" ? null : val);
               }}
               disabled={isUpdating}
               className="w-full h-8 rounded-md border bg-background px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring outline-none disabled:opacity-50"
             >
-              <option value="__terminal__">(Terminal) - End flow</option>
+              <option value="__create_standard__">+ Create next node...</option>
+              <option value="__create_assisted__">✨ Assisted create & route...</option>
+              <option value="__terminal__">End flow (terminal)</option>
               {nodes.map(n => (
                 <option key={n.id} value={n.id}>{n.name}</option>
               ))}
@@ -165,6 +183,22 @@ export function EdgeDetailPanel({
           </p>
         </div>
       )}
+
+      {/* Create Next Node Dialog */}
+      <CreateNextNodeDialog
+        workflowId={workflowId}
+        sourceNodeId={sourceNodeId}
+        sourceNodeName={sourceNodeName}
+        outcomeName={outcomeName}
+        sourcePosition={sourcePosition}
+        open={isCreateNextNodeOpen}
+        onOpenChange={setIsCreateNextNodeOpen}
+        onCreated={() => {
+          onUpdated();
+          setIsCreateNextNodeOpen(false);
+        }}
+        mode={createNextNodeMode}
+      />
     </div>
   );
 }
