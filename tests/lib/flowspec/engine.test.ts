@@ -133,6 +133,7 @@ async function createSimpleWorkflow(companyId: string) {
         id: node.id,
         name: node.name,
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [
@@ -300,6 +301,7 @@ async function createMultiNodeWorkflow(companyId: string) {
         id: startNode.id,
         name: "Start Node",
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [
@@ -322,6 +324,7 @@ async function createMultiNodeWorkflow(companyId: string) {
         id: approvalNode.id,
         name: "Approval Node",
         isEntry: false,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [
@@ -341,6 +344,7 @@ async function createMultiNodeWorkflow(companyId: string) {
         id: rejectionNode.id,
         name: "Rejection Node",
         isEntry: false,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [
@@ -420,13 +424,13 @@ async function createTestFlow(
 // =============================================================================
 
 async function cleanupTestData() {
-  // Delete in order of dependencies
-  await prisma.validityEvent.deleteMany({});
   await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
   await prisma.flow.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.fanOutFailure.deleteMany({});
   await prisma.fanOutRule.deleteMany({});
@@ -781,6 +785,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
             id: node.id,
             name: node.name,
             isEntry: true,
+            nodeKind: "MAINLINE",
             completionRule: CompletionRule.ANY_TASK_DONE,
             specificTasks: [],
             tasks: [
@@ -931,6 +936,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
             id: node.id,
             name: node.name,
             isEntry: true,
+            nodeKind: "MAINLINE",
             completionRule: CompletionRule.ALL_TASKS_DONE,
             specificTasks: [],
             tasks: [
@@ -1013,6 +1019,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
             id: node.id,
             name: node.name,
             isEntry: true,
+            nodeKind: "MAINLINE",
             completionRule: CompletionRule.ALL_TASKS_DONE,
             specificTasks: [],
             tasks: [

@@ -74,6 +74,7 @@ async function createLoopingWorkflow(companyId: string) {
         id: node.id,
         name: node.name,
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [

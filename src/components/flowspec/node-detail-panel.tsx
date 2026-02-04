@@ -49,7 +49,7 @@ interface Task {
   crossFlowDependencies: CrossFlowDependency[];
 }
 
-interface Node {
+interface FlowNode {
   id: string;
   name: string;
   isEntry: boolean;
@@ -67,8 +67,8 @@ interface Gate {
 
 interface NodeDetailPanelProps {
   workflowId: string;
-  node: Node;
-  nodes: Node[];
+  node: FlowNode;
+  nodes: FlowNode[];
   gates: Gate[];
   isEditable: boolean;
   isLastEntryNode: boolean;

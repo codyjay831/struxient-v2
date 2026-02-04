@@ -37,9 +37,12 @@ async function createTestMember(companyId: string, userId: string) {
 }
 
 async function cleanupTestData() {
+  await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.fanOutFailure.deleteMany({});
@@ -104,6 +107,7 @@ describe("EPIC-08: Work Station Integration", () => {
         id: wf.nodes[0].id,
         name: wf.nodes[0].name,
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: "ALL_TASKS_DONE",
         tasks: [{
           id: task.id,
@@ -174,8 +178,8 @@ describe("EPIC-08: Work Station Integration", () => {
       version: 1,
       name: wf.name,
       nodes: [
-        { id: n1.id, name: "N1", isEntry: true, completionRule: "ALL_TASKS_DONE", tasks: [{ id: t1.id, name: "T1", outcomes: [{ name: "GO" }], crossFlowDependencies: [] }] },
-        { id: n2.id, name: "N2", isEntry: false, completionRule: "ALL_TASKS_DONE", tasks: [{ id: t2.id, name: "T2", outcomes: [{ name: "FINISH" }], crossFlowDependencies: [] }] }
+        { id: n1.id, name: "N1", isEntry: true, nodeKind: "MAINLINE", completionRule: "ALL_TASKS_DONE", tasks: [{ id: t1.id, name: "T1", outcomes: [{ name: "GO" }], crossFlowDependencies: [] }] },
+        { id: n2.id, name: "N2", isEntry: false, nodeKind: "MAINLINE", completionRule: "ALL_TASKS_DONE", tasks: [{ id: t2.id, name: "T2", outcomes: [{ name: "FINISH" }], crossFlowDependencies: [] }] }
       ],
       gates: [{ id: "gate_1", sourceNodeId: n1.id, outcomeName: "GO", targetNodeId: n2.id }]
     };

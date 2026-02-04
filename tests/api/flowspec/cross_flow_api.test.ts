@@ -28,11 +28,14 @@ async function createTestMember(companyId: string, userId: string) {
 }
 
 async function cleanupTestData() {
+  await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
+  await prisma.workflowVersion.deleteMany({});
   await prisma.crossFlowDependency.deleteMany({});
   await prisma.outcome.deleteMany({});
   await prisma.task.deleteMany({});
@@ -62,7 +65,7 @@ describe("Cross-Flow Dependency API Compliance", () => {
     const wf = await prisma.workflow.create({
       data: { name: "W1", companyId: company.id }
     });
-    const node = await prisma.node.create({ data: { workflowId: wf.id, name: "N1" } });
+    const node = await prisma.node.create({ data: { workflowId: wf.id, name: "N1", nodeKind: "MAINLINE" } });
     const task = await prisma.task.create({ data: { nodeId: node.id, name: "T1" } });
 
     const req = new NextRequest(`http://localhost/api/flowspec/workflows/${wf.id}/nodes/${node.id}/tasks/${task.id}/cross-flow-dependencies`, {
@@ -91,7 +94,7 @@ describe("Cross-Flow Dependency API Compliance", () => {
     const wf = await prisma.workflow.create({
       data: { name: "W1", companyId: company.id }
     });
-    const node = await prisma.node.create({ data: { workflowId: wf.id, name: "N1" } });
+    const node = await prisma.node.create({ data: { workflowId: wf.id, name: "N1", nodeKind: "MAINLINE" } });
     const task = await prisma.task.create({ data: { nodeId: node.id, name: "T1" } });
 
     const sourceWf = await prisma.workflow.create({

@@ -24,6 +24,7 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
+  await prisma.validityEvent.deleteMany({});
   await prisma.job.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
@@ -102,6 +103,7 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
         id: node.id,
         name: node.name,
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: CompletionRule.ALL_TASKS_DONE,
         specificTasks: [],
         tasks: [{
@@ -238,6 +240,7 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
             id: node.id,
             name: node.name,
             isEntry: true,
+            nodeKind: "MAINLINE",
             completionRule: CompletionRule.ALL_TASKS_DONE,
             specificTasks: [],
             tasks: [

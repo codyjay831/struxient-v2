@@ -15,10 +15,12 @@ vi.mock("@clerk/nextjs/server", () => ({
 import { auth } from "@clerk/nextjs/server";
 
 async function cleanupTestData() {
+  await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
-  await prisma.job.deleteMany({}); // ADDED: Must delete Job before FlowGroup
+  await prisma.job.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.workflowVersion.deleteMany({});

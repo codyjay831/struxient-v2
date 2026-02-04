@@ -16,6 +16,8 @@ vi.mock("@clerk/nextjs/server", () => ({
 import { auth } from "@clerk/nextjs/server";
 
 async function cleanupTestData() {
+  await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.jobAssignment.deleteMany({});
   await prisma.job.deleteMany({});
   await prisma.customer.deleteMany({});

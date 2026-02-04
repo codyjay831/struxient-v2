@@ -47,7 +47,7 @@ interface TaskListPanelProps {
   nodeId: string;
   nodeName: string;
   tasks: Task[];
-  nodes: Node[];
+  nodes: any[];
   gates: Gate[];
   isEditable: boolean;
   onTasksUpdated: () => void;

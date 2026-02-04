@@ -18,10 +18,13 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
+  await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
   await prisma.flow.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.fanOutFailure.deleteMany({});
   await prisma.fanOutRule.deleteMany({});
@@ -51,6 +54,7 @@ async function createPublishedWorkflow(companyId: string, name: string = "Test W
       workflowId: workflow.id,
       name: "Entry Node",
       isEntry: true,
+      nodeKind: "MAINLINE",
     },
   });
 
@@ -87,6 +91,7 @@ async function createPublishedWorkflow(companyId: string, name: string = "Test W
       id: node.id,
       name: node.name,
       isEntry: true,
+      nodeKind: "MAINLINE",
       completionRule: "ALL_TASKS_DONE",
       specificTasks: [],
       tasks: [{
@@ -266,7 +271,7 @@ describe("EPIC-03: FlowSpec Flow Instantiation", () => {
     });
 
     const node = await prisma.node.create({
-      data: { workflowId: workflow.id, name: "Entry", isEntry: true }
+      data: { workflowId: workflow.id, name: "Entry", isEntry: true, nodeKind: "MAINLINE" }
     });
 
     const task = await prisma.task.create({
@@ -292,6 +297,7 @@ describe("EPIC-03: FlowSpec Flow Instantiation", () => {
         id: node.id,
         name: node.name,
         isEntry: true,
+        nodeKind: "MAINLINE",
         completionRule: "ALL_TASKS_DONE",
         specificTasks: [],
         tasks: [{

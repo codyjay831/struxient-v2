@@ -22,14 +22,12 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
-  await prisma.taskPolicyOverride.deleteMany({});
-  await prisma.flowGroupPolicy.deleteMany({});
-  await prisma.job.deleteMany({});
-  await prisma.validityEvent.deleteMany({});
   await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.fanOutFailure.deleteMany({});
@@ -231,7 +229,7 @@ describe("EPIC-04: FlowSpec Workflow Lifecycle", () => {
           nodeId: node!.id,
           name: "Evidence Task",
           evidenceRequired: true,
-          evidenceSchema: null,
+          evidenceSchema: null as any,
         }
       });
 
@@ -256,7 +254,7 @@ describe("EPIC-04: FlowSpec Workflow Lifecycle", () => {
           nodeId: node!.id,
           name: "Evidence Task",
           evidenceRequired: true,
-          evidenceSchema: null,
+          evidenceSchema: null as any,
         }
       });
       await prisma.workflow.update({

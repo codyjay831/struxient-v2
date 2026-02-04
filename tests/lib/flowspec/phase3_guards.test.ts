@@ -11,6 +11,7 @@ describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
         {
           id: "node1",
           name: "Node 1",
+          nodeKind: "MAINLINE",
           tasks: [
             { id: "taskB", name: "Task B", outcomes: [{ id: "out1", name: "DONE" }], displayOrder: 0, evidenceRequired: false, instructions: null, evidenceSchema: null },
             { id: "taskA", name: "Task A", outcomes: [{ id: "out2", name: "DONE" }], displayOrder: 1, evidenceRequired: false, instructions: null, evidenceSchema: null },

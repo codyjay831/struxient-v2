@@ -18,14 +18,12 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
-  await prisma.taskPolicyOverride.deleteMany({});
-  await prisma.flowGroupPolicy.deleteMany({});
-  await prisma.job.deleteMany({});
-  await prisma.validityEvent.deleteMany({});
   await prisma.detourRecord.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flow.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.fanOutFailure.deleteMany({});
@@ -172,11 +170,12 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
       companyId: company.id,
       isNonTerminating: false,
       nodes: [
-        {
-          id: "n1",
-          name: "N1",
-          isEntry: true,
-          tasks: [
+          {
+            id: "n1",
+            name: "N1",
+            isEntry: true,
+            nodeKind: "MAINLINE",
+            tasks: [
             { id: "t1", name: "T1", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] },
             { id: "t2", name: "T2", outcomes: [{ name: "DONE" }], crossFlowDependencies: [] }
           ]
@@ -322,12 +321,13 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
               { 
                 name: "Entry", 
                 isEntry: true,
+                nodeKind: "MAINLINE",
                 tasks: {
                   create: [
                     { 
                       name: "T1",
                       evidenceRequired: true,
-                      evidenceSchema: null,
+                      evidenceSchema: null as any,
                       outcomes: { create: [{ name: "DONE" }] }
                     }
                   ]
@@ -341,7 +341,7 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
         }
       });
 
-      const node = workflow.nodes[0];
+      const node = (workflow as any).nodes[0];
       await prisma.gate.create({
         data: {
           workflowId: workflow.id,
@@ -377,12 +377,13 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
               { 
                 name: "Entry", 
                 isEntry: true,
+                nodeKind: "MAINLINE",
                 tasks: {
                   create: [
                     { 
                       name: "T1",
                       evidenceRequired: true,
-                      evidenceSchema: null,
+                      evidenceSchema: null as any,
                       outcomes: { create: [{ name: "DONE" }] }
                     }
                   ]
@@ -396,7 +397,7 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
         }
       });
 
-      const node = workflow.nodes[0];
+      const node = (workflow as any).nodes[0];
       await prisma.gate.create({
         data: {
           workflowId: workflow.id,
@@ -454,7 +455,7 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
         }
       });
 
-      const node = workflow.nodes[0];
+      const node = (workflow as any).nodes[0];
       await prisma.gate.create({
         data: {
           workflowId: workflow.id,

@@ -34,6 +34,7 @@ const createSnapshot = (tasks: { id: string; defaultSlaHours: number | null }[])
       id: "node-1",
       name: "Node 1",
       isEntry: true,
+      nodeKind: "MAINLINE",
       completionRule: "ALL_TASKS_DONE",
       specificTasks: [],
       transitiveSuccessors: [],

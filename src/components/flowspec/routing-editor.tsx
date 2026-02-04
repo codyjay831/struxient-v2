@@ -417,6 +417,7 @@ export function RoutingEditor({
                                         setCreateNextNodeContext({
                                           sourceNodeId: node.id,
                                           outcomeName: outcomeName,
+                                          mode: "standard",
                                         });
                                         setIsCreateNextNodeOpen(true);
                                         // Restore the select value visually
