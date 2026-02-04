@@ -70,7 +70,9 @@ export async function executeFanOut(
       });
 
       if (existingFlow) {
-        console.log(`[FanOut Skip] Flow for workflow ${rule.targetWorkflowId} already exists in group ${flowGroupId}`);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[FanOut Skip] Flow for workflow ${rule.targetWorkflowId} already exists in group ${flowGroupId}`);
+        }
         continue;
       }
 
@@ -164,7 +166,9 @@ async function provisionJob(
         address: saleDetails.serviceAddress,
       },
     });
-    console.log(`[ProvisionJob] Created Job for FlowGroup ${flowGroupId}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[ProvisionJob] Created Job for FlowGroup ${flowGroupId}`);
+    }
   }
 
   // 5. Instantiate downstream bundles (Pattern B)
