@@ -572,7 +572,7 @@ export function WorkflowCanvas({
           strokeWidth={isSelected ? "3" : "2"}
           strokeDasharray={isDetourEdge ? "5,5" : "none"}
           className={edgeColor}
-          markerEnd={isSelected ? "url(#arrowhead-selected)" : "url(#arrowhead)"}
+          markerEnd={isSelected ? "url(#arrowhead-selected)" : undefined}
         />
         {/* Hover/Selection Label */}
         {(isSelected || camera.k > 0.5) && (
