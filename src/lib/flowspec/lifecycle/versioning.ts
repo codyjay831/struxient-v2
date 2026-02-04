@@ -28,6 +28,7 @@ export function createWorkflowSnapshot(
       id: node.id,
       name: node.name,
       isEntry: node.isEntry,
+      nodeKind: node.nodeKind,
       completionRule: node.completionRule,
       specificTasks: node.specificTasks,
       tasks: node.tasks.map((task) => ({

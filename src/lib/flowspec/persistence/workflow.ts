@@ -385,6 +385,7 @@ export async function hydrateSnapshotToWorkflow(
         workflowId: wf.id,
         name: sNode.name,
         isEntry: sNode.isEntry,
+        nodeKind: sNode.nodeKind || "MAINLINE",
         completionRule: sNode.completionRule,
         specificTasks: [], // Will update after tasks are created
       },

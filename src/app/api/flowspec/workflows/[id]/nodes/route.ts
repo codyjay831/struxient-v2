@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: Props) {
   try {
     const { id: workflowId } = await params;
     const body = await request.json();
-    const { name, isEntry, completionRule, position } = body;
+    const { name, isEntry, nodeKind, completionRule, position } = body;
 
     const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
 
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest, { params }: Props) {
         workflowId,
         name,
         isEntry: isEntry ?? false,
+        nodeKind: nodeKind ?? "MAINLINE",
         completionRule: completionRule ?? "ALL_TASKS_DONE",
         position: position ?? undefined,
       },

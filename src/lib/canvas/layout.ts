@@ -9,6 +9,7 @@ export interface Node {
   id: string;
   name: string;
   isEntry: boolean;
+  nodeKind?: "MAINLINE" | "DETOUR";
   position?: { x: number; y: number } | null;
 }
 

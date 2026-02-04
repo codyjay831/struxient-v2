@@ -240,6 +240,7 @@ model Node {
   workflowId     String
   name           String
   isEntry        Boolean        @default(false)
+  nodeKind       NodeKind       @default(MAINLINE)
   completionRule CompletionRule @default(ALL_TASKS_DONE)
   specificTasks  String[]       // For SPECIFIC_TASKS_DONE rule - list of Task IDs
   position       Json?          // { x: number, y: number } for Builder UI
@@ -260,6 +261,12 @@ enum CompletionRule {
   ALL_TASKS_DONE
   ANY_TASK_DONE
   SPECIFIC_TASKS_DONE
+}
+
+/// Node kind (Mainline vs Detour)
+enum NodeKind {
+  MAINLINE
+  DETOUR
 }
 
 /// Task definition within a Node

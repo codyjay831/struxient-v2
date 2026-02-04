@@ -24,6 +24,7 @@ export function CreateNodeDialog({ workflowId, onNodeCreated, disabled }: Create
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [isEntry, setIsEntry] = useState(false);
+  const [nodeKind, setNodeKind] = useState<"MAINLINE" | "DETOUR">("MAINLINE");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +37,7 @@ export function CreateNodeDialog({ workflowId, onNodeCreated, disabled }: Create
       const response = await fetch(`/api/flowspec/workflows/${workflowId}/nodes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, isEntry }),
+        body: JSON.stringify({ name, isEntry, nodeKind }),
       });
 
       const data = await response.json();
@@ -50,6 +51,7 @@ export function CreateNodeDialog({ workflowId, onNodeCreated, disabled }: Create
       setOpen(false);
       setName("");
       setIsEntry(false);
+      setNodeKind("MAINLINE");
     } catch {
       setError("Failed to create node. Please try again.");
     } finally {
@@ -101,6 +103,41 @@ export function CreateNodeDialog({ workflowId, onNodeCreated, disabled }: Create
               <label htmlFor="is-entry" className="text-sm">
                 Mark as Entry Node (workflow starts here)
               </label>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <label className="text-sm font-medium">Node Classification</label>
+              <div className="flex bg-muted p-1 rounded-md">
+                <button
+                  type="button"
+                  onClick={() => setNodeKind("MAINLINE")}
+                  disabled={isLoading}
+                  className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-all ${
+                    nodeKind === "MAINLINE"
+                      ? "bg-background shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Mainline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNodeKind("DETOUR")}
+                  disabled={isLoading}
+                  className={`flex-1 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-all ${
+                    nodeKind === "DETOUR"
+                      ? "bg-blue-500 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Detour
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-tight italic">
+                {nodeKind === "MAINLINE" 
+                  ? "Standard process step (Solid arrows)" 
+                  : "Compensation or recovery path (Dashed arrows)"}
+              </p>
             </div>
 
             {error && (

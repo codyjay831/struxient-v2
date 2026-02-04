@@ -34,10 +34,11 @@ import {
   CompletionRule,
   EvidenceType,
   Prisma,
+  NodeKind,
 } from "@prisma/client";
 
 // Re-export Prisma enums for convenience
-export { WorkflowStatus, FlowStatus, CompletionRule, EvidenceType };
+export { WorkflowStatus, FlowStatus, CompletionRule, EvidenceType, NodeKind };
 
 // =============================================================================
 // PRISMA PAYLOAD TYPES
@@ -118,6 +119,7 @@ export interface SnapshotNode {
   id: string;
   name: string;
   isEntry: boolean;
+  nodeKind: NodeKind;
   completionRule: CompletionRule;
   specificTasks: string[];
   tasks: SnapshotTask[];

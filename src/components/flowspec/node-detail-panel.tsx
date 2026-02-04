@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { TaskListPanel } from "./task-list-panel";
+import { NodeKind } from "@/lib/flowspec/types";
 
 export type CompletionRule = "ALL_TASKS_DONE" | "ANY_TASK_DONE" | "SPECIFIC_TASKS_DONE";
 
@@ -52,6 +53,7 @@ interface Node {
   id: string;
   name: string;
   isEntry: boolean;
+  nodeKind: NodeKind;
   completionRule: CompletionRule;
   tasks: Task[];
 }
@@ -98,6 +100,7 @@ export function NodeDetailPanel({
   // Form state
   const [name, setName] = useState(node.name);
   const [isEntry, setIsEntry] = useState(node.isEntry);
+  const [nodeKind, setNodeKind] = useState<NodeKind>(node.nodeKind);
   const [completionRule, setCompletionRule] = useState<CompletionRule>(
     node.completionRule as CompletionRule
   );
@@ -116,19 +119,21 @@ export function NodeDetailPanel({
   useEffect(() => {
     setName(node.name);
     setIsEntry(node.isEntry);
+    setNodeKind(node.nodeKind);
     setCompletionRule(node.completionRule as CompletionRule);
     setHasChanges(false);
     setSaveError(null);
-  }, [node.id, node.name, node.isEntry, node.completionRule]);
+  }, [node.id, node.name, node.isEntry, node.nodeKind, node.completionRule]);
 
   // Track changes
   useEffect(() => {
     const changed =
       name !== node.name ||
       isEntry !== node.isEntry ||
+      nodeKind !== node.nodeKind ||
       completionRule !== node.completionRule;
     setHasChanges(changed);
-  }, [name, isEntry, completionRule, node.name, node.isEntry, node.completionRule]);
+  }, [name, isEntry, nodeKind, completionRule, node.name, node.isEntry, node.nodeKind, node.completionRule]);
 
   // Check if we can toggle off entry
   const canToggleEntryOff = !isLastEntryNode || !node.isEntry;
@@ -147,6 +152,7 @@ export function NodeDetailPanel({
           body: JSON.stringify({
             name: name !== node.name ? name : undefined,
             isEntry: isEntry !== node.isEntry ? isEntry : undefined,
+            nodeKind: nodeKind !== node.nodeKind ? nodeKind : undefined,
             completionRule: completionRule !== node.completionRule ? completionRule : undefined,
           }),
         }
@@ -247,6 +253,42 @@ export function NodeDetailPanel({
                 Cannot remove entry status — at least one entry node is required.
               </p>
             )}
+          </div>
+
+          {/* Node Kind (Mainline vs Detour) */}
+          <div className="space-y-2 border-y py-3 my-1">
+            <Label variant="metadata">Node Classification</Label>
+            <div className="flex bg-muted p-1 rounded-md">
+              <button
+                type="button"
+                onClick={() => setNodeKind("MAINLINE")}
+                disabled={!isEditable || isSaving}
+                className={`flex-1 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${
+                  nodeKind === "MAINLINE"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Mainline
+              </button>
+              <button
+                type="button"
+                onClick={() => setNodeKind("DETOUR")}
+                disabled={!isEditable || isSaving}
+                className={`flex-1 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-all ${
+                  nodeKind === "DETOUR"
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Detour
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight px-1">
+              {nodeKind === "MAINLINE" 
+                ? "Standard process step (Solid arrows)" 
+                : "Compensation or recovery path (Dashed arrows)"}
+            </p>
           </div>
 
           {/* Completion Rule */}

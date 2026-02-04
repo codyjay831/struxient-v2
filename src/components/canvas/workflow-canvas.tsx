@@ -109,6 +109,13 @@ export function WorkflowCanvas({
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
   const DRAG_THRESHOLD_PX = 5;
 
+  // Interaction Refs (Contract Enforcement)
+  const isDraggingRef = useRef(false);
+  const isCandidateRef = useRef(false);
+  const didDragRef = useRef(false);
+  const suppressClickRef = useRef(false);
+  const capturedElementRef = useRef<Element | null>(null);
+
   // Combine base positions with overrides
   const positions = useMemo(() => {
     const combined = { ...basePositions };
@@ -120,7 +127,8 @@ export function WorkflowCanvas({
 
   // 3. Zoom-to-fit logic
   const zoomToFit = useCallback(() => {
-    if (nodes.length === 0 || !containerRef.current) return;
+    // Contract: No auto-zoom while user is interacting
+    if (isDraggingRef.current || isCandidateRef.current || nodes.length === 0 || !containerRef.current) return;
 
     const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
     if (containerWidth === 0 || containerHeight === 0) return;
@@ -146,28 +154,87 @@ export function WorkflowCanvas({
     setCamera({ x, y, k: Math.max(0.5, Math.min(1.75, k)) });
   }, [nodes, positions, NODE_WIDTH, NODE_HEIGHT]);
 
-  // Initial zoom to fit and resize handling
+  // Stable reference for event listeners and observers
+  const zoomToFitRef = useRef(zoomToFit);
+  useEffect(() => {
+    zoomToFitRef.current = zoomToFit;
+  }, [zoomToFit]);
+
+  // Initial fit on mount only
+  const hasInitialFit = useRef(false);
+  useEffect(() => {
+    if (!hasInitialFit.current && nodes.length > 0) {
+      zoomToFit();
+      hasInitialFit.current = true;
+    }
+  }, [nodes.length, zoomToFit]);
+
+  // Resize handling and Native Wheel Guard
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Initial fit
-    zoomToFit();
+    // 1. Resize Observer (handles sidebar/inspector toggles)
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => {
+        zoomToFitRef.current();
+      });
+      observer.observe(container);
+    }
 
-    // Re-fit on container resize (handles sidebar/inspector toggles)
-    // Guard for environments without ResizeObserver (e.g., JSDOM tests)
-    if (typeof ResizeObserver === "undefined") return;
+    // 2. Native Wheel Guard (Intercept Pinch-to-Zoom and Block Page Zoom)
+    const handleNativeWheel = (e: WheelEvent) => {
+      // Contract: No zoom during node drag or candidate press
+      if (isDraggingRef.current || isCandidateRef.current) {
+        e.preventDefault(); 
+        e.stopImmediatePropagation();
+        return;
+      }
 
-    const observer = new ResizeObserver(() => {
-      zoomToFit();
-    });
-    observer.observe(container);
+      // Intercept Pinch-to-Zoom (ctrl + wheel)
+      if (e.ctrlKey) {
+        e.preventDefault();
+        
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
 
-    return () => observer.disconnect();
-  }, [zoomToFit]);
+        const delta = -e.deltaY;
+        const zoomFactor = Math.pow(1.1, delta / 100);
+
+        setCamera(prev => {
+          const newK = Math.max(0.5, Math.min(1.75, prev.k * zoomFactor));
+          
+          // Zoom relative to mouse position
+          const worldX = (mouseX - prev.x) / prev.k;
+          const worldY = (mouseY - prev.y) / prev.k;
+          
+          const newX = mouseX - worldX * newK;
+          const newY = mouseY - worldY * newK;
+
+          return { x: newX, y: newY, k: newK };
+        });
+      }
+    };
+
+    container.addEventListener("wheel", handleNativeWheel, { passive: false });
+
+    return () => {
+      observer?.disconnect();
+      container.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, []); // Constant throughout lifecycle
 
   // Interaction Handlers
   const handleWheel = (e: React.WheelEvent) => {
+    // Contract: No zoom during node drag or candidate press
+    if (isDraggingRef.current || isCandidateRef.current) return;
+    
+    // Pinch gestures (ctrl+wheel) are handled by the native listener in useEffect
+    // to reliably call preventDefault() and block page zoom.
+    if (e.ctrlKey) return;
+
     if (!containerRef.current) return;
     
     const rect = containerRef.current.getBoundingClientRect();
@@ -204,7 +271,7 @@ export function WorkflowCanvas({
   };
 
   const handleMouseMove = (e: React.PointerEvent) => {
-    if (draggingCandidateNodeId && !draggingNodeId) {
+    if (draggingCandidateNodeId && !isDraggingRef.current) {
       if (pressStartRef.current) {
         const dist = Math.sqrt(
           Math.pow(e.clientX - pressStartRef.current.x, 2) +
@@ -212,11 +279,13 @@ export function WorkflowCanvas({
         );
         if (dist > DRAG_THRESHOLD_PX) {
           setDraggingNodeId(draggingCandidateNodeId);
+          isDraggingRef.current = true;
+          didDragRef.current = true;
         }
       }
     }
 
-    if (draggingNodeId) {
+    if (isDraggingRef.current && draggingNodeId) {
       const dx = (e.clientX - dragStart.current.x) / camera.k;
       const dy = (e.clientY - dragStart.current.y) / camera.k;
       
@@ -249,9 +318,20 @@ export function WorkflowCanvas({
   };
 
   const handleMouseUp = (e: React.PointerEvent) => {
-    if (draggingCandidateNodeId && !draggingNodeId) {
-      // This was a click, not a drag - selection is handled by onClick for test compatibility
-    } else if (draggingNodeId) {
+    // Release capture on the element that captured it
+    if (capturedElementRef.current && capturedElementRef.current.hasPointerCapture(e.pointerId)) {
+      capturedElementRef.current.releasePointerCapture(e.pointerId);
+    }
+    capturedElementRef.current = null;
+
+    if (didDragRef.current) {
+      // Contract: Suppress the immediate click after a real drag
+      suppressClickRef.current = true;
+      // Clear flag after a short delay so actual clicks still work
+      setTimeout(() => { suppressClickRef.current = false; }, 50);
+    }
+
+    if (isDraggingRef.current && draggingNodeId) {
       // This was a drag end
       const finalPos = positions[draggingNodeId];
       if (finalPos) {
@@ -262,22 +342,34 @@ export function WorkflowCanvas({
     setIsDragging(false);
     setDraggingNodeId(null);
     setDraggingCandidateNodeId(null);
+    isDraggingRef.current = false;
+    isCandidateRef.current = false;
+    didDragRef.current = false;
     pressStartRef.current = null;
   };
 
   const handleNodeClick = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();
-    if (!draggingNodeId) {
-      onNodeClick?.(nodeId);
+    // Contract: Bail if a drag just occurred or is suppressed
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
     }
+    onNodeClick?.(nodeId);
   };
 
   const handleNodePointerDown = (e: React.PointerEvent, nodeId: string) => {
     if (e.button !== 0) return; // Left click only
+    e.preventDefault();
     e.stopPropagation();
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    
+    const target = e.currentTarget as Element;
+    target.setPointerCapture(e.pointerId);
+    capturedElementRef.current = target;
     
     setDraggingCandidateNodeId(nodeId);
+    isCandidateRef.current = true;
+    didDragRef.current = false;
     pressStartRef.current = { x: e.clientX, y: e.clientY };
     dragStart.current = { x: e.clientX, y: e.clientY };
   };
@@ -292,8 +384,15 @@ export function WorkflowCanvas({
     const sourceNode = nodes.find(n => n.id === gate.sourceNodeId);
     const targetNode = gate.targetNodeId ? nodes.find(n => n.id === gate.targetNodeId) : null;
 
-    const isDetourNode = (node: any) => 
-      node && (node.name.startsWith("DETOUR:") || node.id.startsWith("ADD_") || node.id.startsWith("CORR_") || node.id.startsWith("FOLLOWUP_"));
+    const isDetourNode = (node: any) => {
+      if (!node) return false;
+      // Precedence: explicit nodeKind wins if defined
+      if (node.nodeKind) {
+        return node.nodeKind === "DETOUR";
+      }
+      // Legacy fallback: only if nodeKind is missing
+      return node.name.startsWith("DETOUR:") || node.id.startsWith("ADD_") || node.id.startsWith("CORR_") || node.id.startsWith("FOLLOWUP_");
+    };
 
     const isDetourEntry = !isDetourNode(sourceNode) && isDetourNode(targetNode);
     const isDetourExit = isDetourNode(sourceNode) && !isDetourNode(targetNode);
@@ -511,13 +610,14 @@ export function WorkflowCanvas({
   return (
     <div 
       ref={containerRef} 
-      className={`w-full h-full bg-background canvas-grid relative overflow-hidden select-none ${isDragging || draggingNodeId ? "cursor-grabbing" : "cursor-default"}`}
+      className={`w-full h-full bg-background canvas-grid relative overflow-hidden select-none touch-none ${isDragging || draggingNodeId ? "cursor-grabbing" : "cursor-default"}`}
       data-testid="workflow-canvas"
       onWheel={handleWheel}
       onPointerDown={handleMouseDown}
       onPointerMove={handleMouseMove}
       onPointerUp={handleMouseUp}
       onPointerLeave={handleMouseUp}
+      onPointerCancel={handleMouseUp}
       onDoubleClick={(e) => {
         if (e.target === e.currentTarget || (e.target as Element).id === "background-rect") {
           zoomToFit();
@@ -626,7 +726,7 @@ export function WorkflowCanvas({
                 <g 
                   key={node.id}
                   transform={`translate(${pos.x}, ${pos.y})`}
-                  className="cursor-pointer group"
+                  className="cursor-pointer group touch-none"
                   onPointerDown={(e) => handleNodePointerDown(e, node.id)}
                   onClick={(e) => handleNodeClick(e, node.id)}
                   data-testid="canvas-node"
@@ -671,6 +771,26 @@ export function WorkflowCanvas({
           </g>
         </g>
       </svg>
+
+      {/* Canvas Legend */}
+      <div className="absolute bottom-4 left-4 z-20 flex flex-col gap-2 p-3 bg-background/90 backdrop-blur-sm border rounded-md shadow-sm pointer-events-none">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-0.5 bg-muted-foreground/60" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Mainline</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-0.5 border-t-2 border-dashed border-muted-foreground/40" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">Detour (Compensation)</span>
+        </div>
+        <div className="mt-1 flex gap-2">
+          <span className="px-1 py-0.5 rounded bg-blue-500 text-white text-[7px] font-bold uppercase tracking-tighter">Detour</span>
+          <span className="text-[8px] text-muted-foreground">Entry into detour</span>
+        </div>
+        <div className="flex gap-2">
+          <span className="px-1 py-0.5 rounded bg-green-500 text-white text-[7px] font-bold uppercase tracking-tighter">Resume</span>
+          <span className="text-[8px] text-muted-foreground">Exit to mainline</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -76,6 +76,7 @@ interface Node {
   id: string;
   name: string;
   isEntry: boolean;
+  nodeKind: "MAINLINE" | "DETOUR";
   completionRule: CompletionRule;
   tasks: Task[];
   position?: { x: number; y: number } | null;
