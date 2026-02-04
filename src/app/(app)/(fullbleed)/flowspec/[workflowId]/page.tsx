@@ -708,10 +708,10 @@ export default function WorkflowDetailPage() {
           <SheetContent 
             side="right" 
             variant="compact"
-            className="w-96 sm:w-[450px] p-0 overflow-y-auto"
+            className="w-96 sm:w-[450px] p-0 flex flex-col h-full gap-0"
             data-testid="inspector-root"
           >
-            <SheetHeader className="p-4 border-b bg-muted/30 sticky top-0 z-10">
+            <SheetHeader className="p-4 border-b bg-background flex-none">
               <SheetTitle className="flex items-center justify-between">
                 <Label variant="metadata">
                   {selectedNodeId ? "Node Inspector" : "Edge Inspector"}
@@ -722,7 +722,7 @@ export default function WorkflowDetailPage() {
               </SheetDescription>
             </SheetHeader>
 
-            <div className="p-4">
+            <div className="flex-1 overflow-y-auto p-4">
                 {selectedNodeId && selectedNode && (
                   <div data-testid="node-inspector">
                     <NodeDetailPanel
