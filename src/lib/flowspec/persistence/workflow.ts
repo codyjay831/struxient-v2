@@ -118,6 +118,7 @@ export async function createWorkflow(data: CreateWorkflowData) {
  * @param provenance - Template provenance (immutable after import)
  * @returns Created workflow
  */
+/** @deprecated unused */
 export async function createWorkflowFromTemplate(
   data: CreateWorkflowData,
   provenance: TemplateProvenance

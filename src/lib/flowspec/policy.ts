@@ -68,6 +68,7 @@ export function getSnapshotTaskIds(snapshot: WorkflowSnapshot): Set<string> {
 /**
  * Find a task in a snapshot by ID.
  */
+/** @deprecated unused */
 export function findTaskInSnapshotById(snapshot: WorkflowSnapshot, taskId: string): SnapshotTask | null {
   for (const node of snapshot.nodes) {
     for (const task of node.tasks) {

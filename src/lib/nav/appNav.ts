@@ -95,6 +95,7 @@ export function getEnabledNavItems(): NavItem[] {
  * Get all nav items regardless of module state.
  * Use for route validation, not for rendering nav.
  */
+/** @deprecated unused */
 export function getAllNavItems(): NavItem[] {
   return ALL_NAV_ITEMS;
 }
@@ -102,6 +103,7 @@ export function getAllNavItems(): NavItem[] {
 /**
  * Check if a route's module is enabled.
  */
+/** @deprecated unused */
 export function isRouteModuleEnabled(pathname: string): boolean {
   const moduleFlags = getModuleFlags();
   const navItem = ALL_NAV_ITEMS.find(

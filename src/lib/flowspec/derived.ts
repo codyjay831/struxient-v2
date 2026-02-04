@@ -742,6 +742,7 @@ export function evaluateGates(
  * Explains why an action (like starting a task or completing a flow) is refused.
  * Never returns "unknown".
  */
+/** @deprecated unused */
 export function explainActionRefusal(
   node: SnapshotNode,
   task: SnapshotTask,
@@ -842,6 +843,7 @@ export function explainActionRefusal(
  * @param gates - All Gates in the Workflow
  * @returns The matching Gate route or undefined
  */
+/** @deprecated unused */
 export function getGateRoute(
   nodeId: string,
   outcomeName: string,

@@ -389,6 +389,7 @@ export async function getTaskEvidence(
  * @param flowId - The Flow instance ID
  * @returns Array of EvidenceAttachment records
  */
+/** @deprecated unused */
 export async function getFlowEvidence(flowId: string): Promise<EvidenceAttachment[]> {
   return prisma.evidenceAttachment.findMany({
     where: { flowId },

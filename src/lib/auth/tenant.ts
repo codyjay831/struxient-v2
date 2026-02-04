@@ -13,6 +13,7 @@ import { prisma } from "../prisma";
 import { buildAuthorityContext, type AuthorityContext } from "./capabilities";
 import { apiError } from "../api-utils";
 
+/** @deprecated unused */
 export class TenantIsolationError extends Error {
   constructor(message: string = "Tenant isolation violation") {
     super(message);
@@ -118,6 +119,7 @@ export async function getActorTenantContext(): Promise<TenantContext> {
 /**
  * Gets the current actor's companyId (legacy helper).
  */
+/** @deprecated unused */
 export async function getActorCompanyId(): Promise<string> {
   const ctx = await getActorTenantContext();
   return ctx.companyId;

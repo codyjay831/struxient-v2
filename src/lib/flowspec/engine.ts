@@ -65,6 +65,7 @@ import {
 /**
  * Records a ValidityEvent in Truth.
  */
+/** @deprecated unused */
 export async function recordValidityEvent(
   taskExecutionId: string,
   state: "VALID" | "PROVISIONAL" | "INVALID",

@@ -517,6 +517,7 @@ export function isValidOutcome(
   return allowedOutcomes.includes(outcome);
 }
 
+/** @deprecated unused */
 export function isTerminalGate(gate: GateRoute): boolean {
   return gate.targetNodeId === null;
 }

@@ -62,6 +62,7 @@ export function isModuleEnabled(moduleKey: ModuleKey): boolean {
 /**
  * Get list of enabled modules.
  */
+/** @deprecated unused */
 export function getEnabledModules(): ModuleKey[] {
   const flags = getModuleFlags();
   return (Object.keys(flags) as ModuleKey[]).filter((key) => flags[key]);
