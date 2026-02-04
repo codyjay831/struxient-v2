@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { WorkflowCanvas } from "@/components/canvas/workflow-canvas";
+import { Gate } from "@/lib/canvas/layout";
 import * as React from "react";
 
 describe("WorkflowCanvas Persistence", () => {
@@ -11,7 +12,7 @@ describe("WorkflowCanvas Persistence", () => {
     { id: "n1", name: "Node 1", isEntry: true, position: { x: 100, y: 100 } },
     { id: "n2", name: "Node 2", isEntry: false },
   ];
-  const mockGates = [];
+  const mockGates: Gate[] = [];
 
   beforeEach(() => {
     vi.clearAllMocks();
