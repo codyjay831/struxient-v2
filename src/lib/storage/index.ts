@@ -4,11 +4,6 @@
 
 export {
   generateSignedUploadUrl,
-  generateStorageKey,
-  extractCompanyIdFromKey,
-  validateStorageKeyOwnership,
-  validateFilePointer,
-  checkFileExists,
   isStorageConfigured,
 } from "./s3";
 
