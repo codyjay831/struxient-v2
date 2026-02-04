@@ -703,4 +703,17 @@ Fields like `isBlocked` on FlowGroup list APIs are **projections** derived from 
 
 ---
 
+## 15. Automated Enforcement (CI Guards)
+
+The following CI guards enforce structural and behavioral invariants that cannot be easily captured by types alone:
+
+| Guard | Policy | Target |
+|-------|--------|--------|
+| `guard_flowspec_persistence_boundary` | All workflow writes MUST route through persistence gateway. | `src/lib/flowspec/persistence/workflow.ts` |
+| `guard_flowspec_status_mutation` | Workflow status mutations MUST only occur in lifecycle actions or persistence gateway. | `src/lib/flowspec/lifecycle/**`, `src/lib/flowspec/persistence/workflow.ts` |
+| `guard_flowspec_domain_isolation` | FlowSpec engine MUST NOT import from Work Station or other consumer domains. | `src/lib/flowspec/**` |
+| `guard_flowspec_route_tenant_check` | All FlowSpec API routes MUST enforce tenant isolation via `verifyTenantOwnership`. | `src/app/api/flowspec/**` |
+
+---
+
 **End of Document**

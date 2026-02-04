@@ -413,12 +413,13 @@ Validation checks (see [10_flowspec_engine_contract.md](./10_flowspec_engine_con
 2. Multiple drafts may exist for the same Workflow.
 3. Drafts are not executable.
 4. Drafts may be discarded without affecting Published versions.
+5. Drafts MAY be incomplete to support incremental authoring (e.g., INV-025 Evidence Schema is not enforced for Drafts).
 
 ### 8.2 Publish Behavior
 
 **Rules:**
 1. Publishing creates a new immutable version.
-2. Publishing requires passing validation.
+2. Publishing requires passing validation (Zero findings). INV-025 is enforced at the VALIDATED transition and at Publish time.
 3. Published versions are numbered/identified uniquely.
 4. Publishing does NOT modify or delete previous versions.
 

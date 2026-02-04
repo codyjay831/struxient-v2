@@ -5,9 +5,11 @@
  * operations within FlowSpec code paths. All workflow writes must route
  * through these functions.
  *
- * Enforcement: CI guard (guard_flowspec_persistence_boundary.mjs) scans
- * src/app/api/flowspec/** and src/lib/flowspec/** for raw prisma.workflow
- * calls outside this file.
+ * Enforcement: 
+ * - CI guard (guard_flowspec_persistence_boundary.mjs) scans src/app/api/flowspec/** 
+ *   and src/lib/flowspec/** for raw prisma.workflow calls outside this file.
+ * - CI guard (guard_flowspec_status_mutation.mjs) ensures workflow status 
+ *   mutations only occur in lifecycle or this gateway file.
  *
  * Gateway Methods:
  * - createWorkflow: Standard creation (no provenance)
@@ -168,18 +170,31 @@ export async function updateWorkflow(id: string, data: UpdateWorkflowData) {
  * @throws Error if workflow not found or tenant mismatch
  */
 export async function deleteWorkflow(id: string, tenantCtx: TenantContext): Promise<void> {
-  // Fetch workflow to verify ownership
+  // Fetch workflow to verify ownership, status, and versions
   const workflow = await prisma.workflow.findUnique({
     where: { id },
-    select: { companyId: true },
+    include: {
+      _count: {
+        select: { versions: true }
+      }
+    }
   });
 
   if (!workflow) {
-    throw new Error("Workflow not found");
+    const error = new Error("Workflow not found");
+    (error as any).code = "WORKFLOW_NOT_FOUND";
+    throw error;
   }
 
   if (workflow.companyId !== tenantCtx.companyId) {
     throw new Error("Tenant isolation violation: workflow does not belong to company");
+  }
+
+  // INV-011: Published workflows cannot be deleted
+  if (workflow.status === WorkflowStatus.PUBLISHED || workflow._count.versions > 0) {
+    const error = new Error("Published workflows cannot be deleted (INV-011)");
+    (error as any).code = "PUBLISHED_IMMUTABLE";
+    throw error;
   }
 
   await prisma.workflow.delete({

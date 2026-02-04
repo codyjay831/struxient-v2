@@ -65,8 +65,11 @@ export async function validateWorkflowAction(
     };
   }
 
-  // Run full validation
-  const validation = await validateWorkflow(workflow as unknown as WorkflowWithRelations);
+  // Run full validation as if it were VALIDATED to ensure transition is safe
+  const validation = await validateWorkflow({
+    ...workflow,
+    status: WorkflowStatus.VALIDATED,
+  } as unknown as WorkflowWithRelations);
 
   if (!validation.valid) {
     return {

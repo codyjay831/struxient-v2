@@ -22,6 +22,11 @@ async function createTestCompany(name: string = "Test Company") {
 }
 
 async function cleanupTestData() {
+  await prisma.taskPolicyOverride.deleteMany({});
+  await prisma.flowGroupPolicy.deleteMany({});
+  await prisma.job.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
+  await prisma.detourRecord.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
@@ -212,5 +217,61 @@ describe("EPIC-04: FlowSpec Workflow Lifecycle", () => {
     expect(branchResult.workflow?.nodes.length).toBe(1);
     expect(branchResult.workflow?.nodes[0].tasks.length).toBe(1);
     expect(branchResult.workflow?.gates.length).toBe(1);
+  });
+
+  describe("INV-025 Lifecycle Enforcement", () => {
+    it("should fail validate action if evidenceRequired is true but schema is missing", async () => {
+      const company = await createTestCompany();
+      const workflow = await createValidDraftWorkflow(company.id);
+      
+      // Add a task that requires evidence but has no schema
+      const node = await prisma.node.findFirst({ where: { workflowId: workflow.id } });
+      await prisma.task.create({
+        data: {
+          nodeId: node!.id,
+          name: "Evidence Task",
+          evidenceRequired: true,
+          evidenceSchema: null,
+        }
+      });
+
+      const result = await validateWorkflowAction(workflow.id);
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("VALIDATION_FAILED");
+      expect(result.validation?.errors.some(e => e.code === "MISSING_EVIDENCE_SCHEMA")).toBe(true);
+      
+      const updated = await prisma.workflow.findUnique({ where: { id: workflow.id } });
+      expect(updated?.status).toBe(WorkflowStatus.DRAFT);
+    });
+
+    it("should block publish if a Validated workflow somehow misses a schema (revalidation)", async () => {
+      const company = await createTestCompany();
+      const workflow = await createValidDraftWorkflow(company.id);
+      
+      // 1. Manually force VALIDATED state despite missing schema
+      // (Bypassing validationAction to simulate data corruption or direct DB edit)
+      const node = await prisma.node.findFirst({ where: { workflowId: workflow.id } });
+      await prisma.task.create({
+        data: {
+          nodeId: node!.id,
+          name: "Evidence Task",
+          evidenceRequired: true,
+          evidenceSchema: null,
+        }
+      });
+      await prisma.workflow.update({
+        where: { id: workflow.id },
+        data: { status: WorkflowStatus.VALIDATED }
+      });
+
+      // 2. Attempt publish - should re-validate and fail
+      const result = await publishWorkflowAction(workflow.id, "test-user");
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("VALIDATION_FAILED");
+      expect(result.validation?.errors.some(e => e.code === "MISSING_EVIDENCE_SCHEMA")).toBe(true);
+
+      const updated = await prisma.workflow.findUnique({ where: { id: workflow.id } });
+      expect(updated?.status).toBe(WorkflowStatus.VALIDATED); // Remains Validated but not Published
+    });
   });
 });

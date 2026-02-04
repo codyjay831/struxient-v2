@@ -118,11 +118,15 @@ export async function DELETE(request: NextRequest, { params }: Props) {
 
     const tenantCtx = await verifyTenantOwnership(workflow.companyId);
 
-    // Enforce deletion rules - v2 says Not Published (or all versions deleted)
-    // For simplicity in v2, we allow deleting drafts. 
-    // If it's published, we might want to restrict or cascade.
-    
-    await deleteWorkflow(id, tenantCtx);
+    // Enforce deletion rules: Not Published (INV-011)
+    try {
+      await deleteWorkflow(id, tenantCtx);
+    } catch (err: any) {
+      if (err.code === "PUBLISHED_IMMUTABLE") {
+        return apiError("PUBLISHED_IMMUTABLE", err.message, null, 403);
+      }
+      throw err;
+    }
 
     return apiSuccess({ success: true });
   } catch (error) {

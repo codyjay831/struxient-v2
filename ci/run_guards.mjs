@@ -15,7 +15,9 @@ const GUARDS_DIR = path.join(__dirname, 'guards');
 async function runGuards() {
   console.log('=== Running CI Guards ===\n');
   
-  const guards = fs.readdirSync(GUARDS_DIR).filter(f => f.endsWith('.mjs'));
+  const guards = fs.readdirSync(GUARDS_DIR)
+    .filter(f => f.endsWith('.mjs'))
+    .sort();
   let failureCount = 0;
 
   for (const guard of guards) {

@@ -22,7 +22,19 @@ export function validateEvidence(
   workflow.nodes.forEach((node, nodeIndex) => {
     node.tasks.forEach((task, taskIndex) => {
       if (task.evidenceRequired) {
-        // 1. Schema well-formed
+        // 1. INV-025: Evidence schema required when evidence required
+        if (!task.evidenceSchema && workflow.status !== "DRAFT") {
+          errors.push({
+            severity: "error",
+            category: "evidence",
+            path: `nodes[${nodeIndex}].tasks[${taskIndex}].evidenceSchema`,
+            code: "MISSING_EVIDENCE_SCHEMA",
+            message: `Task "${task.name}" requires evidence but has no schema (INV-025)`,
+            suggestion: "Configure the evidence schema in the Task Detail panel",
+          });
+        }
+
+        // 2. Schema well-formed
         if (task.evidenceSchema) {
           try {
             // For now, simple check that it's valid JSON if it's a string,

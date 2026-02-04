@@ -21,6 +21,8 @@ async function cleanupTestData() {
   await prisma.taskPolicyOverride.deleteMany({});
   await prisma.flowGroupPolicy.deleteMany({});
   await prisma.job.deleteMany({});
+  await prisma.validityEvent.deleteMany({});
+  await prisma.detourRecord.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
@@ -305,5 +307,177 @@ describe("EPIC-02: FlowSpec Workflow Validation", () => {
     const result = await validateWorkflow(fullWorkflow as WorkflowWithRelations);
     expect(result.valid).toBe(false);
     expect(result.errors.some(e => e.code === "CIRCULAR_DEPENDENCY")).toBe(true);
+  });
+
+  describe("INV-025: Evidence Schema Enforcement", () => {
+    it("should yield no findings for DRAFT with missing schema", async () => {
+      const company = await createTestCompany();
+      const workflow = await prisma.workflow.create({
+        data: {
+          name: "Draft Evidence Workflow",
+          companyId: company.id,
+          status: WorkflowStatus.DRAFT,
+          nodes: {
+            create: [
+              { 
+                name: "Entry", 
+                isEntry: true,
+                tasks: {
+                  create: [
+                    { 
+                      name: "T1",
+                      evidenceRequired: true,
+                      evidenceSchema: null,
+                      outcomes: { create: [{ name: "DONE" }] }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        include: {
+          nodes: { include: { tasks: true } }
+        }
+      });
+
+      const node = workflow.nodes[0];
+      await prisma.gate.create({
+        data: {
+          workflowId: workflow.id,
+          sourceNodeId: node.id,
+          outcomeName: "DONE",
+          targetNodeId: null
+        }
+      });
+
+      const updatedWorkflow = await prisma.workflow.findUnique({
+        where: { id: workflow.id },
+        include: {
+          nodes: { include: { tasks: { include: { outcomes: true, crossFlowDependencies: true } }, outboundGates: true, inboundGates: true } },
+          gates: true,
+          fanOutRules: true,
+        }
+      });
+
+      const result = await validateWorkflow(updatedWorkflow as WorkflowWithRelations);
+      expect(result.valid).toBe(true);
+      expect(result.errors.length).toBe(0);
+    });
+
+    it("should yield error for VALIDATED with missing schema", async () => {
+      const company = await createTestCompany();
+      const workflow = await prisma.workflow.create({
+        data: {
+          name: "Validated Evidence Workflow",
+          companyId: company.id,
+          status: WorkflowStatus.VALIDATED,
+          nodes: {
+            create: [
+              { 
+                name: "Entry", 
+                isEntry: true,
+                tasks: {
+                  create: [
+                    { 
+                      name: "T1",
+                      evidenceRequired: true,
+                      evidenceSchema: null,
+                      outcomes: { create: [{ name: "DONE" }] }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        include: {
+          nodes: { include: { tasks: true } }
+        }
+      });
+
+      const node = workflow.nodes[0];
+      await prisma.gate.create({
+        data: {
+          workflowId: workflow.id,
+          sourceNodeId: node.id,
+          outcomeName: "DONE",
+          targetNodeId: null
+        }
+      });
+
+      const updatedWorkflow = await prisma.workflow.findUnique({
+        where: { id: workflow.id },
+        include: {
+          nodes: { include: { tasks: { include: { outcomes: true, crossFlowDependencies: true } }, outboundGates: true, inboundGates: true } },
+          gates: true,
+          fanOutRules: true,
+        }
+      });
+
+      const result = await validateWorkflow(updatedWorkflow as WorkflowWithRelations);
+      expect(result.valid).toBe(false);
+      const inv025 = result.errors.find(e => e.code === "MISSING_EVIDENCE_SCHEMA");
+      expect(inv025).toBeDefined();
+      expect(inv025?.severity).toBe("error");
+    });
+  });
+
+  describe("Warning Blocking Regression", () => {
+    it("should block validation when a warning (EMPTY_SPECIFIC_TASKS) is present", async () => {
+      const company = await createTestCompany();
+      const workflow = await prisma.workflow.create({
+        data: {
+          name: "Warning Workflow",
+          companyId: company.id,
+          nodes: {
+            create: [
+              { 
+                name: "Entry", 
+                isEntry: true,
+                completionRule: CompletionRule.SPECIFIC_TASKS_DONE,
+                specificTasks: [], // This triggers the warning in semantic.ts
+                tasks: {
+                  create: [
+                    { 
+                      name: "T1",
+                      outcomes: { create: [{ name: "DONE" }] }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        include: {
+          nodes: { include: { tasks: true } }
+        }
+      });
+
+      const node = workflow.nodes[0];
+      await prisma.gate.create({
+        data: {
+          workflowId: workflow.id,
+          sourceNodeId: node.id,
+          outcomeName: "DONE",
+          targetNodeId: null
+        }
+      });
+
+      const updatedWorkflow = await prisma.workflow.findUnique({
+        where: { id: workflow.id },
+        include: {
+          nodes: { include: { tasks: { include: { outcomes: true, crossFlowDependencies: true } }, outboundGates: true, inboundGates: true } },
+          gates: true,
+          fanOutRules: true,
+        }
+      });
+
+      const result = await validateWorkflow(updatedWorkflow as WorkflowWithRelations);
+      expect(result.valid).toBe(false);
+      const warning = result.errors.find(e => e.code === "EMPTY_SPECIFIC_TASKS");
+      expect(warning).toBeDefined();
+      expect(warning?.severity).toBe("warning");
+    });
   });
 });
