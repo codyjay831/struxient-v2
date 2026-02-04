@@ -71,3 +71,46 @@ export function apiList<T>(
     authority
   );
 }
+
+/**
+ * Centralized API Route Error Handler.
+ * Handles TenantIsolationError, Prisma errors, and generic fallbacks.
+ */
+export function apiRouteError(error: any) {
+  // 1. Tenant/Auth Isolation Errors
+  if (error.name === "TenantIsolationError") {
+    const isNoMembership = error.message === "User has no company membership";
+    return apiError(
+      isNoMembership ? "NO_MEMBERSHIP" : "FORBIDDEN",
+      error.message,
+      null,
+      403
+    );
+  }
+
+  // 2. Prisma Known Request Errors
+  if (error.code === "P2002") {
+    return apiError("CONFLICT", "Resource already exists", error.meta, 409);
+  }
+  if (error.code === "P2025") {
+    return apiError("NOT_FOUND", "Resource not found", error.meta, 404);
+  }
+
+  // 3. Prisma Validation / Schema Mismatch
+  if (error.message?.includes("Unknown argument") || error.code?.startsWith("P")) {
+    return apiError(
+      "INTERNAL_SERVER_ERROR",
+      process.env.NODE_ENV === "development" ? error.message : "A database error occurred",
+      error.code,
+      500
+    );
+  }
+
+  // 4. Generic Fallback
+  return apiError(
+    "INTERNAL_SERVER_ERROR",
+    "An unexpected error occurred",
+    process.env.NODE_ENV === "development" ? error.message : null,
+    500
+  );
+}

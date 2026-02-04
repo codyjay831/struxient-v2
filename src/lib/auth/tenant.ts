@@ -11,6 +11,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../prisma";
 import { buildAuthorityContext, type AuthorityContext } from "./capabilities";
+import { apiError } from "../api-utils";
 
 export class TenantIsolationError extends Error {
   constructor(message: string = "Tenant isolation violation") {
@@ -125,29 +126,21 @@ export async function getActorCompanyId(): Promise<string> {
 /**
  * Standardized error response for API routes.
  */
-export function tenantErrorResponse(error: unknown) {
-  if (error instanceof TenantIsolationError) {
+export function tenantErrorResponse(error: any) {
+  if (error instanceof TenantIsolationError || error.name === "TenantIsolationError") {
     const isNoMembership = error.message === "User has no company membership";
-    return new Response(
-      JSON.stringify({
-        error: {
-          code: isNoMembership ? "NO_MEMBERSHIP" : "FORBIDDEN",
-          message: error.message,
-        },
-        timestamp: new Date().toISOString(),
-      }),
-      { status: 403, headers: { "Content-Type": "application/json" } }
+    return apiError(
+      isNoMembership ? "NO_MEMBERSHIP" : "FORBIDDEN",
+      error.message,
+      null,
+      403
     );
   }
 
-  return new Response(
-    JSON.stringify({
-      error: {
-        code: "INTERNAL_SERVER_ERROR",
-        message: "An unexpected error occurred",
-      },
-      timestamp: new Date().toISOString(),
-    }),
-    { status: 500, headers: { "Content-Type": "application/json" } }
+  return apiError(
+    "INTERNAL_SERVER_ERROR",
+    "An unexpected error occurred",
+    process.env.NODE_ENV === "development" ? error.message : null,
+    500
   );
 }

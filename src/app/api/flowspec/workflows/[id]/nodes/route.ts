@@ -5,8 +5,8 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
-import { apiSuccess, apiError } from "@/lib/api-utils";
+import { verifyTenantOwnership } from "@/lib/auth/tenant";
+import { apiSuccess, apiError, apiRouteError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
@@ -70,6 +70,6 @@ export async function POST(request: NextRequest, { params }: Props) {
 
     return apiSuccess({ node }, 201);
   } catch (error) {
-    return tenantErrorResponse(error);
+    return apiRouteError(error);
   }
 }
