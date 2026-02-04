@@ -437,6 +437,7 @@ model Flow {
   nodeActivations     NodeActivation[]
   taskExecutions      TaskExecution[]
   evidenceAttachments EvidenceAttachment[]
+  detours             DetourRecord[]
 
   @@index([flowGroupId])
   @@index([workflowId])
@@ -497,10 +498,72 @@ model TaskExecution {
   outcomeBy        String?   // User ID who recorded the outcome
   iteration        Int       @default(1) // For cycle tracking
 
+  resolvedDetourId String?   // FK to DetourRecord that this outcome resolved
+
   // Using Restrict instead of Cascade to preserve audit trail
-  flow Flow @relation(fields: [flowId], references: [id], onDelete: Restrict)
+  flow                 Flow            @relation(fields: [flowId], references: [id], onDelete: Restrict)
+  validityEvents       ValidityEvent[]
+  checkpointForDetours DetourRecord[]  @relation("CheckpointDetours")
 
   @@index([flowId, taskId])
+}
+
+/// Detour record for corrections and failure handling
+model DetourRecord {
+  id                        String       @id @default(cuid())
+  flowId                    String
+  checkpointNodeId          String
+  checkpointTaskExecutionId String?      // Anchored to an existing TaskExecution
+  resumeTargetNodeId        String
+  type                      DetourType   @default(NON_BLOCKING)
+  status                    DetourStatus @default(ACTIVE)
+  category                  String?      // e.g., "COMPLIANCE", "DATA_FIX"
+  repeatIndex               Int          @default(0) // flow+node scoped count
+  openedAt                  DateTime     @default(now())
+  openedBy                  String
+  escalatedAt               DateTime?
+  escalatedBy               String?
+  resolvedAt                DateTime?
+  resolvedBy                String?
+  convertedAt               DateTime?
+  convertedBy               String?
+
+  flow                    Flow           @relation(fields: [flowId], references: [id], onDelete: Restrict)
+  checkpointTaskExecution TaskExecution? @relation("CheckpointDetours", fields: [checkpointTaskExecutionId], references: [id])
+
+  @@index([flowId, status])
+  @@index([flowId, checkpointNodeId])
+}
+
+enum DetourStatus {
+  ACTIVE
+  RESOLVED
+  CONVERTED
+}
+
+enum DetourType {
+  NON_BLOCKING
+  BLOCKING
+}
+
+/// Validity event for task outcomes (append-only)
+model ValidityEvent {
+  id              String        @id @default(cuid())
+  taskExecutionId String
+  state           ValidityState
+  reason          String?
+  createdAt       DateTime      @default(now())
+  createdBy       String
+
+  taskExecution TaskExecution @relation(fields: [taskExecutionId], references: [id], onDelete: Restrict)
+
+  @@index([taskExecutionId, createdAt])
+}
+
+enum ValidityState {
+  VALID
+  PROVISIONAL
+  INVALID
 }
 
 /// Evidence attachment (Truth)

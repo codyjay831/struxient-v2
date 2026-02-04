@@ -24,6 +24,7 @@ import type {
   NodeActivation as PrismaNodeActivation,
   TaskExecution as PrismaTaskExecution,
   EvidenceAttachment as PrismaEvidenceAttachment,
+  DetourRecord as PrismaDetourRecord,
   CrossFlowDependency as PrismaCrossFlowDependency,
   FanOutRule as PrismaFanOutRule,
 } from "@prisma/client";
@@ -32,14 +33,45 @@ import {
   FlowStatus,
   CompletionRule,
   EvidenceType,
+  Prisma,
 } from "@prisma/client";
 
 // Re-export Prisma enums for convenience
 export { WorkflowStatus, FlowStatus, CompletionRule, EvidenceType };
 
 // =============================================================================
-// SPECIFICATION TYPES (DESIGN-TIME)
+// PRISMA PAYLOAD TYPES
 // =============================================================================
+
+export const FLOW_WITH_RELATIONS_INCLUDE = {
+  workflow: true,
+  workflowVersion: true,
+  flowGroup: {
+    include: {
+      job: {
+        select: {
+          id: true,
+          customerId: true
+        }
+      }
+    }
+  },
+  nodeActivations: true,
+  taskExecutions: {
+    include: {
+      validityEvents: true,
+    },
+  },
+  evidenceAttachments: true,
+  detours: true,
+} as const;
+
+/**
+ * Flow with all execution-related entities loaded.
+ */
+export type FlowWithRelations = Prisma.FlowGetPayload<{
+  include: typeof FLOW_WITH_RELATIONS_INCLUDE;
+}>;
 
 /**
  * Workflow specification with all related entities loaded.
@@ -89,6 +121,7 @@ export interface SnapshotNode {
   completionRule: CompletionRule;
   specificTasks: string[];
   tasks: SnapshotTask[];
+  transitiveSuccessors: string[]; // Node IDs reachable from this node
 }
 
 export interface SnapshotTask {
@@ -133,20 +166,28 @@ export interface SnapshotGate {
 }
 
 // =============================================================================
-// RUNTIME TYPES (EXECUTION-TIME)
+// EXPLAINER & REFUSAL TYPES
 // =============================================================================
 
-/**
- * Flow with all execution-related entities loaded.
- */
-export interface FlowWithRelations extends PrismaFlow {
-  workflow: PrismaWorkflow;
-  workflowVersion: PrismaWorkflowVersion;
-  flowGroup: PrismaFlowGroup;
-  nodeActivations: PrismaNodeActivation[];
-  taskExecutions: PrismaTaskExecution[];
-  evidenceAttachments: PrismaEvidenceAttachment[];
+export type ReasonCode =
+  | "NODE_NOT_ACTIVE"
+  | "NODE_COMPLETE"
+  | "OUTCOME_ALREADY_RECORDED"
+  | "ACTIVE_BLOCKING_DETOUR"
+  | "JOIN_BLOCKED"
+  | "NESTED_DETOUR_FORBIDDEN"
+  | "CROSS_FLOW_DEP_MISSING"
+  | "EXPLAINER_COVERAGE_GAP";
+
+export interface ActionRefusal {
+  reasonCode: ReasonCode;
+  message: string;
+  requiredActions?: string[];
 }
+
+// =============================================================================
+// RUNTIME TYPES (EXECUTION-TIME)
+// =============================================================================
 
 /**
  * Scope identifier for Flow Group binding.
@@ -261,6 +302,12 @@ export interface ActionableTask {
   iteration: number;
   domainHint: "execution" | "finance" | "sales";
   startedAt: Date | null;
+  latestTaskExecutionId?: string | null;
+  _detour?: {
+    id: string;
+    status: 'ACTIVE' | 'RESOLVED' | 'CONVERTED';
+    type: 'NON_BLOCKING' | 'BLOCKING';
+  };
   diagnostics?: {
     evidence?: {
       required: boolean;
@@ -375,7 +422,11 @@ export type EngineErrorCode =
   | "CONCURRENT_MODIFICATION"
   | "FLOW_BLOCKED"
   | "INVALID_FILE_POINTER"
-  | "STORAGE_KEY_TENANT_MISMATCH";
+  | "STORAGE_KEY_TENANT_MISMATCH"
+  | "DETOUR_SPOOF"
+  | "INVALID_DETOUR"
+  | "DETOUR_HIJACK"
+  | "NESTED_DETOUR_FORBIDDEN";
 
 export interface EngineError {
   code: EngineErrorCode;

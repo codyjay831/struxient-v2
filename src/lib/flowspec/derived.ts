@@ -18,8 +18,8 @@
  * from Truth. Given identical Truth, they MUST produce identical results.
  */
 
-import type { NodeActivation, TaskExecution } from "@prisma/client";
-import { CompletionRule } from "@prisma/client";
+import type { NodeActivation, TaskExecution, ValidityEvent, DetourRecord } from "@prisma/client";
+import { CompletionRule, ValidityState, DetourStatus, DetourType } from "@prisma/client";
 import type {
   WorkflowSnapshot,
   SnapshotNode,
@@ -30,7 +30,86 @@ import type {
   ActionableTask,
   GateRoute,
   GroupOutcome,
+  ReasonCode,
+  ActionRefusal,
 } from "./types";
+
+// =============================================================================
+// VALIDITY DERIVATION (PURE)
+// = : Phase-2 Lock 1 : accepts pre-fetched events
+// =============================================================================
+
+/**
+ * Derives the latest validity state for a set of TaskExecutions.
+ * Tie-break rule: (createdAt DESC, id DESC).
+ * Default: VALID.
+ */
+export function computeValidityMap(
+  validityEvents: ValidityEvent[]
+): Map<string, ValidityState> {
+  const map = new Map<string, ValidityState>();
+  
+  // Sort events to ensure latest wins
+  const sorted = [...validityEvents].sort((a, b) => {
+    const timeDiff = b.createdAt.getTime() - a.createdAt.getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return b.id.localeCompare(a.id);
+  });
+
+  for (const event of sorted) {
+    if (!map.has(event.taskExecutionId)) {
+      map.set(event.taskExecutionId, event.state);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Helper to get validity for a single task execution from a map.
+ */
+function getTaskValidity(
+  taskExecutionId: string | undefined,
+  validityMap: Map<string, ValidityState>
+): ValidityState {
+  if (!taskExecutionId) return ValidityState.VALID;
+  return validityMap.get(taskExecutionId) ?? ValidityState.VALID;
+}
+
+// =============================================================================
+// BLOCKING SCOPE DERIVATION (PURE)
+// =============================================================================
+
+/**
+ * Returns a set of Node IDs that are currently blocked by ACTIVE BLOCKING detours.
+ * Uses publish-time transitiveSuccessors from snapshot.
+ *
+ * LOCK: computeBlockedNodes must never block the checkpoint node for its own detour.
+ */
+export function computeBlockedNodes(
+  detours: DetourRecord[],
+  snapshot: WorkflowSnapshot
+): Set<string> {
+  const blockedNodes = new Set<string>();
+  
+  const activeBlockingDetours = detours.filter(
+    d => d.status === DetourStatus.ACTIVE && d.type === DetourType.BLOCKING
+  );
+
+  for (const detour of activeBlockingDetours) {
+    const node = snapshot.nodes.find(n => n.id === detour.checkpointNodeId);
+    if (node) {
+      // Add checkpoint itself (blocking detours block their own checkpoint node for standard progress)
+      blockedNodes.add(node.id);
+      // Add all pre-computed transitive successors
+      for (const successorId of node.transitiveSuccessors) {
+        blockedNodes.add(successorId);
+      }
+    }
+  }
+
+  return blockedNodes;
+}
 
 // =============================================================================
 // NODE STATE COMPUTATION
@@ -46,16 +125,19 @@ import type {
  *
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
  * @param snapshot - The Workflow snapshot
  * @returns Set of currently active Node IDs
  */
 export function computeActiveNodes(
   nodeActivations: NodeActivation[],
   taskExecutions: TaskExecution[],
+  validityEvents: ValidityEvent[],
   snapshot: WorkflowSnapshot
 ): Set<string> {
   const activeNodes = new Set<string>();
   const nodeIterations = new Map<string, number>();
+  const validityMap = computeValidityMap(validityEvents);
 
   // Track the latest iteration for each node
   for (const activation of nodeActivations) {
@@ -74,6 +156,7 @@ export function computeActiveNodes(
       const isComplete = computeNodeComplete(
         node,
         taskExecutions,
+        validityMap,
         iteration
       );
       if (isComplete) {
@@ -123,45 +206,48 @@ export function computeNodeStarted(
  * - ANY_TASK_DONE: Node is done when ANY Task has recorded an Outcome
  * - SPECIFIC_TASKS_DONE: Node is done when specified Tasks have recorded Outcomes
  *
+ * DETOUR LOCK: Node completion counts only VALID outcomes.
+ *
  * @param node - The Node from workflow snapshot
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param validityMap - Map of task execution IDs to their latest ValidityState
  * @param iteration - The iteration to check (for cycles)
  * @returns True if the Node is complete
  */
 export function computeNodeComplete(
   node: SnapshotNode,
   taskExecutions: TaskExecution[],
+  validityMap: Map<string, ValidityState>,
   iteration: number = 1
 ): boolean {
   const taskIds = node.tasks.map((t) => t.id);
 
-  // Get outcomes for this iteration
-  const outcomesForIteration = taskExecutions.filter(
-    (te) => taskIds.includes(te.taskId) && te.iteration === iteration && te.outcome !== null
+  // Get VALID outcomes for this iteration
+  const validOutcomesForIteration = taskExecutions.filter(
+    (te) => 
+      taskIds.includes(te.taskId) && 
+      te.iteration === iteration && 
+      te.outcome !== null &&
+      getTaskValidity(te.id, validityMap) === ValidityState.VALID
   );
 
-  const tasksWithOutcomes = new Set(outcomesForIteration.map((te) => te.taskId));
+  const tasksWithValidOutcomes = new Set(validOutcomesForIteration.map((te) => te.taskId));
 
   switch (node.completionRule) {
     case CompletionRule.ALL_TASKS_DONE:
-      // All tasks must have outcomes
-      return taskIds.every((taskId) => tasksWithOutcomes.has(taskId));
+      return taskIds.every((taskId) => tasksWithValidOutcomes.has(taskId));
 
     case CompletionRule.ANY_TASK_DONE:
-      // At least one task must have an outcome
-      return tasksWithOutcomes.size > 0;
+      return tasksWithValidOutcomes.size > 0;
 
     case CompletionRule.SPECIFIC_TASKS_DONE:
-      // Specific tasks (from node.specificTasks) must have outcomes
       if (node.specificTasks.length === 0) {
-        // If no specific tasks defined, treat as ALL_TASKS_DONE
-        return taskIds.every((taskId) => tasksWithOutcomes.has(taskId));
+        return taskIds.every((taskId) => tasksWithValidOutcomes.has(taskId));
       }
-      return node.specificTasks.every((taskId) => tasksWithOutcomes.has(taskId));
+      return node.specificTasks.every((taskId) => tasksWithValidOutcomes.has(taskId));
 
     default:
-      // Default to ALL_TASKS_DONE per canon
-      return taskIds.every((taskId) => tasksWithOutcomes.has(taskId));
+      return taskIds.every((taskId) => tasksWithValidOutcomes.has(taskId));
   }
 }
 
@@ -171,12 +257,14 @@ export function computeNodeComplete(
  * @param node - The Node from workflow snapshot
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
  * @returns DerivedNodeState
  */
 export function computeNodeState(
   node: SnapshotNode,
   nodeActivations: NodeActivation[],
-  taskExecutions: TaskExecution[]
+  taskExecutions: TaskExecution[],
+  validityEvents: ValidityEvent[]
 ): DerivedNodeState {
   // Find the latest activation for this node
   const nodeActivation = nodeActivations
@@ -185,12 +273,13 @@ export function computeNodeState(
 
   const isActive = nodeActivation !== undefined;
   const currentIteration = nodeActivation?.iteration ?? 0;
+  const validityMap = computeValidityMap(validityEvents);
 
   return {
     nodeId: node.id,
     isActive,
     isStarted: isActive ? computeNodeStarted(node, taskExecutions, currentIteration) : false,
-    isComplete: isActive ? computeNodeComplete(node, taskExecutions, currentIteration) : false,
+    isComplete: isActive ? computeNodeComplete(node, taskExecutions, validityMap, currentIteration) : false,
     currentIteration,
   };
 }
@@ -206,7 +295,10 @@ export function computeNodeState(
  * A Task is Actionable when ALL of:
  * 1. The Task's containing Node is active (via Entry or Gate routing)
  * 2. All Actionability Constraints are satisfied (Cross-Flow Dependencies)
- * 3. The Task has not yet recorded an Outcome for the current iteration
+ * 3. The Task has not yet recorded a VALID Outcome for the current iteration
+ *    - INVALID outcomes allow the task to re-open.
+ * 4. The Node is not in the blocked scope of any ACTIVE BLOCKING detour.
+ * 5. If it's a Join Node, all structural inbound parent branches are not blocked.
  *
  * Canon: 00_flowspec_glossary.md §3.3
  * INV-019: FlowSpec evaluates all Actionability
@@ -216,6 +308,9 @@ export function computeNodeState(
  * @param node - The containing Node
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param detours - All DetourRecord records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
+ * @param snapshot - The Workflow snapshot
  * @param groupOutcomes - All outcomes recorded in the Flow Group (for Cross-Flow)
  * @returns True if the Task is Actionable
  */
@@ -224,6 +319,9 @@ export function computeTaskActionable(
   node: SnapshotNode,
   nodeActivations: NodeActivation[],
   taskExecutions: TaskExecution[],
+  detours: DetourRecord[],
+  validityEvents: ValidityEvent[],
+  snapshot: WorkflowSnapshot,
   groupOutcomes: GroupOutcome[] = []
 ): boolean {
   // 1. Check if Node is active
@@ -236,23 +334,67 @@ export function computeTaskActionable(
   }
 
   const iteration = nodeActivation.iteration;
+  const validityMap = computeValidityMap(validityEvents);
 
-  // 2. Check if Node is complete (if complete, tasks are no longer actionable)
-  const nodeComplete = computeNodeComplete(node, taskExecutions, iteration);
+  // 2. Check if Node is complete (only counts VALID outcomes)
+  const nodeComplete = computeNodeComplete(node, taskExecutions, validityMap, iteration);
   if (nodeComplete) {
     return false;
   }
 
-  // 3. Check if Task has already recorded an Outcome for this iteration
-  const taskExecution = taskExecutions.find(
-    (te) => te.taskId === task.id && te.iteration === iteration
-  );
+  // 3. Check if Task has already recorded a VALID Outcome for this iteration
+  // LOCK: Use the LATEST task execution for this iteration (Phase-3 re-open logic)
+  const taskExecutionsForIteration = taskExecutions
+    .filter((te) => te.taskId === task.id && te.iteration === iteration)
+    .sort((a, b) => {
+      // Sort by outcomeAt if present, then startedAt, then id as final tie-breaker
+      const timeA = a.outcomeAt?.getTime() ?? a.startedAt?.getTime() ?? 0;
+      const timeB = b.outcomeAt?.getTime() ?? b.startedAt?.getTime() ?? 0;
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
+  
+  const taskExecution = taskExecutionsForIteration[0];
 
+  const validity = getTaskValidity(taskExecution?.id, validityMap);
   if (taskExecution?.outcome !== null && taskExecution?.outcome !== undefined) {
-    return false; // Already has outcome
+    // LOCK: Actionable re-open rules:
+    // 1. If validity is explicitly INVALID
+    // 2. If there is an ACTIVE detour at this checkpoint (allows resolution)
+    const hasActiveDetourAtCheckpoint = detours.some(
+      d => d.checkpointNodeId === node.id && 
+           d.status === DetourStatus.ACTIVE &&
+           (d.checkpointTaskExecutionId === undefined || d.checkpointTaskExecutionId === null || d.checkpointTaskExecutionId === taskExecution.id)
+    );
+
+    if (validity !== ValidityState.INVALID && !hasActiveDetourAtCheckpoint) {
+      return false;
+    }
   }
 
-  // 4. Check Cross-Flow Dependencies (INV-020, INV-021)
+  // 4. Check Blocking Scope (BLOCKING Detours)
+  const blockedNodes = computeBlockedNodes(detours, snapshot);
+  if (blockedNodes.has(node.id)) {
+    // LOCK: A blocking detour blocks its checkpoint for standard work,
+    // but MUST remain actionable for the resolution task itself.
+    const hasActiveDetourAtCheckpoint = detours.some(
+      d => d.checkpointNodeId === node.id && d.status === DetourStatus.ACTIVE
+    );
+    if (!hasActiveDetourAtCheckpoint) {
+      return false;
+    }
+  }
+
+  // 5. Join Rule: Check structural inbound parents
+  const inboundGates = snapshot.gates.filter(g => g.targetNodeId === node.id);
+  // If there are inbound gates, this is a join (or at least has parents)
+  for (const gate of inboundGates) {
+    if (blockedNodes.has(gate.sourceNodeId)) {
+      return false; // Structural parent branch is blocked
+    }
+  }
+
+  // 6. Check Cross-Flow Dependencies (INV-020, INV-021)
   if (task.crossFlowDependencies && task.crossFlowDependencies.length > 0) {
     for (const dep of task.crossFlowDependencies) {
       const satisfied = groupOutcomes.some(
@@ -288,6 +430,9 @@ function matchesTaskPath(path: string, taskId: string): boolean {
  * @param node - The containing Node
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param detours - All DetourRecord records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
+ * @param snapshot - The Workflow snapshot
  * @param groupOutcomes - All outcomes recorded in the Flow Group
  * @returns DerivedTaskState
  */
@@ -296,6 +441,9 @@ export function computeTaskState(
   node: SnapshotNode,
   nodeActivations: NodeActivation[],
   taskExecutions: TaskExecution[],
+  detours: DetourRecord[],
+  validityEvents: ValidityEvent[],
+  snapshot: WorkflowSnapshot,
   groupOutcomes: GroupOutcome[] = []
 ): DerivedTaskState {
   // Find the latest activation for this node
@@ -318,6 +466,9 @@ export function computeTaskState(
       node,
       nodeActivations,
       taskExecutions,
+      detours,
+      validityEvents,
+      snapshot,
       groupOutcomes
     ),
     isStarted: taskExecution?.startedAt !== null && taskExecution?.startedAt !== undefined,
@@ -337,6 +488,8 @@ export function computeTaskState(
  * @param snapshot - The Workflow snapshot
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param detours - All DetourRecord records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
  * @param flowContext - Context about the Flow (ID, Group, Workflow info)
  * @param groupOutcomes - All outcomes recorded in the Flow Group
  * @returns Array of ActionableTask objects
@@ -345,6 +498,8 @@ export function computeActionableTasks(
   snapshot: WorkflowSnapshot,
   nodeActivations: NodeActivation[],
   taskExecutions: TaskExecution[],
+  detours: DetourRecord[],
+  validityEvents: ValidityEvent[],
   flowContext: {
     flowId: string;
     flowGroupId: string;
@@ -354,6 +509,7 @@ export function computeActionableTasks(
   groupOutcomes: GroupOutcome[] = []
 ): ActionableTask[] {
   const actionableTasks: ActionableTask[] = [];
+  const validityMap = computeValidityMap(validityEvents);
 
   // Determine domain hint
   const domainHint: "execution" | "finance" | "sales" = 
@@ -373,7 +529,7 @@ export function computeActionableTasks(
     const iteration = nodeActivation.iteration;
 
     // Check if node is complete
-    if (computeNodeComplete(node, taskExecutions, iteration)) {
+    if (computeNodeComplete(node, taskExecutions, validityMap, iteration)) {
       continue; // Node complete, no actionable tasks
     }
 
@@ -384,6 +540,9 @@ export function computeActionableTasks(
           node,
           nodeActivations,
           taskExecutions,
+          detours,
+          validityEvents,
+          snapshot,
           groupOutcomes
         )
       ) {
@@ -408,6 +567,7 @@ export function computeActionableTasks(
           iteration,
           domainHint,
           startedAt: execution?.startedAt || null,
+          latestTaskExecutionId: execution?.id || null,
         });
       }
     }
@@ -430,29 +590,37 @@ export function computeActionableTasks(
  * Computes whether a Flow is complete.
  * A Flow is complete when all terminal paths have been reached.
  *
- * For a flow to be complete:
- * - All currently active paths must have reached terminal Gates (targetNodeId = null)
- * - OR the workflow is non-terminating and has explicit completion conditions
+ * DETOUR LOCK: Flow cannot complete if any detour is ACTIVE.
  *
  * @param snapshot - The Workflow snapshot
  * @param nodeActivations - All NodeActivation events for the Flow
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param detours - All DetourRecord records for the Flow
+ * @param validityEvents - All ValidityEvent records for the Flow
  * @returns True if the Flow is complete
  */
 export function computeFlowComplete(
   snapshot: WorkflowSnapshot,
   nodeActivations: NodeActivation[],
-  taskExecutions: TaskExecution[]
+  taskExecutions: TaskExecution[],
+  detours: DetourRecord[],
+  validityEvents: ValidityEvent[]
 ): boolean {
+  // LOCK: Any ACTIVE detour prevents completion
+  const hasActiveDetours = detours.some(d => d.status === DetourStatus.ACTIVE);
+  if (hasActiveDetours) {
+    return false;
+  }
+
   if (snapshot.isNonTerminating) {
-    // Non-terminating workflows never complete automatically
     return false;
   }
 
   if (nodeActivations.length === 0) {
-    // No nodes activated yet - not complete
     return false;
   }
+
+  const validityMap = computeValidityMap(validityEvents);
 
   // Get all nodes that have been activated
   const activatedNodeIds = new Set(nodeActivations.map((na) => na.nodeId));
@@ -469,29 +637,25 @@ export function computeFlowComplete(
 
     const iteration = latestActivation.iteration;
 
-    // Check if node is complete
-    if (!computeNodeComplete(node, taskExecutions, iteration)) {
-      // Node not complete, flow not complete
+    // Check if node is complete (only counts VALID outcomes)
+    if (!computeNodeComplete(node, taskExecutions, validityMap, iteration)) {
       return false;
     }
 
     // Node is complete - check if any outbound gates lead to another node
-    const nodeOutcomes = getNodeOutcomes(node, taskExecutions, iteration);
+    const nodeOutcomes = getNodeOutcomes(node, taskExecutions, validityMap, iteration);
     const outboundGates = snapshot.gates.filter((g) => g.sourceNodeId === nodeId);
 
     for (const outcome of nodeOutcomes) {
       const gate = outboundGates.find((g) => g.outcomeName === outcome);
       if (gate && gate.targetNodeId !== null) {
-        // This path leads to another node - check if that node is activated and complete
         const targetActivated = nodeActivations.some(
           (na) => na.nodeId === gate.targetNodeId
         );
         if (!targetActivated) {
-          // Target not activated yet, flow not complete
           return false;
         }
       }
-      // If gate.targetNodeId === null, this is a terminal path (good)
     }
   }
 
@@ -500,10 +664,12 @@ export function computeFlowComplete(
 
 /**
  * Gets all outcomes recorded for a Node in a specific iteration.
+ * DETOUR LOCK: Only VALID outcomes count.
  */
 function getNodeOutcomes(
   node: SnapshotNode,
   taskExecutions: TaskExecution[],
+  validityMap: Map<string, ValidityState>,
   iteration: number
 ): string[] {
   const taskIds = new Set(node.tasks.map((t) => t.id));
@@ -512,7 +678,8 @@ function getNodeOutcomes(
       (te) =>
         taskIds.has(te.taskId) &&
         te.iteration === iteration &&
-        te.outcome !== null
+        te.outcome !== null &&
+        getTaskValidity(te.id, validityMap) === ValidityState.VALID
     )
     .map((te) => te.outcome!);
 }
@@ -531,6 +698,7 @@ function getNodeOutcomes(
  *
  * @param node - The completed Node
  * @param taskExecutions - All TaskExecution records for the Flow
+ * @param validityMap - Map of task execution IDs to their latest ValidityState
  * @param gates - All Gates in the Workflow
  * @param iteration - The current iteration
  * @returns Array of GateRoutes that should be activated
@@ -538,11 +706,12 @@ function getNodeOutcomes(
 export function evaluateGates(
   node: SnapshotNode,
   taskExecutions: TaskExecution[],
+  validityMap: Map<string, ValidityState>,
   gates: SnapshotGate[],
   iteration: number
 ): GateRoute[] {
-  // Get all unique outcomes recorded for this node in this iteration
-  const outcomes = getNodeOutcomes(node, taskExecutions, iteration);
+  // Get all unique VALID outcomes recorded for this node in this iteration
+  const outcomes = getNodeOutcomes(node, taskExecutions, validityMap, iteration);
   const uniqueOutcomes = [...new Set(outcomes)];
 
   // Find matching gates
@@ -562,6 +731,107 @@ export function evaluateGates(
   }
 
   return routes;
+}
+
+// =============================================================================
+// EXPLAINER CONTRACT (PURE)
+// = : Phase-2 Lock 2 : exhaustive switch, no default
+// =============================================================================
+
+/**
+ * Explains why an action (like starting a task or completing a flow) is refused.
+ * Never returns "unknown".
+ */
+export function explainActionRefusal(
+  node: SnapshotNode,
+  task: SnapshotTask,
+  nodeActivations: NodeActivation[],
+  taskExecutions: TaskExecution[],
+  detours: DetourRecord[],
+  validityEvents: ValidityEvent[],
+  snapshot: WorkflowSnapshot,
+  groupOutcomes: GroupOutcome[] = []
+): ActionRefusal {
+  const nodeActivation = nodeActivations
+    .filter((na) => na.nodeId === node.id)
+    .sort((a, b) => b.iteration - a.iteration)[0];
+
+  if (!nodeActivation) {
+    return {
+      reasonCode: "NODE_NOT_ACTIVE",
+      message: `Node "${node.name}" is not active.`,
+    };
+  }
+
+  const iteration = nodeActivation.iteration;
+  const validityMap = computeValidityMap(validityEvents);
+
+  if (computeNodeComplete(node, taskExecutions, validityMap, iteration)) {
+    return {
+      reasonCode: "NODE_COMPLETE",
+      message: `Node "${node.name}" is already complete.`,
+    };
+  }
+
+  const taskExecution = taskExecutions.find(
+    (te) => te.taskId === task.id && te.iteration === iteration
+  );
+
+  const validity = getTaskValidity(taskExecution?.id, validityMap);
+  if (taskExecution?.outcome !== null && taskExecution?.outcome !== undefined) {
+    if (validity !== ValidityState.INVALID) {
+      return {
+        reasonCode: "OUTCOME_ALREADY_RECORDED",
+        message: `Task "${task.name}" already has a recorded outcome.`,
+      };
+    }
+  }
+
+  const blockedNodes = computeBlockedNodes(detours, snapshot);
+  const activeDetour = detours.find(d => d.status === DetourStatus.ACTIVE);
+
+  if (blockedNodes.has(node.id)) {
+    const blockingDetour = detours.find(
+      d => d.status === DetourStatus.ACTIVE && 
+           d.type === DetourType.BLOCKING &&
+           (d.checkpointNodeId === node.id || snapshot.nodes.find(n => n.id === d.checkpointNodeId)?.transitiveSuccessors.includes(node.id))
+    );
+    return {
+      reasonCode: "ACTIVE_BLOCKING_DETOUR",
+      message: `Work is paused due to an active blocking detour at "${snapshot.nodes.find(n => n.id === blockingDetour?.checkpointNodeId)?.name || 'upstream node'}".`,
+    };
+  }
+
+  const inboundGates = snapshot.gates.filter(g => g.targetNodeId === node.id);
+  for (const gate of inboundGates) {
+    if (blockedNodes.has(gate.sourceNodeId)) {
+      return {
+        reasonCode: "JOIN_BLOCKED",
+        message: `This join node is blocked because an inbound branch from "${snapshot.nodes.find(n => n.id === gate.sourceNodeId)?.name}" is blocked.`,
+      };
+    }
+  }
+
+  if (task.crossFlowDependencies && task.crossFlowDependencies.length > 0) {
+    for (const dep of task.crossFlowDependencies) {
+      const satisfied = groupOutcomes.some(
+        (go) =>
+          go.workflowId === dep.sourceWorkflowId &&
+          matchesTaskPath(dep.sourceTaskPath, go.taskId) &&
+          go.outcome === dep.requiredOutcome
+      );
+      if (!satisfied) {
+        return {
+          reasonCode: "CROSS_FLOW_DEP_MISSING",
+          message: `Waiting for task in workflow "${dep.sourceWorkflowId}" to result in "${dep.requiredOutcome}".`,
+        };
+      }
+    }
+  }
+
+  // If we get here but computeTaskActionable was false, it's a logic error in the engine.
+  // LOCK: Throw error to catch coverage gaps in development/test.
+  throw new Error(`EXPLAINER_COVERAGE_GAP: Action refused for an internal reason not yet mapped in explainer for task ${task.id} in node ${node.id}.`);
 }
 
 /**

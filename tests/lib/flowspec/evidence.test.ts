@@ -112,7 +112,8 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
           evidenceSchema: schema,
           displayOrder: 0,
           outcomes: [{ id: "o1", name: "DONE" }]
-        }]
+        }],
+        transitiveSuccessors: [],
       }],
       gates: [{ id: "g1", sourceNodeId: node.id, outcomeName: "DONE", targetNodeId: null }]
     };
@@ -250,6 +251,7 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
                 outcomes: [{ id: "o1", name: "DONE" }],
               },
             ],
+            transitiveSuccessors: [],
           },
         ],
         gates: [{ id: "g1", sourceNodeId: node.id, outcomeName: "DONE", targetNodeId: null }],

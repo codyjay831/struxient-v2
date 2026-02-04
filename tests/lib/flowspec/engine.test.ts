@@ -149,6 +149,7 @@ async function createSimpleWorkflow(companyId: string) {
             ],
           },
         ],
+        transitiveSuccessors: [],
       },
     ],
     gates: [
@@ -315,6 +316,7 @@ async function createMultiNodeWorkflow(companyId: string) {
             ],
           },
         ],
+        transitiveSuccessors: [approvalNode.id, rejectionNode.id],
       },
       {
         id: approvalNode.id,
@@ -333,6 +335,7 @@ async function createMultiNodeWorkflow(companyId: string) {
             outcomes: [{ id: "o3", name: "COMPLETE" }],
           },
         ],
+        transitiveSuccessors: [],
       },
       {
         id: rejectionNode.id,
@@ -351,6 +354,7 @@ async function createMultiNodeWorkflow(companyId: string) {
             outcomes: [{ id: "o4", name: "COMPLETE" }],
           },
         ],
+        transitiveSuccessors: [],
       },
     ],
     gates: [
@@ -417,6 +421,8 @@ async function createTestFlow(
 
 async function cleanupTestData() {
   // Delete in order of dependencies
+  await prisma.validityEvent.deleteMany({});
+  await prisma.detourRecord.deleteMany({});
   await prisma.evidenceAttachment.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
@@ -728,7 +734,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
       // Verify node is complete
       const flowData = await getFlow(flow.id);
       const snapshotNode = snapshot.nodes[0];
-      const isComplete = computeNodeComplete(snapshotNode, flowData!.taskExecutions, 1);
+      const isComplete = computeNodeComplete(snapshotNode, flowData!.taskExecutions, new Map(), 1);
       expect(isComplete).toBe(true);
     });
 
@@ -797,6 +803,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
                 outcomes: [{ id: "o2", name: "DONE" }],
               },
             ],
+            transitiveSuccessors: [],
           },
         ],
         gates: [
@@ -822,7 +829,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
 
       // Node should be complete (ANY_TASK_DONE)
       const flowData = await getFlow(flow.id);
-      const isComplete = computeNodeComplete(snapshot.nodes[0], flowData!.taskExecutions, 1);
+      const isComplete = computeNodeComplete(snapshot.nodes[0], flowData!.taskExecutions, new Map(), 1);
       expect(isComplete).toBe(true);
 
       // Task 2 should no longer be actionable
@@ -849,6 +856,8 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
         snapshot,
         flowData!.nodeActivations,
         flowData!.taskExecutions,
+        [],
+        [],
         {
           flowId: flow.id,
           flowGroupId: flow.flowGroupId,
@@ -862,6 +871,8 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
         snapshot,
         flowData!.nodeActivations,
         flowData!.taskExecutions,
+        [],
+        [],
         {
           flowId: flow.id,
           flowGroupId: flow.flowGroupId,
@@ -933,6 +944,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
                 outcomes: [{ id: "o1", name: "COMPLETE" }],
               },
             ],
+            transitiveSuccessors: [],
           },
         ],
         gates: [
@@ -1014,6 +1026,7 @@ describe("EPIC-01: FlowSpec Engine Core", () => {
                 outcomes: [{ id: "o1", name: "COMPLETE" }],
               },
             ],
+            transitiveSuccessors: [],
           },
         ],
         gates: [

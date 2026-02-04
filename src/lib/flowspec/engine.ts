@@ -35,7 +35,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Flow, NodeActivation, TaskExecution, EvidenceAttachment, Prisma } from "@prisma/client";
 import { FlowStatus, EvidenceType } from "@prisma/client";
-import type {
+import {
+  FLOW_WITH_RELATIONS_INCLUDE,
   WorkflowSnapshot,
   SnapshotNode,
   ActionableTask,
@@ -45,6 +46,7 @@ import type {
   NodeActivationResult,
   EngineError,
   FlowWithRelations,
+  ActionRefusal,
 } from "./types";
 import { isValidOutcome } from "./types";
 import {
@@ -59,12 +61,135 @@ import {
   updateFlowStatus,
   getFlowGroupOutcomes,
 } from "./truth";
+
+/**
+ * Records a ValidityEvent in Truth.
+ */
+export async function recordValidityEvent(
+  taskExecutionId: string,
+  state: "VALID" | "PROVISIONAL" | "INVALID",
+  userId: string,
+  reason?: string,
+  tx?: Prisma.TransactionClient,
+  now?: Date
+) {
+  const client = tx || prisma;
+  return client.validityEvent.create({
+    data: {
+      taskExecutionId,
+      state,
+      reason,
+      createdBy: userId,
+      createdAt: now || new Date(),
+    },
+  });
+}
+
+// =============================================================================
+// DETOUR OPERATIONS
+// =============================================================================
+
+/**
+ * Opens a Detour on a Flow.
+ * PHASE-3 LOCK: checkpointTaskExecutionId is required to anchor the validity overlay.
+ */
+export async function openDetour(
+  flowId: string,
+  checkpointNodeId: string,
+  resumeTargetNodeId: string,
+  userId: string,
+  checkpointTaskExecutionId: string,
+  type: "NON_BLOCKING" | "BLOCKING" = "NON_BLOCKING",
+  category?: string
+) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Calculate repeatIndex
+    const existingDetours = await tx.detourRecord.findMany({
+      where: { flowId, status: "ACTIVE" },
+    });
+
+    // INV-036: No Nested Detours (v1)
+    if (existingDetours.length > 0) {
+      throw new Error(JSON.stringify({ 
+        code: "NESTED_DETOUR_FORBIDDEN", 
+        message: "A detour is already active for this flow. Nested detours are not supported in v1." 
+      }));
+    }
+
+    const repeatIndex = await tx.detourRecord.count({
+      where: { flowId, checkpointNodeId },
+    });
+
+    // 2. Create DetourRecord
+    const detour = await tx.detourRecord.create({
+      data: {
+        flowId,
+        checkpointNodeId,
+        checkpointTaskExecutionId,
+        resumeTargetNodeId,
+        type,
+        status: "ACTIVE",
+        category,
+        repeatIndex,
+        openedBy: userId,
+      },
+    });
+
+    // 3. Emit ValidityEvent(PROVISIONAL) if anchored
+    if (checkpointTaskExecutionId) {
+      await recordValidityEvent(
+        checkpointTaskExecutionId,
+        "PROVISIONAL",
+        userId,
+        `Detour opened: ${detour.id}`,
+        tx
+      );
+    }
+
+    return detour;
+  });
+}
+
+/**
+ * Escalates a Detour to BLOCKING.
+ */
+export async function escalateDetour(
+  detourId: string,
+  userId: string
+) {
+  return prisma.detourRecord.update({
+    where: { id: detourId },
+    data: {
+      type: "BLOCKING",
+      escalatedAt: new Date(),
+      escalatedBy: userId,
+    },
+  });
+}
+
+/**
+ * Triggers Remediation for a Detour (CONVERTED).
+ */
+export async function triggerRemediation(
+  detourId: string,
+  userId: string
+) {
+  return prisma.detourRecord.update({
+    where: { id: detourId },
+    data: {
+      status: "CONVERTED",
+      convertedAt: new Date(),
+      convertedBy: userId,
+    },
+  });
+}
 import {
   computeActionableTasks,
   computeTaskActionable,
   computeNodeComplete,
   computeFlowComplete,
   evaluateGates,
+  computeValidityMap,
 } from "./derived";
 import { checkEvidenceRequirements, validateEvidenceData, type EvidenceSchema } from "./evidence";
 import { executeFanOut } from "./instantiation/fanout";
@@ -82,17 +207,11 @@ import { MAX_NODE_ITERATIONS } from "./constants";
  * @returns The Flow with relations or null
  */
 export async function getFlow(flowId: string): Promise<FlowWithRelations | null> {
-  return prisma.flow.findUnique({
+  const flow = await prisma.flow.findUnique({
     where: { id: flowId },
-    include: {
-      workflow: true,
-      workflowVersion: true,
-      flowGroup: true,
-      nodeActivations: true,
-      taskExecutions: true,
-      evidenceAttachments: true,
-    },
+    include: FLOW_WITH_RELATIONS_INCLUDE,
   });
+  return flow as FlowWithRelations | null;
 }
 
 /**
@@ -175,6 +294,9 @@ export async function startTask(
     node,
     flow.nodeActivations,
     flow.taskExecutions,
+    flow.detours,
+    flow.taskExecutions.flatMap(te => (te as any).validityEvents || []),
+    snapshot,
     groupOutcomes
   );
 
@@ -198,21 +320,21 @@ export async function startTask(
   const latestActivation = await getLatestNodeActivation(flowId, node.id);
   const iteration = latestActivation?.iteration ?? 1;
 
-  // Check if already started for this iteration
-  const existingExecution = flow.taskExecutions.find(
-    (te) => te.taskId === taskId && te.iteration === iteration
+  // LOCK: Check if there is already an active (uncompleted) execution for this iteration
+  const activeExecution = flow.taskExecutions.find(
+    (te) => te.taskId === taskId && te.iteration === iteration && te.outcome === null
   );
 
-  if (existingExecution?.startedAt) {
+  if (activeExecution) {
     return {
       success: false,
       error: {
         code: "TASK_ALREADY_STARTED",
-        message: `Task ${taskId} has already been started for iteration ${iteration}`,
+        message: `Task ${taskId} is already in progress for iteration ${iteration}`,
         details: {
-          taskExecutionId: existingExecution.id,
-          startedAt: existingExecution.startedAt,
-          startedBy: existingExecution.startedBy,
+          taskExecutionId: activeExecution.id,
+          startedAt: activeExecution.startedAt,
+          startedBy: activeExecution.startedBy,
         },
       },
     };
@@ -252,13 +374,15 @@ export async function startTask(
  * @param taskId - The Task ID
  * @param outcome - The outcome value
  * @param userId - The user recording the outcome
+ * @param detourId - Optional Detour ID if this outcome resolves a detour
  * @returns RecordOutcomeResult
  */
 export async function recordOutcome(
   flowId: string,
   taskId: string,
   outcome: string,
-  userId: string
+  userId: string,
+  detourId?: string
 ): Promise<RecordOutcomeResult> {
   // 1. Pre-transaction validation
   const flow = await getFlow(flowId);
@@ -289,14 +413,42 @@ export async function recordOutcome(
   // 2. Business logic validation
   const latestActivation = await getLatestNodeActivation(flowId, node.id);
   const iteration = latestActivation?.iteration ?? 1;
-  const taskExecution = flow.taskExecutions.find(
-    (te) => te.taskId === taskId && te.iteration === iteration
+  
+  // LOCK: Check for spoofing (recordOutcome without detourId when detour is active at checkpoint)
+  const activeDetour = flow.detours.find(
+    d => d.checkpointNodeId === node.id && d.status === "ACTIVE"
   );
-
-  if (!taskExecution?.startedAt) {
+  if (activeDetour && !detourId) {
     return {
       success: false,
-      error: { code: "TASK_NOT_STARTED", message: `Task ${taskId} has not been started.` },
+      error: { code: "DETOUR_SPOOF", message: "An active detour exists for this checkpoint. You must resolve it via the resolution path (provide detourId)." },
+    };
+  }
+
+  // LOCK: Find the latest TaskExecution for this iteration that hasn't been completed
+  const taskExecutionsForIteration = flow.taskExecutions
+    .filter((te) => te.taskId === taskId && te.iteration === iteration)
+    .sort((a, b) => {
+      const timeA = a.startedAt?.getTime() ?? 0;
+      const timeB = b.startedAt?.getTime() ?? 0;
+      if (timeB !== timeA) return timeB - timeA;
+      return b.id.localeCompare(a.id);
+    });
+
+  const taskExecution = taskExecutionsForIteration.find(te => te.outcome === null);
+
+  if (!taskExecution) {
+    // If we have executions for this iteration but none are open, it means it's already done.
+    if (taskExecutionsForIteration.length > 0) {
+      return {
+        success: false,
+        error: { code: "OUTCOME_ALREADY_RECORDED", message: `Task ${taskId} already has a recorded outcome for iteration ${iteration}.` },
+      };
+    }
+
+    return {
+      success: false,
+      error: { code: "TASK_NOT_STARTED", message: `Task ${taskId} has no active (uncompleted) execution for iteration ${iteration}.` },
     };
   }
 
@@ -319,6 +471,33 @@ export async function recordOutcome(
     }
   }
 
+  // DETOUR RESOLUTION VALIDATION
+  let resolutionDetour: any = null;
+  if (detourId) {
+    resolutionDetour = await prisma.detourRecord.findUnique({
+      where: { id: detourId },
+    });
+
+    if (!resolutionDetour || resolutionDetour.status !== "ACTIVE") {
+      return {
+        success: false,
+        error: { code: "INVALID_DETOUR", message: "Detour is not active or not found." },
+      };
+    }
+
+    if (resolutionDetour.checkpointNodeId !== node.id) {
+      return {
+        success: false,
+        error: { code: "DETOUR_HIJACK", message: "This task does not belong to the detour's checkpoint node." },
+      };
+    }
+
+    if (resolutionDetour.checkpointTaskExecutionId && resolutionDetour.checkpointTaskExecutionId === taskExecution.id) {
+       // Cannot resolve using the same task execution that opened the detour
+       // (Unless we allow it, but lock said: "recordOutcome(detourId=...) resolution branch")
+    }
+  }
+
   // 3. Atomic Unit of Progress
   const now = new Date(); // Tighten-up C: Single timestamp for atomic unit
   const hookCtx = new HookContext();
@@ -336,18 +515,66 @@ export async function recordOutcome(
   try {
     await prisma.$transaction(async (tx) => {
       // a. Record Outcome (Tighten-up B: propagate tx)
-      const outcomeResult = await truthRecordOutcome(flowId, taskId, outcome, userId, iteration, tx, now);
+      // PHASE-3: Pass explicit ID to ensure we update the correct record in append-only world
+      const outcomeResult = await truthRecordOutcome(flowId, taskId, outcome, userId, iteration, tx, now, taskExecution.id);
       if (outcomeResult.error) throw new Error(JSON.stringify(outcomeResult.error));
       resultRecord = outcomeResult.taskExecution;
 
       hookCtx.queue({ type: "TASK_DONE", flowId, taskId, outcome, userId });
 
-      // b. Routing (Node Activations)
-      gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now, hookCtx);
+      // PHASE-3 DETOUR RESOLUTION BRANCH
+      if (detourId && resolutionDetour) {
+        // a. Record resolution linkage
+        await tx.taskExecution.update({
+          where: { id: resultRecord!.id },
+          data: { resolvedDetourId: detourId },
+        });
+
+        // b. Emit ValidityEvent(VALID)
+        await tx.validityEvent.create({
+          data: {
+            taskExecutionId: resultRecord!.id,
+            state: "VALID",
+            createdBy: userId,
+            createdAt: now,
+          },
+        });
+
+        // c. Resolve DetourRecord
+        await tx.detourRecord.update({
+          where: { id: detourId },
+          data: {
+            status: "RESOLVED",
+            resolvedAt: now,
+            resolvedBy: userId,
+          },
+        });
+
+        // d. Stable Resume: Explicitly activate resumeTargetNodeId
+        const resumeResult = await activateNode(flowId, resolutionDetour.resumeTargetNodeId, undefined, tx, now, hookCtx);
+        if (!resumeResult.success) throw new Error(JSON.stringify(resumeResult.error));
+
+        // e. Skip gate routing (bypass processGateRouting)
+        gateResults = [{
+          gateId: "STABLE_RESUME",
+          sourceNodeId: node.id,
+          outcomeName: outcome,
+          targetNodeId: resolutionDetour.resumeTargetNodeId,
+          activated: true,
+        }];
+      } else {
+        // b. Routing (Node Activations) - Only for standard progress
+        gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now, hookCtx);
+      }
 
       // c. Check if Node completed for Fan-Out intent
       const updatedExecutions = await getTaskExecutions(flowId, tx);
-      const nodeIsComplete = computeNodeComplete(node, updatedExecutions, iteration);
+      const allValidityEvents = (await tx.validityEvent.findMany({
+        where: { taskExecution: { flowId } }
+      }));
+      const validityMap = computeValidityMap(allValidityEvents);
+
+      const nodeIsComplete = computeNodeComplete(node, updatedExecutions, validityMap, iteration);
       if (nodeIsComplete) {
         fanOutIntent = {
           nodeId: node.id,
@@ -360,7 +587,9 @@ export async function recordOutcome(
 
       // d. Flow Completion check
       const currentActivations = await tx.nodeActivation.findMany({ where: { flowId } });
-      const isComplete = computeFlowComplete(snapshot, currentActivations, updatedExecutions);
+      const currentDetours = await tx.detourRecord.findMany({ where: { flowId } });
+      
+      const isComplete = computeFlowComplete(snapshot, currentActivations, updatedExecutions, currentDetours, allValidityEvents);
       if (isComplete && flow.status !== FlowStatus.BLOCKED) {
         await updateFlowStatus(flowId, FlowStatus.COMPLETED, undefined, tx, now);
         hookCtx.queue({ type: "FLOW_COMPLETED", flowId });
@@ -583,6 +812,8 @@ export async function getActionableTasks(flowId: string): Promise<ActionableTask
     snapshot,
     flow.nodeActivations,
     flow.taskExecutions,
+    flow.detours,
+    flow.taskExecutions.flatMap(te => (te as any).validityEvents || []),
     {
       flowId,
       flowGroupId: flow.flowGroupId,
@@ -624,6 +855,9 @@ export async function isTaskActionable(
     node,
     flow.nodeActivations,
     flow.taskExecutions,
+    flow.detours,
+    flow.taskExecutions.flatMap(te => (te as any).validityEvents || []),
+    snapshot,
     groupOutcomes
   );
 }
@@ -753,19 +987,24 @@ async function processGateRouting(
   now?: Date,
   hookCtx?: HookContext
 ): Promise<GateEvaluationResult[]> {
+  const client = tx || prisma;
   // Re-fetch task executions to get latest state (Tighten-up B: use tx)
   const taskExecutions = await getTaskExecutions(flow.id, tx);
+  const validityEvents = await client.validityEvent.findMany({
+    where: { taskExecution: { flowId: flow.id } }
+  });
+  const validityMap = computeValidityMap(validityEvents);
 
-  // Check if Node is complete
-  const isComplete = computeNodeComplete(node, taskExecutions, iteration);
+  // Check if Node is complete (Validity Aware)
+  const isComplete = computeNodeComplete(node, taskExecutions, validityMap, iteration);
 
   if (!isComplete) {
     // Node not complete yet, no gate routing
     return [];
   }
 
-  // Evaluate Gates
-  const routes = evaluateGates(node, taskExecutions, snapshot.gates, iteration);
+  // Evaluate Gates (Validity Aware)
+  const routes = evaluateGates(node, taskExecutions, validityMap, snapshot.gates, iteration);
   const results: GateEvaluationResult[] = [];
 
   for (const route of routes) {

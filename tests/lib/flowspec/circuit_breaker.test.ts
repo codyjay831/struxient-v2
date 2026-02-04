@@ -88,6 +88,7 @@ async function createLoopingWorkflow(companyId: string) {
             crossFlowDependencies: [],
           },
         ],
+        transitiveSuccessors: [],
       },
     ],
     gates: [

@@ -17,7 +17,7 @@ import { getActionableTasks } from "@/lib/flowspec/engine";
 import { computeEffectivePolicy, computeTaskSignals } from "@/lib/flowspec/policy";
 import { checkEvidenceRequirements } from "@/lib/flowspec/evidence";
 import { buildRecommendations } from "@/lib/flowspec/recommendations";
-import type { WorkflowSnapshot } from "@/lib/flowspec/types";
+import { FLOW_WITH_RELATIONS_INCLUDE, type FlowWithRelations, type WorkflowSnapshot } from "@/lib/flowspec/types";
 import type { NodeActivation } from "@prisma/client";
 import { NextRequest } from "next/server";
 
@@ -37,22 +37,8 @@ export async function GET(request: NextRequest) {
         workflow: { companyId },
         status: "ACTIVE",
       },
-      include: {
-        workflowVersion: true,
-        nodeActivations: true,
-        evidenceAttachments: true,
-        flowGroup: {
-          include: {
-            job: {
-              select: { 
-                id: true,
-                customerId: true
-              }
-            }
-          }
-        }
-      }
-    });
+      include: FLOW_WITH_RELATIONS_INCLUDE
+    }) as FlowWithRelations[];
 
     // 2. Aggregate actionable tasks and collect jobIds + flowGroupIds
     const allActionableTasks = [];
@@ -122,9 +108,15 @@ export async function GET(request: NextRequest) {
     const enrichedTasks = allActionableTasks.map(task => {
       // Find the flow data
       const flowData = flowDataMap.get(task.flowId);
+      const activeFlow = activeFlows.find(f => f.id === task.flowId);
       const jobId = flowData?.jobId;
       const customerId = flowData?.customerId;
       const assignments = jobId ? assignmentsByJob.get(jobId) || [] : [];
+
+      // Find active detour for this task (if it's a checkpoint)
+      const activeDetour = activeFlow?.detours?.find(
+        d => d.checkpointNodeId === task.nodeId && d.status === "ACTIVE"
+      );
 
       // Get effective policy for this flow group
       const effectivePolicy = effectivePolicies.get(task.flowGroupId);
@@ -165,6 +157,12 @@ export async function GET(request: NextRequest) {
 
       const context = jobId ? { jobId, customerId } : undefined;
 
+      // Extract possible resume nodes from snapshot
+      const snapshot = activeFlow?.workflowVersion.snapshot as unknown as WorkflowSnapshot;
+      const possibleResumeNodes = snapshot.nodes
+        .filter(n => n.id !== task.nodeId)
+        .map(n => ({ id: n.id, name: n.name }));
+
       const enrichedTask = {
         ...task,
         _metadata: {
@@ -172,9 +170,15 @@ export async function GET(request: NextRequest) {
             slotKey: a.slotKey,
             assigneeType: a.assigneeType,
             assignee: a.member || a.externalParty
-          }))
+          })),
+          possibleResumeNodes,
         },
         _signals: signals,
+        _detour: activeDetour ? {
+          id: activeDetour.id,
+          status: activeDetour.status,
+          type: activeDetour.type,
+        } : undefined,
         diagnostics,
         context
       };

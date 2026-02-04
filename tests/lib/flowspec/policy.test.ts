@@ -36,6 +36,7 @@ const createSnapshot = (tasks: { id: string; defaultSlaHours: number | null }[])
       isEntry: true,
       completionRule: "ALL_TASKS_DONE",
       specificTasks: [],
+      transitiveSuccessors: [],
       tasks: tasks.map((t) => ({
         id: t.id,
         name: `Task ${t.id}`,

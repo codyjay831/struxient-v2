@@ -49,6 +49,7 @@ export function createWorkflowSnapshot(
           requiredOutcome: dep.requiredOutcome,
         })),
       })),
+      transitiveSuccessors: computeTransitiveSuccessors(node.id, workflow.gates),
     })),
     gates: workflow.gates.map((gate) => ({
       id: gate.id,
@@ -57,4 +58,37 @@ export function createWorkflowSnapshot(
       targetNodeId: gate.targetNodeId,
     })),
   };
+}
+
+/**
+ * Computes all nodes reachable from a given node by following gates.
+ * Handles cycles and uses BFS for deterministic discovery.
+ *
+ * @param nodeId - The starting node ID
+ * @param gates - All gates in the workflow
+ * @returns Sorted array of reachable node IDs
+ */
+function computeTransitiveSuccessors(
+  nodeId: string,
+  gates: { sourceNodeId: string; targetNodeId: string | null }[]
+): string[] {
+  const successors = new Set<string>();
+  const queue = [nodeId];
+  const visited = new Set<string>([nodeId]);
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const outboundGates = gates.filter((g) => g.sourceNodeId === currentId);
+
+    for (const gate of outboundGates) {
+      if (gate.targetNodeId && !visited.has(gate.targetNodeId)) {
+        visited.add(gate.targetNodeId);
+        successors.add(gate.targetNodeId);
+        queue.push(gate.targetNodeId);
+      }
+    }
+  }
+
+  // Deterministic sort for snapshot stability
+  return Array.from(successors).sort();
 }

@@ -1,30 +1,24 @@
-/**
- * Task Outcome API
- *
- * Canon Source: 30_workstation_ui_api_map.md §4
- */
-
 import { prisma } from "@/lib/prisma";
 import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
 import { apiSuccess, apiError } from "@/lib/api-utils";
-import { getFlow, recordOutcome } from "@/lib/flowspec/engine";
+import { getFlow, openDetour } from "@/lib/flowspec/engine";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: Promise<{ flowId: string; taskId: string }>;
+  params: Promise<{ flowId: string }>;
 };
 
 /**
- * Record an Outcome for a Task.
+ * Open a Detour for a Flow.
  */
 export async function POST(request: NextRequest, { params }: Props) {
   try {
-    const { flowId, taskId } = await params;
+    const { flowId } = await params;
     const body = await request.json();
-    const { outcome, detourId } = body;
+    const { checkpointNodeId, checkpointTaskExecutionId, resumeTargetNodeId, type, category } = body;
 
     const flow = await getFlow(flowId);
     if (!flow) {
@@ -38,26 +32,23 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("AUTHENTICATION_REQUIRED", "Authentication required", null, 401);
     }
 
-    if (!outcome) {
-      return apiError("INPUT_REQUIRED", "outcome is required");
+    if (!checkpointNodeId || !resumeTargetNodeId || !checkpointTaskExecutionId) {
+      return apiError("INPUT_REQUIRED", "checkpointNodeId, resumeTargetNodeId, and checkpointTaskExecutionId are required");
     }
 
-    const result = await recordOutcome(
+    const result = await openDetour(
       flowId,
-      taskId,
-      outcome,
+      checkpointNodeId,
+      resumeTargetNodeId,
       session.userId,
-      detourId
+      checkpointTaskExecutionId,
+      type,
+      category
     );
-
-    if (!result.success && result.error) {
-      return apiError(result.error.code, result.error.message, result.error.details);
-    }
 
     return apiSuccess({
       success: true,
-      taskExecutionId: result.taskExecutionId,
-      gateResults: result.gateResults,
+      detourId: result.id,
     });
   } catch (error) {
     return tenantErrorResponse(error);

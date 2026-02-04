@@ -128,22 +128,9 @@ export async function recordTaskStart(
 ): Promise<TaskExecution> {
   const client = tx || prisma;
   
-  // Check if there's already a TaskExecution for this iteration
-  const existing = await client.taskExecution.findFirst({
-    where: {
-      flowId,
-      taskId,
-      iteration,
-    },
-  });
-
-  if (existing) {
-    // If already started, this is an error condition (handled by caller)
-    // Return the existing record for the caller to check
-    return existing;
-  }
-
-  // Create new TaskExecution record
+  // LOCK: Always create a new TaskExecution record (append-only).
+  // The Engine (via computeTaskActionable) is responsible for ensuring 
+  // only one active/valid execution exists per iteration.
   const taskExecution = await client.taskExecution.create({
     data: {
       flowId,
@@ -169,6 +156,7 @@ export async function recordTaskStart(
  * @param iteration - Iteration count for cycle tracking (default 1)
  * @param tx - Optional Prisma transaction client
  * @param now - Optional timestamp to use
+ * @param taskExecutionId - Optional specific record to update (Phase-3 re-open support)
  * @returns The updated TaskExecution record or error
  */
 export async function recordOutcome(
@@ -178,18 +166,32 @@ export async function recordOutcome(
   userId: string,
   iteration: number = 1,
   tx?: Prisma.TransactionClient,
-  now?: Date
+  now?: Date,
+  taskExecutionId?: string
 ): Promise<{ taskExecution?: TaskExecution; error?: EngineError }> {
   const client = tx || prisma;
 
-  // Find the TaskExecution for this iteration
-  const taskExecution = await client.taskExecution.findFirst({
-    where: {
-      flowId,
-      taskId,
-      iteration,
-    },
-  });
+  // Find the TaskExecution
+  const taskExecution = taskExecutionId 
+    ? await client.taskExecution.findUnique({ where: { id: taskExecutionId } })
+    : await client.taskExecution.findFirst({
+        where: {
+          flowId,
+          taskId,
+          iteration,
+          outcome: null, // LOCK: Prefer active one if multiple exist
+        },
+        orderBy: { startedAt: "desc" },
+      });
+
+  if (!taskExecution) {
+    return {
+      error: {
+        code: "TASK_NOT_STARTED",
+        message: `Task ${taskId} has no active execution to record outcome for.`,
+      },
+    };
+  }
 
   if (!taskExecution) {
     return {

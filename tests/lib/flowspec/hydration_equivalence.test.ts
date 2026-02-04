@@ -45,6 +45,7 @@ const goldenSnapshot: WorkflowSnapshot = {
       isEntry: true,
       completionRule: CompletionRule.ALL_TASKS_DONE,
       specificTasks: [],
+      transitiveSuccessors: ["node-followup"],
       tasks: [
         {
           id: "task-review",
@@ -81,6 +82,7 @@ const goldenSnapshot: WorkflowSnapshot = {
       isEntry: false,
       completionRule: CompletionRule.ANY_TASK_DONE,
       specificTasks: [],
+      transitiveSuccessors: [],
       tasks: [
         {
           id: "task-complete",

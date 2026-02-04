@@ -18,6 +18,7 @@ describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
           isEntry: true,
           completionRule: "ALL_TASKS_DONE",
           specificTasks: [],
+          transitiveSuccessors: [],
         },
       ],
       gates: [],
@@ -40,7 +41,7 @@ describe("Phase 3: T-ACT_SORT_01 (Canonical Sort)", () => {
     };
 
     // computeActionableTasks returns ONLY the tasks for the LATEST activation of each node.
-    const tasks = computeActionableTasks(mockSnapshot, mockNodeActivations.filter((na: any) => na.flowId === "flow1"), [], flowContext1);
+    const tasks = computeActionableTasks(mockSnapshot, mockNodeActivations.filter((na: any) => na.flowId === "flow1"), [], [], [], flowContext1);
 
     // Expected order for flow1 (iteration 2 is latest):
     // taskA, iteration 2
