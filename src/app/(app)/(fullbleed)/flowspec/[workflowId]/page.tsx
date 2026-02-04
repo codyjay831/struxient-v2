@@ -32,6 +32,7 @@ import {
   SheetTitle,
   SheetDescription 
 } from "@/components/ui/sheet";
+import { DraggableResizablePanel } from "@/components/flowspec/draggable-resizable-panel";
 import { generateEdgeKey, computeNodeDepths, detectEdgeType } from "@/lib/canvas/layout";
 import {
   Loader2Icon,
@@ -788,59 +789,50 @@ export default function WorkflowDetailPage() {
             </SheetContent>
           </Sheet>
 
-          {/* Configuration Toggle (Floating Bottom Right) */}
+          {/* Configuration & Toggle (Floating Bottom Right) */}
+          <DraggableResizablePanel
+            workflowId={workflowId}
+            title="Workflow Configuration"
+            isExpanded={isConfigExpanded}
+            onExpandedChange={setIsConfigExpanded}
+          >
+            <RoutingEditor
+              workflowId={workflowId}
+              nodes={workflow.nodes}
+              gates={workflow.gates}
+              isEditable={isEditable}
+              onRoutingUpdated={fetchWorkflow}
+              highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
+              highlightOutcome={
+                highlight?.type === "outcome"
+                  ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
+                  : undefined
+              }
+            />
+
+            <LoopbackIndexPanel
+              workflowId={workflowId}
+              nodes={workflow.nodes}
+              gates={workflow.gates}
+            />
+
+            <FanOutRulesEditor
+              workflowId={workflowId}
+              nodes={workflow.nodes}
+              fanOutRules={workflow.fanOutRules}
+              isEditable={isEditable}
+              onRulesUpdated={fetchWorkflow}
+            />
+
+            <WorkflowVersionsCard
+              workflowId={workflowId}
+              versions={versions}
+              isLoading={versionsLoading}
+              error={versionsError}
+            />
+          </DraggableResizablePanel>
+
           <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
-            {isConfigExpanded && (
-              <div 
-                className="w-[600px] max-h-[400px] overflow-y-auto bg-background/95 backdrop-blur-sm border rounded-lg shadow-2xl p-4 space-y-6 mb-2"
-                data-testid="config-drawer"
-              >
-                <div className="flex justify-between items-center pb-2 border-b">
-                  <h3 className="text-sm font-bold flex items-center gap-2">
-                    <SettingsIcon className="size-4" />
-                    Workflow Configuration
-                  </h3>
-                  <Button variant="ghost" size="icon-xs" onClick={() => setIsConfigExpanded(false)}>
-                    <ChevronDownIcon className="size-4" />
-                  </Button>
-                </div>
-                
-                <RoutingEditor
-                  workflowId={workflowId}
-                  nodes={workflow.nodes}
-                  gates={workflow.gates}
-                  isEditable={isEditable}
-                  onRoutingUpdated={fetchWorkflow}
-                  highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
-                  highlightOutcome={
-                    highlight?.type === "outcome"
-                      ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
-                      : undefined
-                  }
-                />
-
-                <LoopbackIndexPanel
-                  workflowId={workflowId}
-                  nodes={workflow.nodes}
-                  gates={workflow.gates}
-                />
-
-                <FanOutRulesEditor
-                  workflowId={workflowId}
-                  nodes={workflow.nodes}
-                  fanOutRules={workflow.fanOutRules}
-                  isEditable={isEditable}
-                  onRulesUpdated={fetchWorkflow}
-                />
-
-                <WorkflowVersionsCard
-                  workflowId={workflowId}
-                  versions={versions}
-                  isLoading={versionsLoading}
-                  error={versionsError}
-                />
-              </div>
-            )}
             <Button
               variant="secondary"
               className="gap-2 shadow-lg"

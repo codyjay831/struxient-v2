@@ -20,6 +20,7 @@ describe("WorkflowCanvas Persistence", () => {
     if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
       Element.prototype.setPointerCapture = vi.fn();
       Element.prototype.releasePointerCapture = vi.fn();
+      Element.prototype.hasPointerCapture = vi.fn(() => true);
     }
   });
 
@@ -91,6 +92,7 @@ describe("WorkflowCanvas Persistence", () => {
     // Simulate click (down then up without move)
     fireEvent.pointerDown(node, { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
     fireEvent.pointerUp(node, { pointerId: 1 });
+    fireEvent.click(node);
 
     expect(onNodeDragEnd).not.toHaveBeenCalled();
     expect(onNodeClick).toHaveBeenCalledWith("n1");
