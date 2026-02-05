@@ -20,7 +20,7 @@ The FlowSpec Builder is a **staged design-time environment**. It operates on a "
 - `src/components/canvas/workflow-canvas.tsx`: SVG-based visualization and interaction (drag/zoom/select).
 - `src/components/flowspec/node-detail-panel.tsx`: Inspector for node semantic properties and task management.
 - `src/components/flowspec/routing-editor.tsx`: Matrix-style editor for outcome-to-target mapping.
-- `src/components/flowspec/builder-save-status.tsx`: The "Save Strip" showing dirty state and action buttons.
+- `src/components/flowspec/builder-session-sidebar.tsx`: The Right Sidebar hosting Commit/Discard and History.
 
 ### API Layer (`/api/flowspec/workflows/[id]/...`)
 - `builder/route.ts`: Buffer-aware workflow fetcher.
@@ -36,7 +36,68 @@ The FlowSpec Builder is a **staged design-time environment**. It operates on a "
 
 ---
 
-## 3. Action Path Table
+## 3. Builder Layout Model
+
+The FlowSpec Builder utilizes a **Dual-Rail Workspace** model designed to maximize canvas real estate while providing structured editing surfaces.
+
+### A) Top Bar
+- **Height:** 48px (h-12).
+- **Z-Index:** 60.
+- **Role:** Global context (Status, Version, Identity) and high-level lifecycle (Validate, Publish).
+- **Invariant:** No editing tools or property editors.
+
+### B) Left Rails (Nodes / Config)
+- **Width:** Variable (default ~520px).
+- **Role:** Structural navigation and global workflow configuration (Routing, Versions, Fan-out).
+- **Interaction:** Rail-based sliding panels. One panel active at a time or both closed.
+
+### C) Canvas (Center)
+- **Role:** Primary workspace. SVG-based visualization.
+- **Interaction:** Zoom, pan, drag-and-drop nodes.
+- **Invariant:** Must never be occluded by floating save/session UI.
+
+### D) Right Session Sidebar
+- **Width:** 360px.
+- **Role:** Save safety (Commit, Discard), history browsing, and layout tools.
+- **Visibility:** Collapsible, leaving a visible spine when closed.
+
+### E) Inspector Sheet
+- **Width:** 384px - 450px.
+- **Z-Index:** 70 (Overlays everything).
+- **Role:** Deep configuration for a single selected element (Node or Edge).
+
+---
+
+## 4. Interaction Rules
+
+### Panel Exclusivity
+- Only one panel per rail side can be active at a time.
+- Opening a panel on the left does not automatically close a panel on the right.
+
+### Collapse/Expand Behavior
+- Panels MUST leave a visible rail affordance when collapsed to allow user re-entry.
+- Canvas MUST resize dynamically when panels open/close to prevent element hiddenness.
+
+### Canvas Resize Expectations
+- The canvas engine must re-calculate its viewport and fit-to-view logic when the side panels change the available main workspace dimensions.
+
+### Keyboard & Pointer Priority
+- **Inspector (Sheet):** Captures all keyboard input when open.
+- **Canvas:** Captures mouse wheel (zoom) and background drag (pan) ONLY when not hovering over an open panel or the top bar.
+
+---
+
+## 5. Anti-Patterns (Explicitly Forbidden)
+
+- **Floating Save Bars:** Never place absolute-positioned save/commit buttons over the canvas. These belong in the Session Sidebar.
+- **Modal Stacking for Session Safety:** Do not use full-screen modals for "Confirm Discard" or "Commit" unless they are the final step in a sidebar-initiated flow.
+- **Duplicate Save State Indicators:** Do not add "Saved" or "Dirty" indicators to nodes or individual tasks. The Session Sidebar is the single source of truth for buffer state.
+- **Hidden Session State:** Never hide the fact that a user is in a Draft/Dirty state. The rail MUST show a status indicator (e.g., amber dot).
+- **Resizing Inspector:** Panels that require the user to manually pan the canvas just to read the label of a node they just clicked are forbidden. Use the Overlay Inspector.
+
+---
+
+## 6. Action Path Table
 
 | Action | UI Element | Handler | API Route | Persistence Method | DB Impact |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -193,3 +254,17 @@ To verify that the builder session authority is working correctly:
 1.  Modify `src/lib/flowspec/persistence/workflow.ts` -> `commitDraftToWorkflow`.
 2.  Ensure you maintain the `tx` (transaction) pass-through pattern.
 3.  Verify that `createCommitEvent` still captures the correct composite snapshot.
+
+---
+
+## 10. Drift Prevention Checklist
+
+This checklist MUST be consulted by any developer or AI agent before introducing UI changes to the FlowSpec Builder.
+
+- [ ] **Rail Alignment:** If adding a new feature or panel, does it belong on the **Left Rail** (Structure/Config) or the **Right Rail** (Session/State)?
+- [ ] **Save Location:** If adding save/persist controls, do they live in the **Session Sidebar**? (No floating canvas bars!)
+- [ ] **Interaction Priority:** Does the new UI use the **Inspector Sheet** (overlay) or a **Rail Panel** (sidebar)? (Favor Inspector for element-specific edits).
+- [ ] **Canvas Obstruction:** Does the new UI element obstruct the central canvas workspace without a clear path to collapse/close?
+- [ ] **Z-Index Check:** Does the new element respect the hierarchy: `Inspector (70)` > `Top Bar (60)` > `Rails (20)`?
+- [ ] **Immutability:** If viewing a Published workflow, is the new UI correctly disabled or hidden?
+- [ ] **Mobile/Compact:** Does the new UI preserve the `data-density="compact"` attribute and standard spacing?

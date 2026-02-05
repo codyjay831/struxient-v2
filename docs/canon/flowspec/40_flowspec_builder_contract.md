@@ -2,12 +2,14 @@
 
 **Document ID:** 40_flowspec_builder_contract  
 **Status:** CANONICAL  
-**Last Updated:** 2026-01-28  
+**Last Updated:** 2026-02-04  
 **Related Documents:**
 - [00_flowspec_glossary.md](./00_flowspec_glossary.md)
 - [10_flowspec_engine_contract.md](./10_flowspec_engine_contract.md)
 - [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md)
+- [43_flowspec_builder_ux_invariants.md](./43_flowspec_builder_ux_invariants.md)
 - [42_flowspec_builder_screen_api_matrix.md](./42_flowspec_builder_screen_api_matrix.md)
+- [50_flowspec_builder_how_it_works.md](./50_flowspec_builder_how_it_works.md)
 - [50_flowspec_builder_ui_api_map.md](./50_flowspec_builder_ui_api_map.md)
 
 ---
@@ -26,8 +28,9 @@ The Builder contract supports two valid implementation approaches that may be de
 
 | Phase | Implementation | Document | Description |
 |-------|---------------|----------|-------------|
-| **Phase 1** | Structured Builder | [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md) | Lists + panels interface. Full API coverage. No canvas. |
-| **Phase 2** | Visual Graph Builder | This document (§3, §5.5) | Canvas-based drag-and-drop graph editing. |
+| **Phase 1** | Structured Builder | [41_flowspec_structured_builder_ux.md](./41_flowspec_structured_builder_ux.md) | Lists + panels interface. |
+| **Phase 2** | Visual Graph Builder | [50_flowspec_builder_how_it_works.md](./50_flowspec_builder_how_it_works.md) | Canvas-based drag-and-drop graph editing. |
+| **Current** | **v1 Unified Builder** | [43_flowspec_builder_ux_invariants.md](./43_flowspec_builder_ux_invariants.md) | Canvas-first with Dual-Rail Rails. |
 
 **Phasing Rules:**
 1. Phase 1 (Structured Builder) is a VALID, COMPLETE implementation that satisfies all functional requirements.
