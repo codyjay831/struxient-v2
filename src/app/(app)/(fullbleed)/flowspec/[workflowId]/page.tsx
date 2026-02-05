@@ -36,9 +36,9 @@ import {
 import { DraggableResizablePanel } from "@/components/flowspec/draggable-resizable-panel";
 import { generateEdgeKey, computeNodeDepths, detectEdgeType } from "@/lib/canvas/layout";
 import { computeSemanticDiff, SemanticChange } from "@/lib/flowspec/diff";
-import { BuilderSaveStatus } from "@/components/flowspec/builder-save-status";
+import { formatDistanceToNow } from "date-fns";
+import { BuilderSessionSidebar } from "@/components/flowspec/builder-session-sidebar";
 import { BuilderCommitDialog } from "@/components/flowspec/builder-commit-dialog";
-import { BuilderHistoryPanel } from "@/components/flowspec/builder-history-panel";
 import {
   Loader2Icon,
   ArrowLeftIcon,
@@ -222,7 +222,6 @@ export default function WorkflowDetailPage() {
 
   // --- SAVE SAFETY STATE ---
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
-  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
   const [draftHistory, setDraftHistory] = useState<any[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [baseSnapshot, setBaseSnapshot] = useState<any>(null);
@@ -369,7 +368,6 @@ export default function WorkflowDetailPage() {
       });
       if (response.ok) {
         await fetchWorkflow();
-        setIsHistoryPanelOpen(false);
       }
     } catch (err) {
       console.error("Failed to restore", err);
@@ -471,7 +469,8 @@ export default function WorkflowDetailPage() {
   useEffect(() => {
     fetchWorkflow();
     fetchVersions();
-  }, [fetchWorkflow, fetchVersions]);
+    fetchHistory();
+  }, [fetchWorkflow, fetchVersions, fetchHistory]);
 
   const handleValidate = async () => {
     if (!workflow) return;
@@ -767,71 +766,67 @@ export default function WorkflowDetailPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col flex-1 min-h-0 relative bg-background" data-density="compact">
-        {/* Shared Header Overlay - Fixed at top with z-50 to ensure buttons are never blocked */}
-        <div 
-          className="fixed top-0 right-0 z-50 p-4 pointer-events-none transition-all duration-300 flex items-start justify-between gap-4"
-          style={{ left: collapsed ? '60px' : '240px' }}
-        >
-          <div className="flex-1 flex justify-center">
-            <div className="pointer-events-auto flex flex-col items-center gap-2">
-              <div className="bg-background/95 backdrop-blur-sm p-4 rounded-xl border shadow-lg max-w-fit flex flex-col items-center">
-                <Link href="/flowspec">
-                  <Button variant="ghost" size="compact" className="-ml-2 mb-2 self-start">
-                    <ArrowLeftIcon className="size-4" />
-                    Back to Workflows
-                  </Button>
-                </Link>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-semibold tracking-tight truncate">{workflow.name}</h1>
-                  <WorkflowStatusBadge status={workflow.status} />
-                  {workflow.version > 1 && (
-                    <span className="text-sm text-muted-foreground">v{workflow.version}</span>
-                  )}
-                </div>
-                {workflow.description && (
-                  <p className="text-muted-foreground text-sm truncate mt-1">{workflow.description}</p>
-                )}
-              </div>
-
-              {/* SAVE SAFETY STATUS STRIP - SECOND ROW */}
-              {!sessionState.isPublished && (
-                <div className="pointer-events-auto max-w-fit md:max-w-lg">
-                  <BuilderSaveStatus 
-                    isDirty={sessionState.isDraft}
-                    changeCount={sessionState.changeCount}
-                    lastSavedAt={sessionState.lastSavedAt}
-                    onCommit={handleCommitClick}
-                    onDiscard={handleDiscard}
-                    onHistory={() => {
-                      fetchHistory();
-                      setIsHistoryPanelOpen(true);
-                    }}
-                    onRevertLayout={handleRevertLayout}
-                    onCenterView={handleCenterView}
-                    isSaving={isCommitLoading}
-                  />
-                </div>
+      <div className="flex flex-col h-screen overflow-hidden bg-background" data-density="compact">
+        {/* Top Bar - Standard App Shell Header */}
+        <header className="h-14 border-b bg-background flex items-center justify-between px-4 z-[60] shrink-0">
+          <div className="flex items-center gap-4">
+            <Link href="/flowspec">
+              <Button variant="ghost" size="sm" className="gap-2 -ml-2">
+                <ArrowLeftIcon className="size-4" />
+                <span className="hidden sm:inline">Workflows</span>
+              </Button>
+            </Link>
+            
+            <div className="w-px h-6 bg-border" />
+            
+            <div className="flex items-center gap-2 max-w-[400px]">
+              <h1 className="text-sm font-semibold truncate" title={workflow.name}>
+                {workflow.name}
+              </h1>
+              <WorkflowStatusBadge 
+                status={workflow.status} 
+                className="text-[10px] px-1.5 py-0.5" 
+              />
+              {workflow.version > 1 && (
+                <span className="text-[10px] text-muted-foreground font-mono">v{workflow.version}</span>
               )}
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm p-2 rounded-xl border shadow-lg">
-              {/* Validate Button */}
+          <div className="flex items-center gap-3">
+            {/* Session Stats (Compact) */}
+            {sessionState.isDraft && (
+              <div className="hidden md:flex items-center gap-3 mr-2 px-3 py-1 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-full">
+                <div className="flex items-center gap-1.5 text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                  <AlertCircleIcon className="size-3" />
+                  <span>{sessionState.changeCount} unsaved</span>
+                </div>
+                {sessionState.lastSavedAt && (
+                  <>
+                    <div className="w-px h-2 bg-amber-200 dark:bg-amber-800" />
+                    <span className="text-[9px] text-amber-600/70 dark:text-amber-400/70 italic">
+                      Saved {formatDistanceToNow(new Date(sessionState.lastSavedAt), { addSuffix: true })}
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
                     <Button
                       variant="outline"
-                      size="compact"
+                      size="sm"
                       onClick={handleValidate}
                       disabled={!sessionState.canValidate}
+                      className="h-8 text-xs gap-2"
                     >
                       {isValidating ? (
-                        <Loader2Icon className="size-4 animate-spin" />
+                        <Loader2Icon className="size-3 animate-spin" />
                       ) : (
-                        <CheckCircleIcon className="size-4" />
+                        <CheckCircleIcon className="size-3 text-green-600" />
                       )}
                       Validate
                     </Button>
@@ -844,36 +839,36 @@ export default function WorkflowDetailPage() {
                 )}
               </Tooltip>
 
-              {/* Return to Draft Button (VALIDATED only) */}
               {sessionState.isValidated && (
                 <Button
                   variant="outline"
-                  size="compact"
+                  size="sm"
                   onClick={() => setRevertDialogOpen(true)}
                   disabled={isReverting}
+                  className="h-8 text-xs gap-2"
                 >
                   {isReverting ? (
-                    <Loader2Icon className="size-4 animate-spin" />
+                    <Loader2Icon className="size-3 animate-spin" />
                   ) : (
-                    <ArrowLeftIcon className="size-4" />
+                    <ArrowLeftIcon className="size-3" />
                   )}
                   Return to Draft
                 </Button>
               )}
 
-              {/* Publish Button */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span>
                     <Button
-                      size="compact"
+                      size="sm"
                       onClick={handlePublishClick}
                       disabled={!sessionState.canPublish}
+                      className="h-8 text-xs gap-2"
                     >
                       {isPublishing ? (
-                        <Loader2Icon className="size-4 animate-spin" />
+                        <Loader2Icon className="size-3 animate-spin" />
                       ) : (
-                        <SendIcon className="size-4" />
+                        <SendIcon className="size-3" />
                       )}
                       Publish
                     </Button>
@@ -889,108 +884,187 @@ export default function WorkflowDetailPage() {
               </Tooltip>
             </div>
           </div>
+        </header>
 
-          {/* INV-011 Banner for Published Workflows */}
-          {sessionState.isPublished && (
-            <div className="mt-4 pointer-events-auto flex items-center gap-2 p-3 rounded-md bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-sm max-w-fit border border-blue-200 shadow-sm">
-              <AlertCircleIcon className="size-4" />
-              This workflow is published and cannot be modified. Create a new version to make changes.
+        {/* Main Workspace Area */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Canvas Column */}
+          <main className="flex-1 relative overflow-hidden bg-muted/5">
+            {/* Canvas - Primary Surface */}
+            <div className="absolute inset-0 z-0" data-testid="workflow-canvas-container">
+              <WorkflowCanvas 
+                ref={canvasRef}
+                nodes={workflow.nodes} 
+                gates={workflow.gates} 
+                onNodeClick={handleNodeSelect}
+                onEdgeClick={handleEdgeSelect}
+                onBackgroundClick={handleClearSelection}
+                onNodeDragEnd={handleNodeDragEnd}
+                selectedNodeId={selectedNodeId}
+                selectedEdgeKey={selectedEdgeKey}
+              />
             </div>
-          )}
 
-        {/* Main Content Area - Full Bleed */}
-        <div className="flex-1 min-h-0 relative overflow-hidden bg-background">
-          {/* Canvas - Primary Surface */}
-          <div className="absolute inset-0 z-0" data-testid="workflow-canvas-container">
-            <WorkflowCanvas 
-              ref={canvasRef}
-              nodes={workflow.nodes} 
-              gates={workflow.gates} 
-              onNodeClick={handleNodeSelect}
-              onEdgeClick={handleEdgeSelect}
-              onBackgroundClick={handleClearSelection}
-              onNodeDragEnd={handleNodeDragEnd}
-              selectedNodeId={selectedNodeId}
-              selectedEdgeKey={selectedEdgeKey}
+            {/* Sidebar Toggle (Floating Left) */}
+            <div className="absolute top-4 left-4 z-20">
+              <Button
+                variant="outline"
+                size="icon-xs"
+                onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+                data-testid="sidebar-toggle"
+                title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
+              >
+                {isSidebarExpanded ? <ChevronLeftIcon className="size-4" /> : <ChevronRightIcon className="size-4" />}
+              </Button>
+            </div>
+
+            {/* Nodes Sidebar (Overlay Left) */}
+            {isSidebarExpanded && (
+              <div 
+                className="absolute inset-y-0 left-0 w-64 z-10 bg-background/95 backdrop-blur-sm border-r shadow-xl"
+                data-testid="nodes-sidebar"
+                aria-expanded="true"
+              >
+                <Card className="h-full border-0 rounded-none overflow-y-auto" variant="compact">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                    <CardTitle className="flex items-center gap-2 text-sm font-bold">
+                      <LayersIcon className="size-4" />
+                      Nodes ({workflow.nodes.length})
+                    </CardTitle>
+                    <div className="flex items-center gap-1">
+                      {sessionState.isEditable && (
+                        <CreateNodeDialog 
+                          workflowId={workflowId} 
+                          onNodeCreated={fetchWorkflow} 
+                        />
+                      )}
+                      <Button variant="ghost" size="icon-xs" onClick={() => setIsSidebarExpanded(false)}>
+                        <XIcon className="size-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      {workflow.nodes.map((node) => {
+                        const isHighlighted = highlight?.type === "node" && highlight.nodeId === node.id;
+                        return (
+                          <button
+                            key={node.id}
+                            onClick={() => handleNodeSelect(node.id)}
+                            className={`w-full text-left px-3 py-2 rounded-md transition-all ${
+                              selectedNodeId === node.id
+                                ? "bg-primary/10 border border-primary/20"
+                                : "hover:bg-muted/50"
+                            } ${isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate text-xs">{node.name}</span>
+                              {node.isEntry && <FlagIcon className="size-3 text-green-600" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Published Banner (Overlay Bottom) */}
+            {sessionState.isPublished && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-2 p-3 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-xs border border-blue-200 dark:border-blue-800 shadow-xl backdrop-blur-md">
+                <AlertCircleIcon className="size-4" />
+                This workflow is published and immutable. Create a new version to edit.
+              </div>
+            )}
+
+            {/* Config & Toggle (Floating Bottom Right) */}
+            <DraggableResizablePanel
+              workflowId={workflowId}
+              title="Workflow Configuration"
+              isExpanded={isConfigExpanded}
+              onExpandedChange={setIsConfigExpanded}
+            >
+              <RoutingEditor
+                workflowId={workflowId}
+                nodes={workflow.nodes}
+                gates={workflow.gates}
+                isEditable={sessionState.isEditable}
+                onRoutingUpdated={fetchWorkflow}
+                highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
+                highlightOutcome={
+                  highlight?.type === "outcome"
+                    ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
+                    : undefined
+                }
+              />
+
+              <LoopbackIndexPanel
+                workflowId={workflowId}
+                nodes={workflow.nodes}
+                gates={workflow.gates}
+              />
+
+              <FanOutRulesEditor
+                workflowId={workflowId}
+                nodes={workflow.nodes}
+                fanOutRules={workflow.fanOutRules}
+                isEditable={sessionState.isEditable}
+                onRulesUpdated={fetchWorkflow}
+              />
+
+              <WorkflowVersionsCard
+                workflowId={workflowId}
+                versions={versions}
+                isLoading={versionsLoading}
+                error={versionsError}
+              />
+            </DraggableResizablePanel>
+
+            <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
+              <Button
+                variant="secondary"
+                className="gap-2 shadow-lg h-9 text-xs"
+                onClick={() => setIsConfigExpanded(!isConfigExpanded)}
+                data-testid="config-toggle"
+              >
+                <SettingsIcon className="size-4" />
+                {isConfigExpanded ? "Hide Configuration" : "Show Configuration"}
+                {isConfigExpanded ? <ChevronUpIcon className="size-4" /> : <ChevronDownIcon className="size-4" />}
+              </Button>
+            </div>
+          </main>
+
+          {/* Right Session Sidebar */}
+          {!sessionState.isPublished && (
+            <BuilderSessionSidebar 
+              isDraft={sessionState.isDraft}
+              changeCount={sessionState.changeCount}
+              lastSavedAt={sessionState.lastSavedAt}
+              baseEventId={workflow?._baseEventId}
+              history={draftHistory}
+              isHistoryLoading={isHistoryLoading}
+              isSaving={isCommitLoading}
+              onCommit={handleCommitClick}
+              onDiscard={handleDiscard}
+              onRestore={handleRestore}
+              onRevertLayout={handleRevertLayout}
+              onCenterView={handleCenterView}
             />
-          </div>
-
-          {/* Sidebar Toggle (Floating Left) */}
-          <div className="absolute top-4 left-4 z-20">
-            <Button
-              variant="outline"
-              size="icon-xs"
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              data-testid="sidebar-toggle"
-              title={isSidebarExpanded ? "Collapse Sidebar" : "Expand Sidebar"}
-            >
-              {isSidebarExpanded ? <ChevronLeftIcon className="size-4" /> : <ChevronRightIcon className="size-4" />}
-            </Button>
-          </div>
-
-          {/* Nodes Sidebar (Overlay Left) */}
-          {isSidebarExpanded && (
-            <div 
-              className="absolute inset-y-0 left-0 w-64 z-10 bg-background/95 backdrop-blur-sm border-r shadow-xl"
-              data-testid="nodes-sidebar"
-              aria-expanded="true"
-            >
-              <Card className="h-full border-0 rounded-none overflow-y-auto" variant="compact">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm font-bold">
-                    <LayersIcon className="size-4" />
-                    Nodes ({workflow.nodes.length})
-                  </CardTitle>
-                  <div className="flex items-center gap-1">
-                    {sessionState.isEditable && (
-                      <CreateNodeDialog 
-                        workflowId={workflowId} 
-                        onNodeCreated={fetchWorkflow} 
-                      />
-                    )}
-                    <Button variant="ghost" size="icon-xs" onClick={() => setIsSidebarExpanded(false)}>
-                      <XIcon className="size-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1">
-                    {workflow.nodes.map((node) => {
-                      const isHighlighted = highlight?.type === "node" && highlight.nodeId === node.id;
-                      return (
-                        <button
-                          key={node.id}
-                          onClick={() => handleNodeSelect(node.id)}
-                          className={`w-full text-left px-3 py-2 rounded-md transition-all ${
-                            selectedNodeId === node.id
-                              ? "bg-primary/10 border border-primary/20"
-                              : "hover:bg-muted/50"
-                          } ${isHighlighted ? "ring-2 ring-amber-500 ring-offset-2" : ""}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate text-xs">{node.name}</span>
-                            {node.isEntry && <FlagIcon className="size-3 text-green-600" />}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           )}
+        </div>
 
-          {/* Inspector Overlay (Sheet) */}
-          <Sheet 
-            open={!!selectedNodeId || !!selectedEdgeKey} 
-            onOpenChange={(open) => {
-              if (!open) handleClearSelection();
-            }}
-          >
+        {/* Inspector Overlay (Sheet) */}
+        <Sheet 
+          open={!!selectedNodeId || !!selectedEdgeKey} 
+          onOpenChange={(open) => {
+            if (!open) handleClearSelection();
+          }}
+        >
           <SheetContent 
             side="right" 
             variant="compact"
-            className="w-96 sm:w-[450px] p-0 flex flex-col h-full gap-0"
+            className="w-96 sm:w-[450px] p-0 flex flex-col h-full gap-0 z-[70]"
             data-testid="inspector-root"
           >
             <SheetHeader className="p-4 border-b bg-background flex-none">
@@ -1005,128 +1079,71 @@ export default function WorkflowDetailPage() {
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto p-4">
-                {selectedNodeId && selectedNode && (
-                  <div data-testid="node-inspector">
-                    <NodeDetailPanel
-                      workflowId={workflowId}
-                      node={selectedNode}
-                      nodes={workflow.nodes}
-                      gates={workflow.gates}
-                      isEditable={sessionState.isEditable}
-                      isLastEntryNode={sessionState.isLastEntryNode && selectedNode.isEntry}
-                      onNodeUpdated={fetchWorkflow}
-                      onNodeDeleted={handleNodeDeleted}
-                      highlightTaskId={
-                        (highlight?.type === "task" || highlight?.type === "outcome") &&
-                        highlight.nodeId === selectedNode.id
-                          ? highlight.taskId
-                          : undefined
-                      }
-                      highlightOutcome={
-                        highlight?.type === "outcome" && highlight.nodeId === selectedNode.id
-                          ? { taskId: highlight.taskId, outcomeName: highlight.outcomeName }
-                          : undefined
-                      }
-                    />
-                  </div>
-                )}
+              {selectedNodeId && selectedNode && (
+                <div data-testid="node-inspector">
+                  <NodeDetailPanel
+                    workflowId={workflowId}
+                    node={selectedNode}
+                    nodes={workflow.nodes}
+                    gates={workflow.gates}
+                    isEditable={sessionState.isEditable}
+                    isLastEntryNode={sessionState.isLastEntryNode && selectedNode.isEntry}
+                    onNodeUpdated={fetchWorkflow}
+                    onNodeDeleted={handleNodeDeleted}
+                    highlightTaskId={
+                      (highlight?.type === "task" || highlight?.type === "outcome") &&
+                      highlight.nodeId === selectedNode.id
+                        ? highlight.taskId
+                        : undefined
+                    }
+                    highlightOutcome={
+                      highlight?.type === "outcome" && highlight.nodeId === selectedNode.id
+                        ? { taskId: highlight.taskId, outcomeName: highlight.outcomeName }
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
 
-                {selectedEdgeKey && (
-                  <div data-testid="edge-inspector-container">
-                    {(() => {
-                      const [sourceId, outcomeName, targetId] = selectedEdgeKey.split("::");
-                      const sourceNode = workflow.nodes.find(n => n.id === sourceId);
-                      const targetNode = workflow.nodes.find(n => n.id === targetId) || null;
-                      const gate = workflow.gates.find(g => 
-                        g.sourceNodeId === sourceId && 
-                        g.outcomeName === outcomeName && 
-                        (g.targetNodeId === targetId || (g.targetNodeId === null && targetId === "terminal"))
-                      );
-                      
-                      const depthMap = computeNodeDepths(workflow.nodes, workflow.gates);
-                      const edgeType = detectEdgeType(sourceId, targetId === "terminal" ? null : targetId, depthMap);
+              {selectedEdgeKey && (
+                <div data-testid="edge-inspector-container">
+                  {(() => {
+                    const [sourceId, outcomeName, targetId] = selectedEdgeKey.split("::");
+                    const sourceNode = workflow.nodes.find(n => n.id === sourceId);
+                    const targetNode = workflow.nodes.find(n => n.id === targetId) || null;
+                    const gate = workflow.gates.find(g => 
+                      g.sourceNodeId === sourceId && 
+                      g.outcomeName === outcomeName && 
+                      (g.targetNodeId === targetId || (g.targetNodeId === null && targetId === "terminal"))
+                    );
+                    
+                    const depthMap = computeNodeDepths(workflow.nodes, workflow.gates);
+                    const edgeType = detectEdgeType(sourceId, targetId === "terminal" ? null : targetId, depthMap);
 
-                      if (!sourceNode || !gate) return <p className="text-sm text-muted-foreground">Edge data unavailable</p>;
+                    if (!sourceNode || !gate) return <p className="text-sm text-muted-foreground">Edge data unavailable</p>;
 
-                      return (
-                        <EdgeDetailPanel
-                          workflowId={workflowId}
-                          gateId={gate.id}
-                          sourceNodeId={sourceId}
-                          sourceNodeName={sourceNode.name}
-                          sourcePosition={sourceNode.position}
-                          outcomeName={outcomeName}
-                          targetNodeId={gate.targetNodeId}
-                          targetNodeName={targetNode?.name || "(Terminal)"}
-                          edgeType={edgeType}
-                          nodes={workflow.nodes}
-                          isEditable={sessionState.isEditable}
-                          onUpdated={fetchWorkflow}
-                        />
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          {/* Configuration & Toggle (Floating Bottom Right) */}
-          <DraggableResizablePanel
-            workflowId={workflowId}
-            title="Workflow Configuration"
-            isExpanded={isConfigExpanded}
-            onExpandedChange={setIsConfigExpanded}
-          >
-            <RoutingEditor
-              workflowId={workflowId}
-              nodes={workflow.nodes}
-              gates={workflow.gates}
-              isEditable={sessionState.isEditable}
-              onRoutingUpdated={fetchWorkflow}
-              highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
-              highlightOutcome={
-                highlight?.type === "outcome"
-                  ? { nodeId: highlight.nodeId, outcomeName: highlight.outcomeName }
-                  : undefined
-              }
-            />
-
-            <LoopbackIndexPanel
-              workflowId={workflowId}
-              nodes={workflow.nodes}
-              gates={workflow.gates}
-            />
-
-            <FanOutRulesEditor
-              workflowId={workflowId}
-              nodes={workflow.nodes}
-              fanOutRules={workflow.fanOutRules}
-              isEditable={sessionState.isEditable}
-              onRulesUpdated={fetchWorkflow}
-            />
-
-            <WorkflowVersionsCard
-              workflowId={workflowId}
-              versions={versions}
-              isLoading={versionsLoading}
-              error={versionsError}
-            />
-          </DraggableResizablePanel>
-
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col items-end gap-2">
-            <Button
-              variant="secondary"
-              className="gap-2 shadow-lg"
-              onClick={() => setIsConfigExpanded(!isConfigExpanded)}
-              data-testid="config-toggle"
-            >
-              <SettingsIcon className="size-4" />
-              {isConfigExpanded ? "Hide Configuration" : "Show Configuration"}
-              {isConfigExpanded ? <ChevronUpIcon className="size-4" /> : <ChevronDownIcon className="size-4" />}
-            </Button>
-          </div>
-        </div>
+                    return (
+                      <EdgeDetailPanel
+                        workflowId={workflowId}
+                        gateId={gate.id}
+                        sourceNodeId={sourceId}
+                        sourceNodeName={sourceNode.name}
+                        sourcePosition={sourceNode.position}
+                        outcomeName={outcomeName}
+                        targetNodeId={gate.targetNodeId}
+                        targetNodeName={targetNode?.name || "(Terminal)"}
+                        edgeType={edgeType}
+                        nodes={workflow.nodes}
+                        isEditable={sessionState.isEditable}
+                        onUpdated={fetchWorkflow}
+                      />
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Validation Results Dialog */}
         {validationResult && (
@@ -1141,7 +1158,7 @@ export default function WorkflowDetailPage() {
 
         {/* Navigation/Save Status Toast */}
         {(navigationError || saveStatus) && (
-          <div className={`fixed bottom-4 right-4 p-3 rounded-md border shadow-lg max-w-sm z-50 transition-all ${
+          <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 p-3 rounded-md border shadow-lg max-w-sm z-[100] transition-all ${
             saveStatus?.type === "success" 
               ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
               : "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800"
@@ -1271,14 +1288,6 @@ export default function WorkflowDetailPage() {
           onOpenChange={setIsCommitDialogOpen}
           changes={semanticDiff}
           onConfirm={handleCommitConfirm}
-        />
-
-        <BuilderHistoryPanel 
-          open={isHistoryPanelOpen}
-          onOpenChange={setIsHistoryPanelOpen}
-          history={draftHistory}
-          isLoading={isHistoryLoading}
-          onRestore={handleRestore}
         />
       </div>
     </TooltipProvider>
