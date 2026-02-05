@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { addOutcomeToBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ type Props = {
  */
 export async function POST(request: NextRequest, { params }: Props) {
   try {
-    const { id: workflowId, taskId } = await params;
+    const { id: workflowId, nodeId, taskId } = await params;
     const body = await request.json();
     const { name } = body;
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -48,28 +49,24 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("NAME_REQUIRED", "Outcome name is required");
     }
 
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task) {
-      return apiError("TASK_NOT_FOUND", "Task not found", null, 404);
-    }
+    // Adding an outcome is a semantic change. Stage it in the buffer.
+    const outcomeData = { name };
 
-    // Check for unique name within task
-    const existing = await prisma.outcome.findFirst({
-      where: { taskId, name },
-    });
+    const updatedBuffer = await addOutcomeToBuffer(
+      workflowId,
+      companyId,
+      nodeId,
+      taskId,
+      outcomeData,
+      userId
+    );
+    
+    const content = updatedBuffer.content as any;
+    const nodeInContent = content.nodes.find((n: any) => n.id === nodeId);
+    const taskInContent = nodeInContent.tasks.find((t: any) => t.id === taskId);
+    const newOutcome = taskInContent.outcomes[taskInContent.outcomes.length - 1];
 
-    if (existing) {
-      return apiError("NAME_EXISTS", `An outcome with name "${name}" already exists for this task`);
-    }
-
-    const outcome = await prisma.outcome.create({
-      data: {
-        taskId,
-        name,
-      },
-    });
-
-    return apiSuccess({ outcome }, 201);
+    return apiSuccess({ outcome: newOutcome, message: "Outcome addition staged to draft buffer" }, 201);
   } catch (error) {
     return tenantErrorResponse(error);
   }

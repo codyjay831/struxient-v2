@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { addTaskToBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -53,27 +54,21 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("NAME_REQUIRED", "Task name is required");
     }
 
-    // Check for unique name within node
-    const existing = await prisma.task.findFirst({
-      where: { nodeId, name },
-    });
+    // Creating a task is a semantic change. Stage it in the buffer.
+    const taskData = {
+      name,
+      instructions,
+      evidenceRequired: evidenceRequired ?? false,
+      evidenceSchema: evidenceSchema ?? undefined,
+      displayOrder: displayOrder ?? 0,
+    };
 
-    if (existing) {
-      return apiError("NAME_EXISTS", `A task with name "${name}" already exists in this node`);
-    }
+    const updatedBuffer = await addTaskToBuffer(workflowId, companyId, nodeId, taskData, userId);
+    const content = updatedBuffer.content as any;
+    const nodeInContent = content.nodes.find((n: any) => n.id === nodeId);
+    const newTask = nodeInContent.tasks[nodeInContent.tasks.length - 1];
 
-    const task = await prisma.task.create({
-      data: {
-        nodeId,
-        name,
-        instructions,
-        evidenceRequired: evidenceRequired ?? false,
-        evidenceSchema: evidenceSchema ?? undefined,
-        displayOrder: displayOrder ?? 0,
-      },
-    });
-
-    return apiSuccess({ task }, 201);
+    return apiSuccess({ task: newTask, message: "Task creation staged to draft buffer" }, 201);
   } catch (error) {
     return tenantErrorResponse(error);
   }

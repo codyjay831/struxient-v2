@@ -32,6 +32,8 @@ model Company {
   customers       Customer[]
   jobs            Job[]
   externalParties ExternalParty[]
+  draftBuffers    WorkflowDraftBuffer[]
+  draftEvents     WorkflowDraftEvent[]
 }
 
 /// Membership role within a company
@@ -197,6 +199,8 @@ model Workflow {
   versions    WorkflowVersion[]
   flows       Flow[]
   fanOutRules FanOutRule[]
+  draftBuffer WorkflowDraftBuffer?
+  draftEvents WorkflowDraftEvent[]
 
   company Company @relation(fields: [companyId], references: [id])
 
@@ -230,6 +234,62 @@ model WorkflowVersion {
   flows    Flow[]
 
   @@unique([workflowId, version])
+}
+
+// =============================================================================
+// FLOWSPEC: BUILDER DRAFT SAFETY (PHASE 1)
+// Canon: Builder Save Safety v1
+// =============================================================================
+
+/// Draft change event type
+enum DraftEventType {
+  INITIAL
+  COMMIT
+  RESTORE
+}
+
+/// Work-in-progress buffer for semantic workflow changes.
+/// Tenant-scoped, exactly one buffer per workflow.
+model WorkflowDraftBuffer {
+  id          String   @id @default(cuid())
+  companyId   String
+  workflowId  String   @unique
+  content     Json     // WIP semantic structure (WorkflowSnapshot shape)
+  updatedAt   DateTime @updatedAt
+  updatedBy   String   // User ID who last edited
+  baseEventId String?  // Anchor event ID for diffing against relational Truth
+
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workflow  Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  baseEvent WorkflowDraftEvent? @relation(fields: [baseEventId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, workflowId])
+  @@index([companyId, workflowId])
+}
+
+/// Append-only history of saved/committed draft events.
+/// Provides the "Time Machine" for restoring previous versions.
+model WorkflowDraftEvent {
+  id              String         @id @default(cuid())
+  companyId       String
+  workflowId      String
+  seq             Int            // Sequential order within workflow (managed by app)
+  type            DraftEventType
+  label           String?        // User-provided milestone name
+  snapshot        Json           // Full composite snapshot (semantic + layout)
+  createdAt       DateTime       @default(now())
+  createdBy       String         // User ID who created the event
+  restoresEventId String?        // FK for RESTORE type events
+
+  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  workflow     Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  restoredFrom WorkflowDraftEvent? @relation("RestoreReference", fields: [restoresEventId], references: [id], onDelete: SetNull)
+  restoredBy   WorkflowDraftEvent[] @relation("RestoreReference")
+  baseForBuffers WorkflowDraftBuffer[]
+
+  @@unique([workflowId, seq])
+  @@index([companyId, workflowId])
+  @@index([workflowId, createdAt])
 }
 
 /// Node container within a Workflow

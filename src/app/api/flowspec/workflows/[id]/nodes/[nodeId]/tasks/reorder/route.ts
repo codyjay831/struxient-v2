@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { reorderTasksInBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -48,34 +49,13 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    // Verify all tasks belong to the node
-    const tasks = await prisma.task.findMany({
-      where: { nodeId },
-    });
-    const taskIds = new Set(tasks.map((t) => t.id));
+    // Task reordering is a semantic change. Stage it in the buffer.
+    const updatedBuffer = await reorderTasksInBuffer(workflowId, companyId, nodeId, order, userId);
+    const content = updatedBuffer.content as any;
+    const nodeInContent = content.nodes.find((n: any) => n.id === nodeId);
+    const updatedTasks = nodeInContent.tasks;
 
-    for (const id of order) {
-      if (!taskIds.has(id)) {
-        return apiError("TASK_NOT_FOUND", `Task ${id} does not belong to node ${nodeId}`);
-      }
-    }
-
-    // Perform updates in a transaction
-    await prisma.$transaction(
-      order.map((taskId, index) =>
-        prisma.task.update({
-          where: { id: taskId },
-          data: { displayOrder: index },
-        })
-      )
-    );
-
-    const updatedTasks = await prisma.task.findMany({
-      where: { nodeId },
-      orderBy: { displayOrder: "asc" },
-    });
-
-    return apiSuccess({ tasks: updatedTasks });
+    return apiSuccess({ tasks: updatedTasks, message: "Task reordering staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }

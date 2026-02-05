@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { updateGateInBuffer, deleteGateFromBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -44,27 +45,15 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const gate = await prisma.gate.findUnique({ where: { id: gateId } });
-    if (!gate || gate.workflowId !== workflowId) {
-      return apiError("GATE_NOT_FOUND", "Gate not found", null, 404);
-    }
+    // Gate updates are semantic changes. Stage them in the buffer.
+    const updates: any = {};
+    if (targetNodeId !== undefined) updates.targetNodeId = targetNodeId;
 
-    // Verify target node exists (if not terminal)
-    if (targetNodeId !== undefined && targetNodeId !== null) {
-      const targetNode = await prisma.node.findUnique({ where: { id: targetNodeId } });
-      if (!targetNode || targetNode.workflowId !== workflowId) {
-        return apiError("NODE_NOT_FOUND", `Target node ${targetNodeId} not found`);
-      }
-    }
+    const updatedBuffer = await updateGateInBuffer(workflowId, companyId, gateId, updates, userId);
+    const content = updatedBuffer.content as any;
+    const updatedGate = content.gates.find((g: any) => g.id === gateId);
 
-    const updated = await prisma.gate.update({
-      where: { id: gateId },
-      data: {
-        targetNodeId: targetNodeId === undefined ? undefined : targetNodeId,
-      },
-    });
-
-    return apiSuccess({ gate: updated });
+    return apiSuccess({ gate: updatedGate, message: "Gate update staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }
@@ -83,7 +72,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -95,14 +84,10 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const gate = await prisma.gate.findUnique({ where: { id: gateId } });
-    if (!gate || gate.workflowId !== workflowId) {
-      return apiError("GATE_NOT_FOUND", "Gate not found", null, 404);
-    }
+    // Gate deletion is a semantic change. Stage it in the buffer.
+    await deleteGateFromBuffer(workflowId, companyId, gateId, userId);
 
-    await prisma.gate.delete({ where: { id: gateId } });
-
-    return apiSuccess({ success: true });
+    return apiSuccess({ success: true, message: "Gate deletion staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }

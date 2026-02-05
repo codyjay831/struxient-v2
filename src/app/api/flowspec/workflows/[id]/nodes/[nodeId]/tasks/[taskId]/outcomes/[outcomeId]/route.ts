@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { updateOutcomeInBuffer, deleteOutcomeFromBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ type Props = {
  */
 export async function PATCH(request: NextRequest, { params }: Props) {
   try {
-    const { id: workflowId, taskId, outcomeId } = await params;
+    const { id: workflowId, nodeId, taskId, outcomeId } = await params;
     const body = await request.json();
     const { name } = body;
 
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -44,29 +45,26 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const outcome = await prisma.outcome.findUnique({ where: { id: outcomeId } });
-    if (!outcome || outcome.taskId !== taskId) {
-      return apiError("OUTCOME_NOT_FOUND", "Outcome not found", null, 404);
-    }
+    // Outcome updates are semantic changes. Stage them in the buffer.
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
 
-    // Check name uniqueness if changed
-    if (name && name !== outcome.name) {
-      const existing = await prisma.outcome.findFirst({
-        where: { taskId, name },
-      });
-      if (existing) {
-        return apiError("NAME_EXISTS", `An outcome with name "${name}" already exists`);
-      }
-    }
+    const updatedBuffer = await updateOutcomeInBuffer(
+      workflowId,
+      companyId,
+      nodeId,
+      taskId,
+      outcomeId,
+      updates,
+      userId
+    );
+    
+    const content = updatedBuffer.content as any;
+    const nodeInContent = content.nodes.find((n: any) => n.id === nodeId);
+    const taskInContent = nodeInContent.tasks.find((t: any) => t.id === taskId);
+    const updatedOutcome = taskInContent.outcomes.find((o: any) => o.id === outcomeId);
 
-    const updated = await prisma.outcome.update({
-      where: { id: outcomeId },
-      data: {
-        name: name ?? undefined,
-      },
-    });
-
-    return apiSuccess({ outcome: updated });
+    return apiSuccess({ outcome: updatedOutcome, message: "Outcome update staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }
@@ -77,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
  */
 export async function DELETE(request: NextRequest, { params }: Props) {
   try {
-    const { id: workflowId, taskId, outcomeId } = await params;
+    const { id: workflowId, nodeId, taskId, outcomeId } = await params;
 
     const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
 
@@ -85,7 +83,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -97,17 +95,10 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const outcome = await prisma.outcome.findUnique({ where: { id: outcomeId } });
-    if (!outcome || outcome.taskId !== taskId) {
-      return apiError("OUTCOME_NOT_FOUND", "Outcome not found", null, 404);
-    }
+    // Outcome deletion is a semantic change. Stage it in the buffer.
+    await deleteOutcomeFromBuffer(workflowId, companyId, nodeId, taskId, outcomeId, userId);
 
-    // Rule: Route must be deleted first (or cascade handled by DB)
-    // Prisma schema has onDelete: Cascade for outcomes, but we should be careful.
-    
-    await prisma.outcome.delete({ where: { id: outcomeId } });
-
-    return apiSuccess({ success: true });
+    return apiSuccess({ success: true, message: "Outcome deletion staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }

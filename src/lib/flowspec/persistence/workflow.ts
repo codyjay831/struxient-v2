@@ -297,8 +297,9 @@ export async function publishWorkflow(
  * Find a workflow by ID with full relations.
  * Read operations don't require gateway enforcement.
  */
-export async function findWorkflowById(id: string) {
-  return prisma.workflow.findUnique({
+export async function findWorkflowById(id: string, tx?: Prisma.TransactionClient) {
+  const client = tx || prisma;
+  return client.workflow.findUnique({
     where: { id },
     include: {
       nodes: {
@@ -482,5 +483,133 @@ export async function hydrateSnapshotToWorkflow(
     nodeIdMap,
     taskIdMap,
   };
+}
+
+/**
+ * Commits a draft snapshot to an existing workflow's relational tables.
+ * 
+ * This is an atomic "wipe and replace" operation.
+ * 
+ * INV-011: Only allowed for DRAFT/VALIDATED workflows.
+ */
+export async function commitDraftToWorkflow(
+  workflowId: string,
+  companyId: string,
+  snapshot: WorkflowSnapshot,
+  userId: string,
+  existingTx?: Prisma.TransactionClient
+) {
+  const execute = async (tx: Prisma.TransactionClient) => {
+    // 1. Ensure draft status and ownership
+    const workflow = await tx.workflow.findUnique({
+      where: { id: workflowId },
+      select: { companyId: true, status: true, version: true }
+    });
+
+    if (!workflow) throw new Error("Workflow not found");
+    if (workflow.companyId !== companyId) throw new Error("Tenant mismatch");
+    if (workflow.status === WorkflowStatus.PUBLISHED) {
+      throw new Error("Cannot commit to a published workflow");
+    }
+
+    // 2. Wipe existing structure
+    // Order matters for FK constraints
+    await tx.gate.deleteMany({ where: { workflowId } });
+    await tx.fanOutRule.deleteMany({ where: { workflowId } });
+    
+    // Prisma Cascade delete on Node should handle Tasks, Outcomes, etc.
+    await tx.node.deleteMany({ where: { workflowId } });
+
+    // 3. Hydrate from snapshot (preserving IDs)
+    for (const sNode of snapshot.nodes) {
+      const newNode = await tx.node.create({
+        data: {
+          id: sNode.id, // PRESERVE ID
+          workflowId,
+          name: sNode.name,
+          isEntry: sNode.isEntry,
+          nodeKind: sNode.nodeKind || "MAINLINE",
+          completionRule: sNode.completionRule,
+          specificTasks: [], 
+        },
+      });
+
+      for (const sTask of sNode.tasks) {
+        const newTask = await tx.task.create({
+          data: {
+            id: sTask.id, // PRESERVE ID
+            nodeId: newNode.id,
+            name: sTask.name,
+            instructions: sTask.instructions,
+            evidenceRequired: sTask.evidenceRequired,
+            evidenceSchema: sTask.evidenceSchema as Prisma.InputJsonValue,
+            displayOrder: sTask.displayOrder,
+            defaultSlaHours: sTask.defaultSlaHours ?? null,
+          },
+        });
+
+        for (const sOutcome of sTask.outcomes) {
+          await tx.outcome.create({
+            data: {
+              id: sOutcome.id, // PRESERVE ID
+              taskId: newTask.id,
+              name: sOutcome.name,
+            },
+          });
+        }
+
+        for (const sDep of (sTask.crossFlowDependencies ?? [])) {
+          await tx.crossFlowDependency.create({
+            data: {
+              id: sDep.id, // PRESERVE ID
+              taskId: newTask.id,
+              sourceWorkflowId: sDep.sourceWorkflowId,
+              sourceTaskPath: sDep.sourceTaskPath,
+              requiredOutcome: sDep.requiredOutcome,
+            },
+          });
+        }
+      }
+    }
+
+    // 4. Update specificTasks for nodes
+    for (const sNode of snapshot.nodes) {
+      if (sNode.specificTasks.length > 0) {
+        await tx.node.update({
+          where: { id: sNode.id },
+          data: { specificTasks: sNode.specificTasks },
+        });
+      }
+    }
+
+    // 5. Create Gates
+    for (const sGate of snapshot.gates) {
+      await tx.gate.create({
+        data: {
+          id: sGate.id, // PRESERVE ID
+          workflowId,
+          sourceNodeId: sGate.sourceNodeId,
+          outcomeName: sGate.outcomeName,
+          targetNodeId: sGate.targetNodeId,
+        },
+      });
+    }
+
+    // 6. Update Workflow updatedAt
+    await tx.workflow.update({
+      where: { id: workflowId },
+      data: { updatedAt: new Date() }
+    });
+
+    return { success: true };
+  };
+
+  if (existingTx) {
+    return execute(existingTx);
+  }
+
+  return prisma.$transaction(execute, {
+    timeout: 15000 // 15s timeout for complex hydration
+  });
 }
 

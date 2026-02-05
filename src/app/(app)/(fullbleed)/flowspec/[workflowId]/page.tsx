@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,8 @@ import { RoutingEditor } from "@/components/flowspec/routing-editor";
 import { LoopbackIndexPanel } from "@/components/builder/loopback-index-panel";
 import { FanOutRulesEditor } from "@/components/flowspec/fan-out-rules-editor";
 import { WorkflowVersionsCard, WorkflowVersion } from "@/components/flowspec/workflow-versions-card";
-import { WorkflowCanvas } from "@/components/canvas/workflow-canvas";
+import { WorkflowCanvas, WorkflowCanvasRef } from "@/components/canvas/workflow-canvas";
+import { useSidebar } from "@/components/nav/sidebar-context";
 import { 
   Sheet, 
   SheetContent, 
@@ -34,6 +35,10 @@ import {
 } from "@/components/ui/sheet";
 import { DraggableResizablePanel } from "@/components/flowspec/draggable-resizable-panel";
 import { generateEdgeKey, computeNodeDepths, detectEdgeType } from "@/lib/canvas/layout";
+import { computeSemanticDiff, SemanticChange } from "@/lib/flowspec/diff";
+import { BuilderSaveStatus } from "@/components/flowspec/builder-save-status";
+import { BuilderCommitDialog } from "@/components/flowspec/builder-commit-dialog";
+import { BuilderHistoryPanel } from "@/components/flowspec/builder-history-panel";
 import {
   Loader2Icon,
   ArrowLeftIcon,
@@ -109,11 +114,29 @@ interface Workflow {
   fanOutRules: FanOutRule[];
   createdAt: string;
   updatedAt: string;
+  _isDraft?: boolean;
+  _bufferUpdatedAt?: string;
+  _baseEventId?: string | null;
+}
+
+interface BuilderSessionState {
+  isDraft: boolean;
+  isPublished: boolean;
+  isValidated: boolean;
+  isEditable: boolean;
+  isLastEntryNode: boolean;
+  canCommit: boolean;
+  canDiscard: boolean;
+  canValidate: boolean;
+  canPublish: boolean;
+  changeCount: number;
+  lastSavedAt: string | Date | undefined;
 }
 
 export default function WorkflowDetailPage() {
   const params = useParams();
   const workflowId = params.workflowId as string;
+  const { collapsed } = useSidebar();
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,6 +146,8 @@ export default function WorkflowDetailPage() {
   const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isConfigExpanded, setIsConfigExpanded] = useState(false);
+
+  const canvasRef = useRef<WorkflowCanvasRef>(null);
 
   // Selection handlers following mutual exclusivity rule
   const handleNodeSelect = (id: string | null) => {
@@ -141,7 +166,7 @@ export default function WorkflowDetailPage() {
   };
 
   const handleNodeDragEnd = async (nodeId: string, position: { x: number; y: number }) => {
-    if (workflow?.status !== "DRAFT") return;
+    if (!sessionState.isEditable) return;
 
     try {
       const response = await fetch(`/api/flowspec/workflows/${workflowId}/nodes/${nodeId}`, {
@@ -195,11 +220,221 @@ export default function WorkflowDetailPage() {
   } | null>(null);
   const [navigationError, setNavigationError] = useState<string | null>(null);
 
+  // --- SAVE SAFETY STATE ---
+  const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+  const [draftHistory, setDraftHistory] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [baseSnapshot, setBaseSnapshot] = useState<any>(null);
+  const [isCommitLoading, setIsCommitLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  const lastFetchedBaseId = useRef<string | null>(null);
+
+  // Derive semantic diff from snapshots
+  const semanticDiff = useMemo(() => {
+    if (workflow && baseSnapshot) {
+      return computeSemanticDiff(baseSnapshot, workflow);
+    }
+    return [];
+  }, [workflow, baseSnapshot]);
+
+  // Clear status after 3 seconds
+  useEffect(() => {
+    if (saveStatus) {
+      const timer = setTimeout(() => setSaveStatus(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [saveStatus]);
+
+  const fetchHistory = useCallback(async () => {
+    setIsHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/history`);
+      const data = await response.json();
+      if (response.ok) {
+        setDraftHistory(data.items || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [workflowId]);
+
+  const fetchBaseSnapshot = useCallback(async (eventId: string) => {
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/history/${eventId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setBaseSnapshot(data.event.snapshot);
+      }
+    } catch (err) {
+      console.error("Failed to fetch base snapshot", err);
+    }
+  }, [workflowId]);
+
+  // Proactively fetch base snapshot when workflow changes
+  useEffect(() => {
+    const baseId = workflow?._baseEventId;
+    if (baseId && baseId !== lastFetchedBaseId.current) {
+      lastFetchedBaseId.current = baseId;
+      fetchBaseSnapshot(baseId);
+    } else if (workflow && !workflow._isDraft) {
+      lastFetchedBaseId.current = null;
+      // If not a draft and no base, base is current
+      setBaseSnapshot({ 
+        nodes: workflow.nodes, 
+        gates: workflow.gates,
+        name: workflow.name,
+        description: workflow.description,
+        isNonTerminating: workflow.isNonTerminating
+      });
+    }
+  }, [workflow, fetchBaseSnapshot]);
+
+  const handleCommitClick = () => {
+    if (!workflow) return;
+    setIsCommitDialogOpen(true);
+  };
+
+  const handleCommitConfirm = async (label?: string) => {
+    console.log("Commit confirmed with label:", label);
+    setIsCommitLoading(true);
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/commit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+      });
+      if (response.ok) {
+        setSaveStatus({ message: "Changes committed successfully", type: "success" });
+        setBaseSnapshot(null); // Force refetch of base
+        await fetchWorkflow();
+        await fetchHistory();
+      } else {
+        const data = await response.json();
+        setSaveStatus({ 
+          message: data.error?.message || "Failed to commit changes", 
+          type: "error" 
+        });
+      }
+    } catch (err) {
+      console.error("Failed to commit", err);
+      setSaveStatus({ message: "Network error while committing", type: "error" });
+    } finally {
+      setIsCommitLoading(false);
+    }
+  };
+
+  const handleDiscard = async () => {
+    console.log("Discard button clicked");
+    if (!window.confirm("Are you sure you want to discard all uncommitted changes? This cannot be undone.")) return;
+    
+    setIsCommitLoading(true);
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/discard`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        setSaveStatus({ message: "Changes discarded", type: "success" });
+        setBaseSnapshot(null); // Force reset
+        handleClearSelection(); // Clear inspector to prevent stale buffer references
+        await fetchWorkflow();
+      } else {
+        const data = await response.json();
+        setSaveStatus({ 
+          message: data.error?.message || "Failed to discard changes", 
+          type: "error" 
+        });
+      }
+    } catch (err) {
+      console.error("Failed to discard", err);
+      setSaveStatus({ message: "Network error while discarding", type: "error" });
+    } finally {
+      setIsCommitLoading(false);
+    }
+  };
+
+  const handleRestore = async (eventId: string) => {
+    if (!window.confirm("Restore this version to the builder? Current uncommitted changes will be replaced.")) return;
+
+    try {
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/restore`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId }),
+      });
+      if (response.ok) {
+        await fetchWorkflow();
+        setIsHistoryPanelOpen(false);
+      }
+    } catch (err) {
+      console.error("Failed to restore", err);
+    }
+  };
+
+  const handleRevertLayout = async () => {
+    if (!window.confirm("Revert node positions to the last committed state?")) return;
+
+    try {
+      let eventId = workflow?._baseEventId;
+      
+      if (!eventId) {
+        const historyResponse = await fetch(`/api/flowspec/workflows/${workflowId}/history`);
+        const historyData = await historyResponse.json();
+        const lastCommit = historyData.items?.find((e: any) => e.type === "COMMIT" || e.type === "INITIAL");
+        
+        if (!lastCommit) {
+          alert("No committed layout found to revert to.");
+          return;
+        }
+        eventId = lastCommit.id;
+      }
+
+      const eventResponse = await fetch(`/api/flowspec/workflows/${workflowId}/history/${eventId}`);
+      const eventData = await eventResponse.json();
+      const snapshot = eventData.event.snapshot;
+      
+      if (snapshot.layout) {
+        const positions = snapshot.layout.reduce((acc: any, curr: any) => {
+          acc[curr.id] = curr.position;
+          return acc;
+        }, {});
+
+        const response = await fetch(`/api/flowspec/workflows/${workflowId}/layout/restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ positions }),
+        });
+
+        if (response.ok) {
+          setSaveStatus({ message: "Layout reverted to last commit", type: "success" });
+          await fetchWorkflow();
+        } else {
+          setSaveStatus({ message: "Failed to revert layout", type: "error" });
+        }
+      } else {
+        alert("No layout data found in the committed snapshot.");
+      }
+    } catch (err) {
+      console.error("Error reverting layout", err);
+      setSaveStatus({ message: "Error reverting layout", type: "error" });
+    }
+  };
+
+  const handleCenterView = () => {
+    canvasRef.current?.zoomToFit();
+  };
+  // --- END SAVE SAFETY ---
+
   const fetchWorkflow = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/flowspec/workflows/${workflowId}`);
+      const response = await fetch(`/api/flowspec/workflows/${workflowId}/builder`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -370,13 +605,32 @@ export default function WorkflowDetailPage() {
     }
   };
 
+  const sessionState = useMemo<BuilderSessionState>(() => {
+    const status = workflow?.status;
+    const isDraft = !!workflow?._isDraft;
+    const isPublished = status === "PUBLISHED";
+    const isValidated = status === "VALIDATED";
+    const isEditable = status === "DRAFT";
+    
+    const entryNodeCount = workflow?.nodes.filter((n) => n.isEntry).length ?? 0;
+    const isLastEntryNode = entryNodeCount === 1;
+
+    return {
+      isDraft,
+      isPublished,
+      isValidated,
+      isEditable,
+      isLastEntryNode,
+      canCommit: isDraft && !isCommitLoading,
+      canDiscard: isDraft && !isCommitLoading,
+      canValidate: !isValidating && !isPublished,
+      canPublish: isValidated && !isPublishing,
+      changeCount: semanticDiff.length,
+      lastSavedAt: workflow?._bufferUpdatedAt || workflow?.updatedAt
+    };
+  }, [workflow, semanticDiff, isCommitLoading, isValidating, isPublishing]);
+
   const selectedNode = workflow?.nodes.find((n) => n.id === selectedNodeId) || null;
-  const isEditable = workflow?.status === "DRAFT";
-  const canPublish = workflow?.status === "VALIDATED";
-  
-  // Count entry nodes for safety checks
-  const entryNodeCount = workflow?.nodes.filter((n) => n.isEntry).length ?? 0;
-  const isLastEntryNode = entryNodeCount === 1;
 
   // Handle node deletion - clear selection if deleted node was selected
   const handleNodeDeleted = () => {
@@ -513,115 +767,143 @@ export default function WorkflowDetailPage() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col flex-1 min-h-0 gap-4 p-4" data-density="compact">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <Link href="/flowspec">
-              <Button variant="ghost" size="compact" className="-ml-2 mb-2">
-                <ArrowLeftIcon className="size-4" />
-                Back to Workflows
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-semibold tracking-tight">{workflow.name}</h1>
-              <WorkflowStatusBadge status={workflow.status} />
-              {workflow.version > 1 && (
-                <span className="text-sm text-muted-foreground">v{workflow.version}</span>
+      <div className="flex flex-col flex-1 min-h-0 relative bg-background" data-density="compact">
+        {/* Shared Header Overlay - Fixed at top with z-50 to ensure buttons are never blocked */}
+        <div 
+          className="fixed top-0 right-0 z-50 p-4 pointer-events-none transition-all duration-300 flex items-start justify-between gap-4"
+          style={{ left: collapsed ? '60px' : '240px' }}
+        >
+          <div className="flex-1 flex justify-center">
+            <div className="pointer-events-auto flex flex-col items-center gap-2">
+              <div className="bg-background/95 backdrop-blur-sm p-4 rounded-xl border shadow-lg max-w-fit flex flex-col items-center">
+                <Link href="/flowspec">
+                  <Button variant="ghost" size="compact" className="-ml-2 mb-2 self-start">
+                    <ArrowLeftIcon className="size-4" />
+                    Back to Workflows
+                  </Button>
+                </Link>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-semibold tracking-tight truncate">{workflow.name}</h1>
+                  <WorkflowStatusBadge status={workflow.status} />
+                  {workflow.version > 1 && (
+                    <span className="text-sm text-muted-foreground">v{workflow.version}</span>
+                  )}
+                </div>
+                {workflow.description && (
+                  <p className="text-muted-foreground text-sm truncate mt-1">{workflow.description}</p>
+                )}
+              </div>
+
+              {/* SAVE SAFETY STATUS STRIP - SECOND ROW */}
+              {!sessionState.isPublished && (
+                <div className="pointer-events-auto max-w-fit md:max-w-lg">
+                  <BuilderSaveStatus 
+                    isDirty={sessionState.isDraft}
+                    changeCount={sessionState.changeCount}
+                    lastSavedAt={sessionState.lastSavedAt}
+                    onCommit={handleCommitClick}
+                    onDiscard={handleDiscard}
+                    onHistory={() => {
+                      fetchHistory();
+                      setIsHistoryPanelOpen(true);
+                    }}
+                    onRevertLayout={handleRevertLayout}
+                    onCenterView={handleCenterView}
+                    isSaving={isCommitLoading}
+                  />
+                </div>
               )}
             </div>
-            {workflow.description && (
-              <p className="text-muted-foreground">{workflow.description}</p>
-            )}
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
-            {/* Validate Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    variant="outline"
-                    size="compact"
-                    onClick={handleValidate}
-                    disabled={isValidating || workflow.status === "PUBLISHED"}
-                  >
-                    {isValidating ? (
-                      <Loader2Icon className="size-4 animate-spin" />
-                    ) : (
-                      <CheckCircleIcon className="size-4" />
-                    )}
-                    Validate
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {workflow.status === "PUBLISHED" && (
-                <TooltipContent>
-                  Published workflows cannot be modified
-                </TooltipContent>
-              )}
-            </Tooltip>
-
-            {/* Return to Draft Button (VALIDATED only) */}
-            {workflow.status === "VALIDATED" && (
-              <Button
-                variant="outline"
-                size="compact"
-                onClick={() => setRevertDialogOpen(true)}
-                disabled={isReverting}
-              >
-                {isReverting ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <ArrowLeftIcon className="size-4" />
+          <div className="flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm p-2 rounded-xl border shadow-lg">
+              {/* Validate Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="outline"
+                      size="compact"
+                      onClick={handleValidate}
+                      disabled={!sessionState.canValidate}
+                    >
+                      {isValidating ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        <CheckCircleIcon className="size-4" />
+                      )}
+                      Validate
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {sessionState.isPublished && (
+                  <TooltipContent>
+                    Published workflows cannot be modified
+                  </TooltipContent>
                 )}
-                Return to Draft
-              </Button>
-            )}
+              </Tooltip>
 
-            {/* Publish Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    size="compact"
-                    onClick={handlePublishClick}
-                    disabled={!canPublish || isPublishing}
-                  >
-                    {isPublishing ? (
-                      <Loader2Icon className="size-4 animate-spin" />
-                    ) : (
-                      <SendIcon className="size-4" />
-                    )}
-                    Publish
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {!canPublish && (
-                <TooltipContent>
-                  {workflow.status === "PUBLISHED"
-                    ? "Workflow is already published"
-                    : "Validate workflow before publishing"}
-                </TooltipContent>
+              {/* Return to Draft Button (VALIDATED only) */}
+              {sessionState.isValidated && (
+                <Button
+                  variant="outline"
+                  size="compact"
+                  onClick={() => setRevertDialogOpen(true)}
+                  disabled={isReverting}
+                >
+                  {isReverting ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <ArrowLeftIcon className="size-4" />
+                  )}
+                  Return to Draft
+                </Button>
               )}
-            </Tooltip>
-          </div>
-        </div>
 
-        {/* INV-011 Banner for Published Workflows */}
-        {workflow.status === "PUBLISHED" && (
-          <div className="flex items-center gap-2 p-3 rounded-md bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-sm">
-            <AlertCircleIcon className="size-4" />
-            This workflow is published and cannot be modified. Create a new version to make changes.
+              {/* Publish Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="compact"
+                      onClick={handlePublishClick}
+                      disabled={!sessionState.canPublish}
+                    >
+                      {isPublishing ? (
+                        <Loader2Icon className="size-4 animate-spin" />
+                      ) : (
+                        <SendIcon className="size-4" />
+                      )}
+                      Publish
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!sessionState.canPublish && (
+                  <TooltipContent>
+                    {sessionState.isPublished
+                      ? "Workflow is already published"
+                      : "Validate workflow before publishing"}
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </div>
           </div>
-        )}
 
-        {/* Main Content Area */}
-        <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden bg-background">
+          {/* INV-011 Banner for Published Workflows */}
+          {sessionState.isPublished && (
+            <div className="mt-4 pointer-events-auto flex items-center gap-2 p-3 rounded-md bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 text-sm max-w-fit border border-blue-200 shadow-sm">
+              <AlertCircleIcon className="size-4" />
+              This workflow is published and cannot be modified. Create a new version to make changes.
+            </div>
+          )}
+
+        {/* Main Content Area - Full Bleed */}
+        <div className="flex-1 min-h-0 relative overflow-hidden bg-background">
           {/* Canvas - Primary Surface */}
           <div className="absolute inset-0 z-0" data-testid="workflow-canvas-container">
             <WorkflowCanvas 
+              ref={canvasRef}
               nodes={workflow.nodes} 
               gates={workflow.gates} 
               onNodeClick={handleNodeSelect}
@@ -660,7 +942,7 @@ export default function WorkflowDetailPage() {
                     Nodes ({workflow.nodes.length})
                   </CardTitle>
                   <div className="flex items-center gap-1">
-                    {isEditable && (
+                    {sessionState.isEditable && (
                       <CreateNodeDialog 
                         workflowId={workflowId} 
                         onNodeCreated={fetchWorkflow} 
@@ -730,8 +1012,8 @@ export default function WorkflowDetailPage() {
                       node={selectedNode}
                       nodes={workflow.nodes}
                       gates={workflow.gates}
-                      isEditable={isEditable}
-                      isLastEntryNode={isLastEntryNode && selectedNode.isEntry}
+                      isEditable={sessionState.isEditable}
+                      isLastEntryNode={sessionState.isLastEntryNode && selectedNode.isEntry}
                       onNodeUpdated={fetchWorkflow}
                       onNodeDeleted={handleNodeDeleted}
                       highlightTaskId={
@@ -778,7 +1060,7 @@ export default function WorkflowDetailPage() {
                           targetNodeName={targetNode?.name || "(Terminal)"}
                           edgeType={edgeType}
                           nodes={workflow.nodes}
-                          isEditable={isEditable}
+                          isEditable={sessionState.isEditable}
                           onUpdated={fetchWorkflow}
                         />
                       );
@@ -800,7 +1082,7 @@ export default function WorkflowDetailPage() {
               workflowId={workflowId}
               nodes={workflow.nodes}
               gates={workflow.gates}
-              isEditable={isEditable}
+              isEditable={sessionState.isEditable}
               onRoutingUpdated={fetchWorkflow}
               highlightGateId={highlight?.type === "gate" ? highlight.gateId : undefined}
               highlightOutcome={
@@ -820,7 +1102,7 @@ export default function WorkflowDetailPage() {
               workflowId={workflowId}
               nodes={workflow.nodes}
               fanOutRules={workflow.fanOutRules}
-              isEditable={isEditable}
+              isEditable={sessionState.isEditable}
               onRulesUpdated={fetchWorkflow}
             />
 
@@ -857,10 +1139,21 @@ export default function WorkflowDetailPage() {
           />
         )}
 
-        {/* Navigation Error Toast */}
-        {navigationError && (
-          <div className="fixed bottom-4 right-4 p-3 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-sm shadow-lg max-w-sm">
-            {navigationError}
+        {/* Navigation/Save Status Toast */}
+        {(navigationError || saveStatus) && (
+          <div className={`fixed bottom-4 right-4 p-3 rounded-md border shadow-lg max-w-sm z-50 transition-all ${
+            saveStatus?.type === "success" 
+              ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
+              : "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+          }`}>
+            <div className="flex items-center gap-2">
+              {saveStatus?.type === "success" ? (
+                <CheckCircleIcon className="size-4" />
+              ) : (
+                <AlertCircleIcon className="size-4" />
+              )}
+              <span>{navigationError || saveStatus?.message}</span>
+            </div>
           </div>
         )}
 
@@ -971,6 +1264,22 @@ export default function WorkflowDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* SAVE SAFETY DIALOGS */}
+        <BuilderCommitDialog 
+          open={isCommitDialogOpen}
+          onOpenChange={setIsCommitDialogOpen}
+          changes={semanticDiff}
+          onConfirm={handleCommitConfirm}
+        />
+
+        <BuilderHistoryPanel 
+          open={isHistoryPanelOpen}
+          onOpenChange={setIsHistoryPanelOpen}
+          history={draftHistory}
+          isLoading={isHistoryLoading}
+          onRestore={handleRestore}
+        />
       </div>
     </TooltipProvider>
   );

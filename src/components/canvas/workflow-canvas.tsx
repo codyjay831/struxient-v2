@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useRef, useState, useCallback } from "react";
+import { useMemo, useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { 
   Node, 
   Gate, 
@@ -12,6 +12,10 @@ import {
   slugify,
   getPerimeterPoint
 } from "@/lib/canvas/layout";
+
+export interface WorkflowCanvasRef {
+  zoomToFit: () => void;
+}
 
 interface WorkflowCanvasProps {
   nodes: Node[];
@@ -25,7 +29,7 @@ interface WorkflowCanvasProps {
   scale?: number; // Injectable for testing
 }
 
-export function WorkflowCanvas({ 
+export const WorkflowCanvas = forwardRef<WorkflowCanvasRef, WorkflowCanvasProps>(({ 
   nodes, 
   gates, 
   onNodeClick, 
@@ -35,7 +39,7 @@ export function WorkflowCanvas({
   selectedNodeId, 
   selectedEdgeKey, 
   scale: initialScale = 1 
-}: WorkflowCanvasProps) {
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   
   // Camera State
@@ -153,6 +157,10 @@ export function WorkflowCanvas({
 
     setCamera({ x, y, k: Math.max(0.5, Math.min(1.75, k)) });
   }, [nodes, positions, NODE_WIDTH, NODE_HEIGHT]);
+
+  useImperativeHandle(ref, () => ({
+    zoomToFit
+  }));
 
   // Stable reference for event listeners and observers
   const zoomToFitRef = useRef(zoomToFit);
@@ -793,4 +801,4 @@ export function WorkflowCanvas({
       </div>
     </div>
   );
-}
+});

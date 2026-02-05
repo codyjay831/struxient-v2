@@ -5,11 +5,12 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { verifyTenantOwnership } from "@/lib/auth/tenant";
-import { apiSuccess, apiError, apiRouteError } from "@/lib/api-utils";
+import { verifyTenantOwnership, tenantErrorResponse } from "@/lib/auth/tenant";
+import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { addNodeToBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -48,28 +49,21 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("NAME_REQUIRED", "Node name is required");
     }
 
-    // Check for unique name within workflow
-    const existing = await prisma.node.findFirst({
-      where: { workflowId, name },
-    });
+    // Creating a node is a semantic change. Stage it in the buffer.
+    const nodeData = {
+      name,
+      isEntry: isEntry ?? false,
+      nodeKind: nodeKind ?? "MAINLINE",
+      completionRule: completionRule ?? "ALL_TASKS_DONE",
+      position: position ?? { x: 0, y: 0 },
+    };
 
-    if (existing) {
-      return apiError("NAME_EXISTS", `A node with name "${name}" already exists in this workflow`);
-    }
+    const updatedBuffer = await addNodeToBuffer(workflowId, companyId, nodeData, userId);
+    const content = updatedBuffer.content as any;
+    const newNode = content.nodes[content.nodes.length - 1];
 
-    const node = await prisma.node.create({
-      data: {
-        workflowId,
-        name,
-        isEntry: isEntry ?? false,
-        nodeKind: nodeKind ?? "MAINLINE",
-        completionRule: completionRule ?? "ALL_TASKS_DONE",
-        position: position ?? undefined,
-      },
-    });
-
-    return apiSuccess({ node }, 201);
+    return apiSuccess({ node: newNode, message: "Node creation staged to draft buffer" }, 201);
   } catch (error) {
-    return apiRouteError(error);
+    return tenantErrorResponse(error);
   }
 }

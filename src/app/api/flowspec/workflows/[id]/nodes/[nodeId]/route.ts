@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { updateNodeInBuffer, deleteNodeFromBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -44,34 +45,35 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const node = await prisma.node.findUnique({ where: { id: nodeId } });
-    if (!node || node.workflowId !== workflowId) {
-      return apiError("NODE_NOT_FOUND", "Node not found", null, 404);
+    // Identify if this is a semantic change or just layout
+    const semanticUpdates: any = {};
+    if (name !== undefined) semanticUpdates.name = name;
+    if (isEntry !== undefined) semanticUpdates.isEntry = isEntry;
+    if (nodeKind !== undefined) semanticUpdates.nodeKind = nodeKind;
+    if (completionRule !== undefined) semanticUpdates.completionRule = completionRule;
+    if (specificTasks !== undefined) semanticUpdates.specificTasks = specificTasks;
+
+    const isSemantic = Object.keys(semanticUpdates).length > 0;
+
+    if (isSemantic) {
+      // 1. Write semantic changes to the buffer (WIP)
+      await updateNodeInBuffer(workflowId, companyId, nodeId, semanticUpdates, userId);
+      
+      // For semantic changes, we don't update the relational table yet!
+      // This is the "Staged" principle.
+      return apiSuccess({ message: "Changes staged to draft buffer" });
     }
 
-    // Check name uniqueness if changed
-    if (name && name !== node.name) {
-      const existing = await prisma.node.findFirst({
-        where: { workflowId, name },
+    // 2. Layout changes (Position) go direct to relational tables (Autosave)
+    if (position !== undefined) {
+      const updated = await prisma.node.update({
+        where: { id: nodeId },
+        data: { position: position as any },
       });
-      if (existing) {
-        return apiError("NAME_EXISTS", `A node with name "${name}" already exists`);
-      }
+      return apiSuccess({ node: updated });
     }
 
-    const updated = await prisma.node.update({
-      where: { id: nodeId },
-      data: {
-        name: name ?? undefined,
-        isEntry: isEntry ?? undefined,
-        nodeKind: nodeKind ?? undefined,
-        completionRule: completionRule ?? undefined,
-        position: position ?? undefined,
-        specificTasks: specificTasks ?? undefined,
-      },
-    });
-
-    return apiSuccess({ node: updated });
+    return apiSuccess({ message: "No changes detected" });
   } catch (error) {
     return tenantErrorResponse(error);
   }
@@ -90,7 +92,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -102,14 +104,10 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const node = await prisma.node.findUnique({ where: { id: nodeId } });
-    if (!node || node.workflowId !== workflowId) {
-      return apiError("NODE_NOT_FOUND", "Node not found", null, 404);
-    }
+    // Deleting a node is a semantic change. Stage it in the buffer.
+    await deleteNodeFromBuffer(workflowId, companyId, nodeId, userId);
 
-    await prisma.node.delete({ where: { id: nodeId } });
-
-    return apiSuccess({ success: true });
+    return apiSuccess({ message: "Node deletion staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }

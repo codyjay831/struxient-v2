@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { addGateToBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -48,39 +49,18 @@ export async function POST(request: NextRequest, { params }: Props) {
       return apiError("INPUT_REQUIRED", "sourceNodeId and outcomeName are required");
     }
 
-    // Verify source node exists
-    const sourceNode = await prisma.node.findUnique({ where: { id: sourceNodeId } });
-    if (!sourceNode || sourceNode.workflowId !== workflowId) {
-      return apiError("NODE_NOT_FOUND", `Source node ${sourceNodeId} not found`);
-    }
+    // Creating a gate is a semantic change. Stage it in the buffer.
+    const gateData = {
+      sourceNodeId,
+      outcomeName,
+      targetNodeId,
+    };
 
-    // Verify target node exists (if not terminal)
-    if (targetNodeId !== null) {
-      const targetNode = await prisma.node.findUnique({ where: { id: targetNodeId } });
-      if (!targetNode || targetNode.workflowId !== workflowId) {
-        return apiError("NODE_NOT_FOUND", `Target node ${targetNodeId} not found`);
-      }
-    }
+    const updatedBuffer = await addGateToBuffer(workflowId, companyId, gateData, userId);
+    const content = updatedBuffer.content as any;
+    const newGate = content.gates[content.gates.length - 1];
 
-    // Check for duplicate route (INV-024: Gate key is Node-level)
-    const existing = await prisma.gate.findFirst({
-      where: { workflowId, sourceNodeId, outcomeName },
-    });
-
-    if (existing) {
-      return apiError("ROUTE_EXISTS", `A route for outcome "${outcomeName}" already exists in this node`);
-    }
-
-    const gate = await prisma.gate.create({
-      data: {
-        workflowId,
-        sourceNodeId,
-        outcomeName,
-        targetNodeId,
-      },
-    });
-
-    return apiSuccess({ gate }, 201);
+    return apiSuccess({ gate: newGate, message: "Gate creation staged to draft buffer" }, 201);
   } catch (error) {
     return tenantErrorResponse(error);
   }

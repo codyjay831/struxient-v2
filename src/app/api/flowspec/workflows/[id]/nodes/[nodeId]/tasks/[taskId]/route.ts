@@ -10,6 +10,7 @@ import { apiSuccess, apiError } from "@/lib/api-utils";
 import { NextRequest } from "next/server";
 import { WorkflowStatus } from "@prisma/client";
 import { ensureDraftForStructuralEdit } from "@/lib/flowspec/persistence/workflow";
+import { updateTaskInBuffer, deleteTaskFromBuffer } from "@/lib/flowspec/persistence/draft-buffer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -44,33 +45,20 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.nodeId !== nodeId) {
-      return apiError("TASK_NOT_FOUND", "Task not found", null, 404);
-    }
+    // Task updates are semantic changes. Stage them in the buffer.
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
+    if (instructions !== undefined) updates.instructions = instructions;
+    if (evidenceRequired !== undefined) updates.evidenceRequired = evidenceRequired;
+    if (evidenceSchema !== undefined) updates.evidenceSchema = evidenceSchema;
+    if (displayOrder !== undefined) updates.displayOrder = displayOrder;
 
-    // Check name uniqueness if changed
-    if (name && name !== task.name) {
-      const existing = await prisma.task.findFirst({
-        where: { nodeId, name },
-      });
-      if (existing) {
-        return apiError("NAME_EXISTS", `A task with name "${name}" already exists`);
-      }
-    }
+    const updatedBuffer = await updateTaskInBuffer(workflowId, companyId, nodeId, taskId, updates, userId);
+    const content = updatedBuffer.content as any;
+    const nodeInContent = content.nodes.find((n: any) => n.id === nodeId);
+    const updatedTask = nodeInContent.tasks.find((t: any) => t.id === taskId);
 
-    const updated = await prisma.task.update({
-      where: { id: taskId },
-      data: {
-        name: name ?? undefined,
-        instructions: instructions ?? undefined,
-        evidenceRequired: evidenceRequired ?? undefined,
-        evidenceSchema: evidenceSchema ?? undefined,
-        displayOrder: displayOrder ?? undefined,
-      },
-    });
-
-    return apiSuccess({ task: updated });
+    return apiSuccess({ task: updatedTask, message: "Task update staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }
@@ -89,7 +77,7 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       return apiError("WORKFLOW_NOT_FOUND", "Workflow not found", null, 404);
     }
 
-    await verifyTenantOwnership(workflow.companyId);
+    const { companyId, userId } = await verifyTenantOwnership(workflow.companyId);
 
     // INV-026 Enforcement: Auto-revert VALIDATED to DRAFT (Policy B)
     try {
@@ -101,14 +89,10 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       throw err;
     }
 
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.nodeId !== nodeId) {
-      return apiError("TASK_NOT_FOUND", "Task not found", null, 404);
-    }
+    // Task deletion is a semantic change. Stage it in the buffer.
+    await deleteTaskFromBuffer(workflowId, companyId, nodeId, taskId, userId);
 
-    await prisma.task.delete({ where: { id: taskId } });
-
-    return apiSuccess({ success: true });
+    return apiSuccess({ success: true, message: "Task deletion staged to draft buffer" });
   } catch (error) {
     return tenantErrorResponse(error);
   }
