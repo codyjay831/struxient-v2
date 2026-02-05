@@ -8,9 +8,9 @@ The Work Station Execution Surface (Version 1.0) is formally implemented, verifi
 **Version:** 1.0  
 **Date Sealed:** 2026-02-01  
 **Scope:**
-- `src/app/(app)/workstation/**` (UI Surface)
-- `src/app/(app)/workstation/_lib/execution-adapter.ts` (API Bridge)
-- `src/app/(app)/workstation/_lib/filter-logic.ts` (Shared View Logic)
+- `src/app/(app)/(fullbleed)/workstation/**` (UI Surface)
+- `src/app/(app)/(fullbleed)/workstation/_lib/execution-adapter.ts` (API Bridge)
+- `src/app/(app)/(fullbleed)/workstation/_lib/filter-logic.ts` (Shared View Logic)
 
 ---
 

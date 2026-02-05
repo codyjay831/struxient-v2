@@ -17,7 +17,7 @@ import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const WORKSTATION_PATH = join(__dirname, '../../src/app/(app)/workstation');
+const WORKSTATION_PATH = join(__dirname, '../../src/app/(app)/(fullbleed)/workstation');
 const FORBIDDEN_IMPORTS = [
   'lib/flowspec/engine',
   'lib/flowspec/derived',

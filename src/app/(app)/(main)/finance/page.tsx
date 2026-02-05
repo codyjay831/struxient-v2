@@ -114,7 +114,7 @@ export default function FinancePage() {
                                 Card
                               </Button>
                             </Link>
-                            <Link href={`/workstation?job=${job.flowGroupId}`}>
+                            <Link href={`/workstation?lens=jobs&job=${job.flowGroupId}`}>
                               <Button variant="outline" size="sm" className="h-8 text-xs px-2 bg-background">
                                 <ArrowUpRight className="h-3 w-3 mr-1" />
                                 Work

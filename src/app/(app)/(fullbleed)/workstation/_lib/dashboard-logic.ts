@@ -328,7 +328,7 @@ export function useManagerDashboardData() {
           missingEvidence: hasMissingEvidence,
           unassigned: hasUnassigned,
         },
-        primaryHref: `/workstation?job=${flowGroupId}`
+        primaryHref: `/workstation?lens=jobs&job=${flowGroupId}`
       };
     });
 

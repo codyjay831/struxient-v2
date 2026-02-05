@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ManagerDashboard } from "@/app/(app)/(fullbleed)/workstation/_components/manager-dashboard";
 import * as Logic from "@/app/(app)/(fullbleed)/workstation/_lib/dashboard-logic";
@@ -36,6 +36,29 @@ describe("Work Station Manager Dashboard - Phase 1", () => {
       _detour: { type: "BLOCKING" },
     }
   ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock fetch for TaskFeed and member context
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url === "/api/tenancy/me") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ memberId: "m1" }),
+        } as Response);
+      }
+      if (url === "/api/flowspec/actionable-tasks" || (typeof url === 'string' && url.includes("/actionable-tasks"))) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ items: [] }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      } as Response);
+    });
+  });
 
   it("renders the dashboard with all required lens tabs", () => {
     (Logic.useManagerDashboardData as any).mockReturnValue({
@@ -310,7 +333,7 @@ describe("Work Station Manager Dashboard - Phase 1", () => {
       blockingSignal: "Blocking Detour",
       nextDecision: "Resolve Detour",
       signals: { blocked: true, overdue: false, atRisk: false, missingEvidence: false, unassigned: false },
-      primaryHref: "/workstation?job=job1"
+      primaryHref: "/workstation?lens=jobs&job=job1"
     };
 
     (Logic.useManagerDashboardData as any).mockReturnValue({

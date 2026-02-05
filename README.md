@@ -81,7 +81,6 @@ src/
 │   ├── api/              # API routes
 │   ├── (app)/            # Authenticated application core
 │   │   ├── (fullbleed)/workstation # Work Station Manager Dashboard (v1)
-│   ├── dashboard/        # legacy/stub dashboard
 │   ├── sign-in/          # Auth pages
 │   └── sign-up/
 ├── components/

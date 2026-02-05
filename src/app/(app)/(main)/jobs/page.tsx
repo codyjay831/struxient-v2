@@ -173,7 +173,7 @@ export default function JobsPage() {
       if (data.job?.id) {
         router.push(`/jobs/${data.job.id}`);
       } else if (data.flowGroup?.id) {
-        router.push(`/workstation?job=${data.flowGroup.id}`);
+        router.push(`/workstation?lens=jobs&job=${data.flowGroup.id}`);
       } else {
         await fetchData();
       }

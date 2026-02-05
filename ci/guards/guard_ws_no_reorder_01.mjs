@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '../../');
 
-const TARGET_DIRS = ['src/app/(app)/workstation', 'src/app/(app)/(fullbleed)/workstation'];
+const TARGET_DIRS = ['src/app/(app)/(fullbleed)/workstation'];
 
 const FORBIDDEN_REORDER = [
   '.sort(',

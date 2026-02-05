@@ -57,7 +57,7 @@ export function DashboardRightRail() {
                   className="h-6 text-[10px] font-bold uppercase text-muted-foreground hover:text-blue-500 p-0"
                   asChild
                 >
-                  <a href={`/workstation?job=${msg.jobId}`}>
+                  <a href={`/workstation?lens=jobs&job=${msg.jobId}`}>
                     View Job
                   </a>
                 </Button>

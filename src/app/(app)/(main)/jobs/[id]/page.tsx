@@ -187,7 +187,7 @@ export default function JobCardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/workstation?job=${job.flowGroupId}`}>
+          <Link href={`/workstation?lens=jobs&job=${job.flowGroupId}`}>
             <Button className="w-full md:w-auto">
               <Play className="mr-2 h-4 w-4" />
               Go to Work Station

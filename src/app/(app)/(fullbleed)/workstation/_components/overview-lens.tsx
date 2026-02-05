@@ -148,7 +148,7 @@ export function OverviewLens() {
                 )}
                 asChild
               >
-                <a href={`/workstation?job=${item.task.flowGroupId}`}>
+                <a href={`/workstation?lens=jobs&job=${item.task.flowGroupId}`}>
                   ({item.task.startedAt ? "opens execution" : "start task"}) {item.primaryActionLabel}
                 </a>
               </Button>

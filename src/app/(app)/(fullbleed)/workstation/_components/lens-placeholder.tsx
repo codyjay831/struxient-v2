@@ -7,9 +7,15 @@ import type { LensAlert } from "../_lib/dashboard-logic";
 interface LensPlaceholderProps {
   title: string;
   alerts: LensAlert[];
+  hideEmptyState?: boolean;
 }
 
-export function LensPlaceholder({ title, alerts }: LensPlaceholderProps) {
+export function LensPlaceholder({ title, alerts, hideEmptyState = false }: LensPlaceholderProps) {
+  const hasAlerts = alerts.length > 0;
+
+  if (!hasAlerts && hideEmptyState) {
+    return null;
+  }
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '../../');
-const WORKSTATION_PATH = join(ROOT, 'src/app/(app)/workstation');
+const WORKSTATION_PATH = join(ROOT, 'src/app/(app)/(fullbleed)/workstation');
 
 const FORBIDDEN_STRINGS = [
   "Tasks I can do",

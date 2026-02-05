@@ -115,7 +115,7 @@ export default function SalesPage() {
       }
 
       setIsDialogOpen(false);
-      router.push(`/workstation?job=${data.flowGroup.id}`);
+      router.push(`/workstation?lens=jobs&job=${data.flowGroup.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -247,7 +247,7 @@ export default function SalesPage() {
                   </div>
                 )}
                 
-                <Link href={`/workstation?job=${opp.id}`}>
+                <Link href={`/workstation?lens=jobs&job=${opp.id}`}>
                   <Button variant="outline" size="sm" className="w-full mt-2 group">
                     Open in Work Station
                     <ArrowRight className="ml-2 h-3 w-3 transition-transform group-hover:translate-x-1" />

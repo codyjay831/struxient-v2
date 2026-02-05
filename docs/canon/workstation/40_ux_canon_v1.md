@@ -12,7 +12,7 @@ This section defines the canonical roles of product surfaces and the mutations p
 
 | Surface | Role | Allowed Mutations | Forbidden Mutations | Evidence (Code) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Work Station** | Execution Surface | Start Task, Record Outcome, Attach Evidence | Domain metadata edits | `src/app/(app)/workstation/...` |
+| **Work Station** | Execution Surface | Start Task, Record Outcome, Attach Evidence | Domain metadata edits | `src/app/(app)/(fullbleed)/workstation/...` |
 | **Jobs** | Entry & Recovery | Create FlowGroup (Sales OFF), Link Metadata | Outcome/Evidence recording | `src/app/(app)/jobs/page.tsx` |
 | **Sales** | Entry & Lens | Create FlowGroup (Sales ON) | Outcome/Evidence recording | `src/app/(app)/sales/page.tsx` |
 | **Finance** | Lens | None (Read-only projection) | All execution/metadata mutations | `src/app/(app)/finance/page.tsx` |
