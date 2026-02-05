@@ -87,8 +87,8 @@ export function LoopbackIndexPanel({
                         : `${Math.abs(l.topologicalDelta)} Steps Back`}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className="truncate max-w-[120px]">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span className="truncate max-w-[180px]">
                       {getNodeName(l.sourceNodeId)}
                     </span>
                     <ArrowRightIcon className="size-2.5" />
@@ -96,7 +96,7 @@ export function LoopbackIndexPanel({
                       {l.outcomeName}
                     </span>
                     <ArrowRightIcon className="size-2.5" />
-                    <span className="truncate max-w-[120px] font-semibold text-amber-600/80 dark:text-amber-400/80">
+                    <span className="truncate max-w-[180px] font-semibold text-amber-600/80 dark:text-amber-400/80">
                       {getNodeName(l.targetNodeId)}
                     </span>
                   </div>

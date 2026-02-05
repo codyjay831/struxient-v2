@@ -210,18 +210,23 @@ export function FanOutRulesEditor({
                   className="flex items-center justify-between p-3 rounded-md bg-muted/30 border text-sm"
                 >
                   <div className="flex-1 min-w-0 pr-4">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-foreground">
-                        {node?.name || "Unknown Node"}
-                      </span>
-                      <span className="text-muted-foreground">when</span>
-                      <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium text-xs">
-                        {rule.triggerOutcome}
-                      </span>
-                      <span className="text-muted-foreground">→ start</span>
-                      <span className="font-medium text-foreground truncate">
-                        {workflows.find((w) => w.id === rule.targetWorkflowId)?.name || `Workflow: ${rule.targetWorkflowId}`}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">
+                          {node?.name || "Unknown Node"}
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">when</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold text-[10px] uppercase tracking-wide">
+                          {rule.triggerOutcome}
+                        </span>
+                      </div>
+                      <ArrowRightIcon className="size-3.5 text-muted-foreground" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">start</span>
+                        <span className="font-semibold text-foreground truncate max-w-[180px]">
+                          {workflows.find((w) => w.id === rule.targetWorkflowId)?.name || `Workflow: ${rule.targetWorkflowId}`}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   {isEditable && (

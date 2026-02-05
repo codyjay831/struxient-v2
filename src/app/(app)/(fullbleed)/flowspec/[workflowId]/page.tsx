@@ -922,7 +922,7 @@ export default function WorkflowDetailPage() {
           </div>
 
           {/* LEFT PANEL */}
-          <BuilderPanel isOpen={activeLeftPanel !== null} side="left" width="300px">
+          <BuilderPanel isOpen={activeLeftPanel !== null} side="left" width="520px">
             {activeLeftPanel === "nodes" && (
               <div className="flex flex-col h-full bg-background">
                 <div className="p-4 border-b flex items-center justify-between bg-muted/20">
@@ -1037,7 +1037,7 @@ export default function WorkflowDetailPage() {
           {/* RIGHT PANEL & RAIL */}
           {!sessionState.isPublished && (
             <div className="flex z-20">
-              <BuilderPanel isOpen={activeRightPanel === "session"} side="right" width="320px">
+              <BuilderPanel isOpen={activeRightPanel === "session"} side="right" width="360px">
                 <BuilderSessionSidebar 
                   isDraft={sessionState.isDraft}
                   changeCount={sessionState.changeCount}

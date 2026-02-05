@@ -250,44 +250,46 @@ export function RoutingEditor({
   return (
     <TooltipProvider>
       <Card variant="compact">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              <GitBranchIcon className="size-3" />
+            <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-muted-foreground/80">
+              <GitBranchIcon className="size-4" />
               Routing Editor
             </CardTitle>
-            <div className="flex items-center gap-3">
-              {isEditable && (
-                <Button
-                  size="compact"
-                  variant="outline"
-                  onClick={() => {
-                    setAddGateData({
-                      sourceNodeId: nodes[0]?.id || "",
-                      outcomeName: "",
-                      targetNodeId: null,
-                    });
-                    setAddError(null);
-                    setIsAddDialogOpen(true);
-                  }}
-                  className="h-7 gap-1 text-[10px]"
-                >
-                  <PlusIcon className="size-3" />
-                  Add Gate
-                </Button>
-              )}
-              <div className="flex items-center gap-3 text-sm">
-                <span className="flex items-center gap-1 text-green-600">
-                  <LinkIcon className="size-3" />
-                  {routedCount} routed
-                </span>
-                {orphanedCount > 0 && (
-                  <span className="flex items-center gap-1 text-amber-600">
-                    <Link2OffIcon className="size-3" />
-                    {orphanedCount} orphaned (missing target)
-                  </span>
-                )}
+            {isEditable && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAddGateData({
+                    sourceNodeId: nodes[0]?.id || "",
+                    outcomeName: "",
+                    targetNodeId: null,
+                  });
+                  setAddError(null);
+                  setIsAddDialogOpen(true);
+                }}
+                className="h-8 gap-1.5 text-xs font-semibold shadow-sm"
+              >
+                <PlusIcon className="size-3.5" />
+                Add Gate
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-2 pt-2 border-t border-muted/30">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
+              <LinkIcon className="size-3 text-green-600" />
+              <span className="text-[11px] font-bold text-green-700 dark:text-green-400">{routedCount} routed</span>
+            </div>
+            {orphanedCount > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20">
+                <Link2OffIcon className="size-3 text-amber-600" />
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">{orphanedCount} orphaned</span>
               </div>
+            )}
+            <div className="flex-1" />
+            <div className="text-[10px] font-medium text-muted-foreground italic">
+              Total Outcomes: {totalOutcomes}
             </div>
           </div>
         </CardHeader>
@@ -313,14 +315,14 @@ export function RoutingEditor({
                 return (
                   <div key={node.id} className="space-y-3">
                     {/* Node Header */}
-                    <div className="flex items-center justify-between border-b pb-1">
-                      <h3 className="font-bold text-[10px] uppercase tracking-tight text-muted-foreground">
+                    <div className="flex items-center justify-between border-b border-muted/50 pb-1.5 mb-2">
+                      <h3 className="font-bold text-xs uppercase tracking-tight text-foreground/70">
                         {node.name}
                       </h3>
                       {nodeTotalCount > 0 && (
-                        <span className="text-[10px] font-medium text-muted-foreground/60">
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-bold tracking-tight bg-muted/50 text-muted-foreground">
                           Coverage: {nodeRoutedCount} / {nodeTotalCount}
-                        </span>
+                        </Badge>
                       )}
                     </div>
 
@@ -358,7 +360,7 @@ export function RoutingEditor({
                           return (
                             <div
                               key={rowKey}
-                              className={`flex flex-col gap-1.5 p-2 rounded-md border transition-all ${
+                              className={`flex flex-col gap-2 p-3 rounded-md border transition-all ${
                                 isRouted 
                                   ? "bg-muted/30 border-border" 
                                   : "bg-amber-50/50 border-amber-200/50 dark:bg-amber-900/10 dark:border-amber-900/30"
@@ -368,15 +370,15 @@ export function RoutingEditor({
                             >
                               <div className="flex items-center gap-3">
                                 {/* Status Badge */}
-                                <div className="shrink-0 w-20">
+                                <div className="shrink-0 w-24">
                                   {isRouted ? (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                      <LinkIcon className="size-2" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                      <LinkIcon className="size-3" />
                                       Routed
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                      <Link2OffIcon className="size-2" />
+                                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                      <Link2OffIcon className="size-3" />
                                       Missing
                                     </span>
                                   )}
@@ -385,14 +387,14 @@ export function RoutingEditor({
                                 {/* Outcome name */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-medium text-xs truncate">
+                                    <span className="font-semibold text-xs truncate">
                                       {outcomeName}
                                     </span>
                                     {isLoopback && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
-                                          <Badge variant="outline" className="h-4 px-1 gap-1 border-amber-200 bg-amber-50 text-[9px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50">
-                                            <RefreshCcwIcon className="size-2" />
+                                          <Badge variant="outline" className="h-5 px-1.5 gap-1 border-amber-200 bg-amber-50 text-[10px] font-bold text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50">
+                                            <RefreshCcwIcon className="size-2.5" />
                                             Loop
                                           </Badge>
                                         </TooltipTrigger>
@@ -405,10 +407,10 @@ export function RoutingEditor({
                                 </div>
 
                                 {/* Arrow */}
-                                <ArrowRightIcon className="size-3 text-muted-foreground shrink-0" />
+                                <ArrowRightIcon className="size-4 text-muted-foreground shrink-0 mx-1" />
 
                                 {/* Target selector or display */}
-                                <div className="w-48 shrink-0 flex items-center gap-1.5">
+                                <div className="w-56 shrink-0 flex items-center gap-1.5">
                                   <select
                                     value={gate?.targetNodeId ?? (isRouted ? "__terminal__" : "__none__")}
                                     onChange={(e) => {
@@ -445,7 +447,7 @@ export function RoutingEditor({
                                       }
                                     }}
                                     disabled={!isEditable || isCurrentLoading}
-                                    className={`w-full h-7 rounded-md border px-1.5 text-[11px] shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                                    className={`w-full h-8 rounded-md border px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
                                       !isRouted 
                                         ? "border-amber-200 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-transparent" 
                                         : "border-input bg-background"
