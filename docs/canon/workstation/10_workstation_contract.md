@@ -2,10 +2,12 @@
 
 **Document ID:** 10_workstation_contract  
 **Status:** CANONICAL  
-**Last Updated:** 2026-01-28  
+**Last Updated:** 2026-02-04  
 **Related Documents:**
 - [00_workstation_glossary.md](./00_workstation_glossary.md)
+- [10_workstation_invariants_v1.md](./10_workstation_invariants_v1.md)
 - [20_workstation_invariants.md](./20_workstation_invariants.md)
+- [20_workstation_manager_dashboard_contract_v1.md](./20_workstation_manager_dashboard_contract_v1.md)
 - [30_workstation_ui_api_map.md](./30_workstation_ui_api_map.md)
 - [FlowSpec Engine Contract](../flowspec/10_flowspec_engine_contract.md)
 
@@ -40,11 +42,11 @@ Work Station provides a user interface where humans:
 2. Perform the actual work
 3. Submit results (Outcomes and Evidence) to FlowSpec
 
-Work Station is NOT:
-- A workflow engine
-- An orchestrator
-- A scheduler
-- A decision-maker for sequencing
+**Manager View (v1):**
+The primary interface for Work Station v1 is the **Manager Dashboard**. It serves as a decision-support and execution hub for operational leaders to identify and resolve system blockages.
+
+**Worker View (Future):**
+A focused, task-centric view for individual contributors is planned as a future overlay. v1 defaults to the Manager view.
 
 ---
 
@@ -384,6 +386,33 @@ The following statements must be true for Work Station to be considered complian
 
 - [ ] Requires authenticated session
 - [ ] Passes authentication context to FlowSpec
+
+## 11. Manager Dashboard v1 (Primary Interface)
+
+Work Station v1 is implemented as a high-density dashboard focused on managerial decision-making.
+
+### 11.1 The Lens Model
+- **Tabs as Lenses:** Each tab provides a unique perspective (Overview, Calendar, Jobs, Tasks, Crews, Analytics).
+- **Proactive Alerts:** Each non-Overview lens surfaces tab-relevant alerts at the top (INV-WS-03).
+- **URL-Driven:** Current lens state is preserved in the URL (`?lens=...`) for linkability.
+
+### 11.2 Job Health (INV-WS-07)
+- **Derived Concept:** Health is not a database model; it is computed client-side based on blocker presence.
+- **Rules:**
+  - **Red:** Blocking detours or overdue urgent tasks.
+  - **Orange:** Risks, missing evidence, or unassigned tasks.
+  - **Green:** No active risk signals.
+- **Needs Decision Filter:** A derived view surfacing all jobs requiring intervention.
+
+### 11.3 Customer Messages (Read-Only)
+- **UX Boundary:** A dedicated panel in the Right Rail for customer signals.
+- **Status:** **READ ONLY.**
+- **Limitation:** No messaging primitives (threads/replies) exist in v1. Implementation is placeholder-only to establish the UX boundary.
+
+### 11.4 Non-Goals (v1)
+- No bidirectional messaging system.
+- No real-time calendar conflict engine.
+- No persistent "Alert" records (derived only).
 
 ---
 

@@ -17,7 +17,8 @@ import {
   PlusIcon, 
   TrashIcon, 
   GitForkIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  ArrowRightIcon,
 } from "lucide-react";
 
 interface FanOutRule {

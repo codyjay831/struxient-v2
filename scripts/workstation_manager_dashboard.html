@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Struxient Work Station | Manager Dashboard</title>
+    <style>
+        :root {
+            --bg-page: #050505;
+            --bg-surface: #111111;
+            --bg-card: #1a1a1a;
+            --border-color: #2a2a2a;
+            --text-primary: #f5f5f5;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --status-red: #ef4444;
+            --status-orange: #f59e0b;
+            --status-green: #10b981;
+            --radius: 5px;
+            --sidebar-width: 220px;
+            --right-panel-width: 340px;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.5;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* --- Global App Shell --- */
+        aside.sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+
+        .sidebar-brand {
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-brand svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--accent-blue);
+        }
+
+        nav.sidebar-nav {
+            flex: 1;
+            padding: 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius);
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            background-color: #ffffff08;
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background-color: #3b82f615;
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            opacity: 0.7;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* --- Main Content Area --- */
+        main.content-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        header.ws-header {
+            padding: 24px 32px 0 32px;
+            background-color: var(--bg-page);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .header-title h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header-title p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .role-pill {
+            background-color: #ffffff10;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .toggle-hint {
+            font-size: 11px;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* --- Tabs --- */
+        .ws-tabs {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+        }
+
+        .tab {
+            padding: 8px 0 12px 0;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            position: relative;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--accent-blue);
+        }
+
+        /* --- Dashboard Body --- */
+        .dashboard-body {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            gap: 0;
+        }
+
+        .main-pane {
+            flex: 1;
+            padding: 24px 32px;
+            max-width: 1200px;
+        }
+
+        /* --- Signals Strip --- */
+        .signals-strip {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .signal-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            font-size: 13px;
+        }
+
+        .signal-pill .count {
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .signal-pill.urgent .count { color: var(--status-red); }
+
+        /* --- Critical Attention Section --- */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .critical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .critical-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--status-red);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: transform 0.2s;
+        }
+
+        .critical-card:hover {
+            border-color: #444;
+        }
+
+        .critical-card.orange { border-left-color: var(--status-orange); }
+
+        .card-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .severity-red { color: var(--status-red); }
+        .severity-orange { color: var(--status-orange); }
+
+        .card-job-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .card-reason {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            border: 1px solid transparent;
+            gap: 8px;
+        }
+
+        .btn-primary { background-color: var(--accent-blue); color: white; }
+        .btn-primary:hover { background-color: var(--accent-blue-hover); }
+
+        .btn-secondary { background-color: transparent; border-color: var(--border-color); color: var(--text-primary); }
+        .btn-secondary:hover { background-color: #ffffff10; }
+
+        .btn-outline { background-color: transparent; border-color: var(--accent-blue); color: var(--accent-blue); }
+        .btn-outline:hover { background-color: #3b82f610; }
+
+        .btn-danger-outline { background-color: transparent; border-color: var(--status-red); color: var(--status-red); }
+        .btn-danger-outline:hover { background-color: #ef444410; }
+
+        .btn-xs { padding: 4px 8px; font-size: 11px; }
+
+        /* --- Timeline Columns --- */
+        .timeline-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .timeline-column h3 {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .timeline-item {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+        }
+
+        .timeline-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .timeline-tag {
+            font-size: 10px;
+            background-color: #ffffff08;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+
+        /* --- Job Health Table --- */
+        .health-table-container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .filter-row {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-chip {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            background-color: #ffffff08;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .filter-chip.active {
+            background-color: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+
+        table.health-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .health-table th {
+            padding: 12px 16px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .health-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .dot-green { background-color: var(--status-green); box-shadow: 0 0 8px var(--status-green); }
+        .dot-orange { background-color: var(--status-orange); box-shadow: 0 0 8px var(--status-orange); }
+        .dot-red { background-color: var(--status-red); box-shadow: 0 0 8px var(--status-red); }
+
+        /* --- Right Sidebar Pane --- */
+        .right-pane {
+            width: var(--right-panel-width);
+            background-color: var(--bg-surface);
+            border-left: 1px solid var(--border-color);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            overflow-y: auto;
+        }
+
+        .right-section h4 {
+            font-size: 13px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            letter-spacing: 0.05em;
+        }
+
+        .message-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .message-item:last-child { border-bottom: none; }
+
+        .msg-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .msg-sender { font-weight: 600; font-size: 13px; }
+        .msg-time { font-size: 11px; color: var(--text-muted); }
+        .msg-excerpt { color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
+        .msg-context { font-size: 10px; color: var(--accent-blue); font-weight: 600; }
+
+        .context-link {
+            display: block;
+            padding: 8px 0;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .context-link:hover { color: var(--accent-blue); }
+
+        .safe-nav-label {
+            font-size: 10px;
+            color: var(--status-green);
+            background-color: #10b98110;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: 700;
+        }
+
+        .execution-label {
+            font-size: 10px;
+            color: var(--accent-blue);
+            background-color: #3b82f610;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            font-weight: 700;
+        }
+
+        /* --- Footer Invariants --- */
+        footer.ws-footer {
+            padding: 16px 32px;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--bg-surface);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .invariants-trigger {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        /* --- Tab Content Simulation --- */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* --- Responsive --- */
+        @media (max-width: 1100px) {
+            body { flex-direction: column; overflow: auto; height: auto; }
+            aside.sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border-color); }
+            nav.sidebar-nav { display: flex; overflow-x: auto; padding: 8px; }
+            .nav-item { margin-bottom: 0; white-space: nowrap; }
+            .sidebar-brand { padding: 16px; }
+            .dashboard-body { flex-direction: column; }
+            .right-pane { width: 100%; border-left: none; border-top: 1px solid var(--border-color); }
+            .timeline-section { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            STRUXIENT
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                Work Station
+            </a>
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                Jobs
+            </a>
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                Tasks
+            </a>
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Calendar
+            </a>
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                Crew
+            </a>
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Analytics
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" class="nav-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Settings
+            </a>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <main class="content-wrapper">
+        <header class="ws-header">
+            <div class="header-top">
+                <div class="header-title">
+                    <h1>Work Station</h1>
+                    <p>Decision & execution hub for actionable work</p>
+                </div>
+                <div class="header-actions">
+                    <span class="role-pill">Manager View</span>
+                    <span class="toggle-hint">Switch to Owner</span>
+                </div>
+            </div>
+            <div class="ws-tabs">
+                <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchTab('calendar')">Calendar</button>
+                <button class="tab" onclick="switchTab('jobs')">Jobs</button>
+                <button class="tab" onclick="switchTab('tasks')">Tasks</button>
+                <button class="tab" onclick="switchTab('crews')">Crews & Employees</button>
+                <button class="tab" onclick="switchTab('analytics')">Analytics</button>
+            </div>
+        </header>
+
+        <div class="dashboard-body">
+            <!-- MAIN PANE -->
+            <div class="main-pane">
+                
+                <!-- OVERVIEW CONTENT -->
+                <div id="overview" class="tab-content active">
+                    <!-- Signals Strip -->
+                    <div class="signals-strip">
+                        <div class="signal-pill urgent"><span class="count">4</span> Blocked</div>
+                        <div class="signal-pill"><span class="count">7</span> At Risk</div>
+                        <div class="signal-pill"><span class="count">12</span> Waiting on Customer</div>
+                        <div class="signal-pill"><span class="count">5</span> Missing Evidence</div>
+                        <div class="signal-pill"><span class="count">2</span> Unassigned</div>
+                        <div class="signal-pill"><span class="count">8</span> Overdue</div>
+                    </div>
+
+                    <!-- Critical Attention -->
+                    <div class="section-header">
+                        <h2>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--status-red)"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"></path></svg>
+                            Critical Attention (6)
+                        </h2>
+                    </div>
+                    <div class="critical-grid">
+                        <div class="critical-card">
+                            <div class="card-meta"><span class="severity-red">CRITICAL</span> <span>Permit</span></div>
+                            <div class="card-job-name">Smith – MPU + Solar</div>
+                            <div class="card-reason">Permit resubmission required. AHJ rejected structural calc.</div>
+                            <button class="btn btn-primary">(opens execution) Appeal Rejection</button>
+                        </div>
+                        <div class="critical-card">
+                            <div class="card-meta"><span class="severity-red">CRITICAL</span> <span>Contract</span></div>
+                            <div class="card-job-name">Cody – Solar Residential</div>
+                            <div class="card-reason">Missing signed contract PDF before tomorrow's install.</div>
+                            <button class="btn btn-primary">(opens execution) Call Customer</button>
+                        </div>
+                        <div class="critical-card orange">
+                            <div class="card-meta"><span class="severity-orange">AT RISK</span> <span>Evidence</span></div>
+                            <div class="card-job-name">Johnson – EV Charger</div>
+                            <div class="card-reason">Missing main panel photo for final prep.</div>
+                            <button class="btn btn-outline">Request from Crew</button>
+                        </div>
+                        <div class="critical-card orange">
+                            <div class="card-meta"><span class="severity-orange">AT RISK</span> <span>Schedule</span></div>
+                            <div class="card-job-name">Lee – 5kW Expansion</div>
+                            <div class="card-reason">Crew lead out sick. Reschedule or shift required.</div>
+                            <button class="btn btn-outline">Review Coverage</button>
+                        </div>
+                        <div class="critical-card">
+                            <div class="card-meta"><span class="severity-red">CRITICAL</span> <span>Detour</span></div>
+                            <div class="card-job-name">Garcia – Solar + Bat</div>
+                            <div class="card-reason">Inspection failed – correction detour active. 48hr deadline.</div>
+                            <button class="btn btn-danger-outline">Resolve Detour</button>
+                        </div>
+                        <div class="critical-card orange">
+                            <div class="card-meta"><span class="severity-orange">AT RISK</span> <span>Materials</span></div>
+                            <div class="card-job-name">Martinez – MPU</div>
+                            <div class="card-reason">Materials not confirmed for Wednesday install.</div>
+                            <button class="btn btn-outline">Check Inventory</button>
+                        </div>
+                    </div>
+
+                    <!-- Today / Tomorrow / This Week -->
+                    <div class="timeline-section">
+                        <div class="timeline-column">
+                            <h3>Today</h3>
+                            <div class="timeline-item">
+                                <div class="timeline-item-header">
+                                    <span class="card-job-name" style="font-size:13px">Patel Solar</span>
+                                    <span class="timeline-tag">Prep</span>
+                                </div>
+                                <div class="card-reason" style="font-size:12px">Install prep needed for crew arrival.</div>
+                            </div>
+                            <div class="timeline-item">
+                                <div class="timeline-item-header">
+                                    <span class="card-job-name" style="font-size:13px">Wilson EV</span>
+                                    <span class="timeline-tag">Approval</span>
+                                </div>
+                                <div class="card-reason" style="font-size:12px">Final invoice approval required.</div>
+                            </div>
+                        </div>
+                        <div class="timeline-column">
+                            <h3>Tomorrow</h3>
+                            <div class="timeline-item">
+                                <div class="timeline-item-header">
+                                    <span class="card-job-name" style="font-size:13px">Thompson MPU</span>
+                                    <span class="timeline-tag">Evidence</span>
+                                </div>
+                                <div class="card-reason" style="font-size:12px">Missing site photos before crew dispatch.</div>
+                            </div>
+                        </div>
+                        <div class="timeline-column">
+                            <h3>This Week</h3>
+                            <div class="timeline-item">
+                                <div class="timeline-item-header">
+                                    <span class="card-job-name" style="font-size:13px">8 Jobs Scheduled</span>
+                                    <span class="timeline-tag">Logistics</span>
+                                </div>
+                                <div class="card-reason" style="font-size:12px">Review crew allocation for Fri.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Job Health at a Glance -->
+                    <div class="section-header">
+                        <h2>Job Health at a Glance</h2>
+                    </div>
+                    <div class="health-table-container">
+                        <div class="filter-row">
+                            <span class="filter-chip active">All (42)</span>
+                            <span class="filter-chip">Red (3)</span>
+                            <span class="filter-chip">Orange (8)</span>
+                            <span class="filter-chip">Green (31)</span>
+                            <span class="filter-chip">Needs Decision (14)</span>
+                        </div>
+                        <table class="health-table">
+                            <thead>
+                                <tr>
+                                    <th>Health</th>
+                                    <th>Job</th>
+                                    <th>Stage/Door</th>
+                                    <th>Blocking Signal</th>
+                                    <th>Next Decision</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="health-dot dot-red"></span> Red</td>
+                                    <td><strong>Smith – MPU + Solar</strong></td>
+                                    <td>Permit / Resubmit</td>
+                                    <td>AHJ Reject</td>
+                                    <td>Structural Appeal</td>
+                                    <td><button class="btn btn-secondary btn-xs">View</button></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="health-dot dot-orange"></span> Orange</td>
+                                    <td><strong>Johnson – EV Charger</strong></td>
+                                    <td>Design / Final</td>
+                                    <td>Missing Panel Photo</td>
+                                    <td>Request Evidence</td>
+                                    <td><button class="btn btn-secondary btn-xs">View</button></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="health-dot dot-green"></span> Green</td>
+                                    <td><strong>Lee – Residential Solar</strong></td>
+                                    <td>Install / Prep</td>
+                                    <td>None</td>
+                                    <td>Confirm Schedule</td>
+                                    <td><button class="btn btn-secondary btn-xs">View</button></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="health-dot dot-green"></span> Green</td>
+                                    <td><strong>Nguyen – MPU</strong></td>
+                                    <td>Permit / Issued</td>
+                                    <td>None</td>
+                                    <td>Schedule Crew</td>
+                                    <td><button class="btn btn-secondary btn-xs">View</button></td>
+                                </tr>
+                                <tr>
+                                    <td><span class="health-dot dot-orange"></span> Orange</td>
+                                    <td><strong>Baker – Solar + Bat</strong></td>
+                                    <td>Post-Install</td>
+                                    <td>Cust. Unavailable</td>
+                                    <td>Rebook Inspection</td>
+                                    <td><button class="btn btn-secondary btn-xs">View</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PLACEHOLDER TABS -->
+                <div id="calendar" class="tab-content">
+                    <div class="section-header"><h2>Calendar Lens</h2></div>
+                    <div class="critical-card orange" style="margin-bottom: 24px;">
+                        <div class="card-meta"><span class="severity-orange">CALENDAR ALERT</span></div>
+                        <div class="card-reason">3 crews double-booked for Friday morning. Prep tasks unassigned.</div>
+                        <button class="btn btn-primary">Fix Conflicts</button>
+                    </div>
+                    <div style="height: 400px; background: var(--bg-surface); border: 1px dashed var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                        Calendar Visual Grid Mock
+                    </div>
+                </div>
+
+                <div id="jobs" class="tab-content">
+                    <div class="section-header"><h2>Jobs Lens</h2></div>
+                    <div style="color: var(--text-secondary); margin-bottom: 20px;">Detailed active jobs list with pipeline visualization.</div>
+                </div>
+
+                <div id="crews" class="tab-content">
+                    <div class="section-header"><h2>Crews & Employees Lens</h2></div>
+                    <div class="critical-card" style="margin-bottom: 24px;">
+                        <div class="card-meta"><span class="severity-red">COVERAGE RISK</span></div>
+                        <div class="card-reason">South Region lacks a certified Electrician for 3 scheduled MPU jobs.</div>
+                        <button class="btn btn-primary">Reassign Personnel</button>
+                    </div>
+                </div>
+
+                <div id="analytics" class="tab-content">
+                    <div class="section-header"><h2>Analytics Lens</h2></div>
+                    <div class="timeline-section">
+                        <div class="timeline-column" style="background: var(--bg-surface); padding: 16px; border-radius: var(--radius);">
+                            <h3 style="color: var(--status-red)">Bottleneck Found</h3>
+                            <p style="font-size: 13px; color: var(--text-secondary)">Permit resubmission cycle time increased by 40% this month.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT PANE (QUICK CONTEXT) -->
+            <div class="right-pane">
+                <div class="right-section">
+                    <h4>Customer Messages <span style="float:right; background: var(--status-red); font-size: 10px; padding: 2px 6px; border-radius: 10px; color: white;">3</span></h4>
+                    <div class="message-item">
+                        <div class="msg-header"><span class="msg-sender">Smith, John</span> <span class="msg-time">10m ago</span></div>
+                        <div class="msg-excerpt">"When will the inspector arrive? I need to..."</div>
+                        <div class="msg-context">Job: Smith Solar – MPU</div>
+                    </div>
+                    <div class="message-item">
+                        <div class="msg-header"><span class="msg-sender">Davis, Sarah</span> <span class="msg-time">2h ago</span></div>
+                        <div class="msg-excerpt">"Sent the photos of the main panel you asked for."</div>
+                        <div class="msg-context">Job: Davis EV Home</div>
+                    </div>
+                    <div class="message-item">
+                        <div class="msg-header"><span class="msg-sender">Admin (Automated)</span> <span class="msg-time">4h ago</span></div>
+                        <div class="msg-excerpt">Reminder: Permit for Garcia expires in 7 days.</div>
+                        <div class="msg-context">Job: Garcia Bat Expansion</div>
+                    </div>
+                </div>
+
+                <div class="right-section">
+                    <h4>Safe Navigation</h4>
+                    <a href="#" class="context-link">Open Job Profile <span class="safe-nav-label">READ ONLY</span></a>
+                    <a href="#" class="context-link">Open Customer CRM <span class="safe-nav-label">READ ONLY</span></a>
+                    <a href="#" class="context-link">Capability Matrix <span class="safe-nav-label">READ ONLY</span></a>
+                    <a href="#" class="context-link">Archive & Logs <span class="safe-nav-label">READ ONLY</span></a>
+                </div>
+
+                <div class="right-section">
+                    <h4>Recommended Next</h4>
+                    <a href="#" class="context-link">Approve 14 Pending Tasks <span class="execution-label">EXECUTION</span></a>
+                    <a href="#" class="context-link">Review Unassigned Leads <span class="execution-label">EXECUTION</span></a>
+                    <a href="#" class="context-link">Update Crew Capacity <span class="execution-label">EXECUTION</span></a>
+                </div>
+            </div>
+        </div>
+
+        <footer class="ws-footer">
+            <div class="invariants-trigger">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                Work Station Invariants (5 Active)
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted);">Struxient v2.0.4-stable | Decision Hub</div>
+        </footer>
+    </main>
+
+    <script>
+        function switchTab(tabId) {
+            // Update tabs UI
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(t => t.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            // Update content visibility
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(c => c.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+    </script>
+</body>
+</html>
+
+<!--
+  INVARIANTS ENCODED:
+  1) INV-WS-01: "Critical Attention" capped at 6 items in this view to prevent cognitive overload.
+  2) INV-WS-02: Every critical card has a clear primary action button (Execution or Decision).
+  3) INV-WS-03: Switching tabs (Calendar, Crews) surfaces context-specific alerts at the top (Double-booking, Coverage risk).
+  4) INV-WS-04: Clear visual distinction between "Safe Navigation" (Read-only) and "Execution" (Actionable) in the side panel.
+  5) INV-WS-05: Data is grouped by status and time-horizon (Today/Tomorrow/Week) instead of a raw task stream.
+
+  RESPONSIVE BEHAVIOR:
+  - On viewports >= 1100px, a three-pane layout is used (Sidebar, Dashboard, Context Panel).
+  - On smaller viewports (typical laptops or smaller), the layout collapses:
+    - Sidebar becomes a top-scrolling nav.
+    - Right panel moves to the bottom of the main content flow.
+    - Timeline columns stack vertically.
+
+  NEXT STEPS (NOT IMPLEMENTED):
+  - Real-time signal polling (WebSockets).
+  - Dynamic "Execution" overlays/modals when buttons are clicked.
+  - Multi-select and bulk actions for the Job Health table.
+  - User-specific personalization (pinning certain jobs to the side panel).
+-->

@@ -6,13 +6,16 @@
 **Related Documents:**
 - [00_workstation_glossary.md](./00_workstation_glossary.md)
 - [10_workstation_contract.md](./10_workstation_contract.md)
+- [10_workstation_invariants_v1.md](./10_workstation_invariants_v1.md)
 - [FlowSpec Invariants](../flowspec/20_flowspec_invariants.md)
 
 ---
 
 ## 1. Purpose
 
-This document enumerates the invariants specific to Work Station. These invariants are in addition to (not replacing) FlowSpec invariants. Work Station implementations MUST satisfy both FlowSpec invariants (as a consumer) and Work Station invariants.
+This document enumerates the architectural invariants specific to Work Station. These invariants focus on the boundary between Work Station and FlowSpec. 
+
+For **UX-specific invariants** related to the Manager Dashboard, see [Work Station Invariants v1](./10_workstation_invariants_v1.md).
 
 **Structure:** Each invariant includes:
 - MUST / MUST NOT statement

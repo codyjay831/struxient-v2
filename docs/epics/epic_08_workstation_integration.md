@@ -2,8 +2,8 @@
 
 **Epic ID:** EPIC-08  
 **Title:** Work Station Integration  
-**Status:** SPECIFICATION  
-**Canon Sources:** 00_workstation_glossary.md, 10_workstation_contract.md, 20_workstation_invariants.md, 30_workstation_ui_api_map.md
+**Status:** DONE (v1.0)  
+**Canon Sources:** 00_workstation_glossary.md, 10_workstation_contract.md, 20_workstation_invariants.md, 30_workstation_ui_api_map.md, 10_workstation_invariants_v1.md
 
 ---
 
@@ -327,11 +327,20 @@ None — canon complete.
 
 ---
 
-## 11. Final Notes / Closure (Responsibility Integration)
+## 11. Final Notes / Closure (Manager Dashboard v1)
 
-**Status:** SEALED (v2.1 Integration)
-The Work Station has been integrated with the Responsibility Layer v2.1 (EPIC-12).
-- Non-gating view filters added.
-- Client-side assignment matching implemented.
-- Neutral metadata badges added to task feed.
-- ALL FlowSpec-canonical invariants (no reduction, no engine coupling) remain enforced.
+**Status:** DONE / SEALED (v2.2 Integration)
+The Work Station has been upgraded to the Manager Dashboard v1.
+
+### Key Milestones Delivered:
+1. **The Lens Model:** Tab-driven perspectives (Overview, Jobs, Tasks, etc.) with proactive alerts.
+2. **Exception Signaling:** Signals Strip + Capped Critical Attention grid (INV-WS-01).
+3. **Time Horizons:** Temporal grouping (Today/Tomorrow/Week) (INV-WS-05).
+4. **Job Health Projection:** Risk-prioritized health dots (INV-WS-07).
+5. **Read-Only Comms:** UX boundary for customer messages established.
+
+### Final Verification Status:
+- [x] Invariants INV-WS-01 through INV-WS-07 enforced.
+- [x] 12/12 Integration tests passing.
+- [x] Canonical order preservation verified.
+- [x] Zero drift into Left Nav.

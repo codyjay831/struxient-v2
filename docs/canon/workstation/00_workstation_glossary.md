@@ -5,7 +5,9 @@
 **Last Updated:** 2026-01-28  
 **Related Documents:**
 - [10_workstation_contract.md](./10_workstation_contract.md)
+- [10_workstation_invariants_v1.md](./10_workstation_invariants_v1.md)
 - [20_workstation_invariants.md](./20_workstation_invariants.md)
+- [20_workstation_manager_dashboard_contract_v1.md](./20_workstation_manager_dashboard_contract_v1.md)
 - [30_workstation_ui_api_map.md](./30_workstation_ui_api_map.md)
 - [FlowSpec Glossary](../flowspec/00_flowspec_glossary.md)
 - [FlowSpec Engine Contract](../flowspec/10_flowspec_engine_contract.md)
@@ -150,6 +152,34 @@ and Evidence. If a surface cannot submit, it is a Projection Surface.
 
 ---
 
+### 3.9 Lens
+
+**Definition:** A tabbed perspective within the Work Station that filters and presents actionable tasks based on a specific operational domain (e.g., Calendar, Jobs, Tasks, Crews, Analytics).
+
+**Clarification:**
+- Switching lenses changes the "Signals" and "Proactive Alerts" displayed to the user.
+- Lenses are client-side view reductions; they do not alter the canonical set of actionable tasks.
+
+---
+
+### 3.10 Proactive Alert
+
+**Definition:** A derived signal displayed at the top of a lens that surfaces operational risks, conflicts, or gaps specific to that lens's perspective (INV-WS-03).
+
+---
+
+### 3.11 Job Health
+
+**Definition:** A derived status indicator (Red, Orange, or Green) representing the operational risk of a Job based on the presence of blocking detours, overdue tasks, or missing evidence (INV-WS-07).
+
+---
+
+### 3.12 Critical Attention
+
+**Definition:** A capped, high-priority grid surfacing the most urgent actionable items (e.g., blocking detours or urgent overdue work) requiring immediate manager intervention (INV-WS-01).
+
+---
+
 ## 4. Relationship to FlowSpec Terms
 
 | Work Station Concept | FlowSpec Equivalent | Relationship |
@@ -182,11 +212,15 @@ The following behaviors are PROHIBITED in Work Station:
 
 | Term | Section |
 |------|---------|
+| Critical Attention | 3.12 |
 | Evidence Attachment | 3.6 |
 | Execution Surface | 3.2 |
 | Idempotency | 3.8 |
+| Job Health | 3.11 |
+| Lens | 3.9 |
 | Multi-Flow View | 3.4 |
 | Outcome Submission | 3.5 |
+| Proactive Alert | 3.10 |
 | Stale Derived State | 3.7 |
 | Task Rendering | 3.3 |
 | Work Station | 3.1 |

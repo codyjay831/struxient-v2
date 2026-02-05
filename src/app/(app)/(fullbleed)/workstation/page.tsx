@@ -19,6 +19,7 @@ import { TaskFeed, type ActionableTask } from "./_components/task-feed";
 import { TaskExecution } from "./_components/task-execution";
 import { QuickFixPanel } from "./_components/quick-fix-panel";
 import { JobHeader } from "./_components/job-header";
+import { ManagerDashboard } from "./_components/manager-dashboard";
 import { Button } from "@/components/ui/button";
 import { X, Filter, Info } from "lucide-react";
 import {
@@ -81,6 +82,14 @@ export default function WorkStationPage() {
   const clearAssignmentFilter = useCallback(() => {
     setAssignmentFilter(false);
   }, []);
+
+  if (!selectedTask && !jobId) {
+    return (
+      <div className="h-full bg-background flex flex-col">
+         <ManagerDashboard />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 space-y-8 max-w-4xl">

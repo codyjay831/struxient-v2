@@ -79,7 +79,9 @@ Execution-first operations platform.
 src/
 ├── app/                  # Next.js App Router
 │   ├── api/              # API routes
-│   ├── dashboard/        # Protected dashboard
+│   ├── (app)/            # Authenticated application core
+│   │   ├── (fullbleed)/workstation # Work Station Manager Dashboard (v1)
+│   ├── dashboard/        # legacy/stub dashboard
 │   ├── sign-in/          # Auth pages
 │   └── sign-up/
 ├── components/
