@@ -1,17 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { OverviewLens } from "./overview-lens";
 import { LensPlaceholder } from "./lens-placeholder";
 import { DashboardRightRail } from "./dashboard-right-rail";
 import { TaskFeed, type ActionableTask } from "./task-feed";
-import { TaskExecution } from "./task-execution";
 import { JobHeader } from "./job-header";
-import { QuickFixPanel } from "./quick-fix-panel";
 import { Button } from "@/components/ui/button";
-import { X, ArrowLeft, Filter } from "lucide-react";
+import { X, Filter } from "lucide-react";
 import { useManagerDashboardData, type LensType } from "../_lib/dashboard-logic";
 import {
   Tooltip,
@@ -26,16 +24,33 @@ export function ManagerDashboard() {
   
   const lensFromUrl = searchParams.get("lens") as LensType | null;
   const jobIdFromUrl = searchParams.get("job");
+  const taskIdFromUrl = searchParams.get("task");
+  const flowIdFromUrl = searchParams.get("flow");
   
   const initialLens: LensType = lensFromUrl && ["overview", "calendar", "jobs", "tasks", "crews", "analytics"].includes(lensFromUrl) 
     ? lensFromUrl 
     : jobIdFromUrl ? "jobs" : "overview";
 
   const [activeLens, setActiveLens] = useState<LensType>(initialLens);
-  const [selectedTask, setSelectedTask] = useState<ActionableTask | null>(null);
   const [assignmentFilter, setAssignmentFilter] = useState(false);
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
-  const { lensAlerts, isLoading, error } = useManagerDashboardData();
+  const { lensAlerts, allActionableTasks, isLoading, error } = useManagerDashboardData();
+
+  // Selection state derived from URL
+  const selectedTask = useMemo(() => {
+    if (!taskIdFromUrl || !flowIdFromUrl) return null;
+    return allActionableTasks.find(t => t.taskId === taskIdFromUrl && t.flowId === flowIdFromUrl) || null;
+  }, [taskIdFromUrl, flowIdFromUrl, allActionableTasks]);
+
+  // Edge case: Clear dead URL state if task is not found after loading
+  useEffect(() => {
+    if (!isLoading && taskIdFromUrl && !selectedTask) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("task");
+      params.delete("flow");
+      router.replace(`/workstation?${params.toString()}`, { scroll: false });
+    }
+  }, [isLoading, taskIdFromUrl, selectedTask, searchParams, router]);
 
   // Fetch current member context for filtering
   useEffect(() => {
@@ -64,10 +79,10 @@ export function ManagerDashboard() {
 
   const handleLensChange = (lens: LensType) => {
     setActiveLens(lens);
-    setSelectedTask(null);
     const params = new URLSearchParams(searchParams.toString());
     params.set("lens", lens);
-    // When changing lens, we usually want to clear the job focus unless we are in the jobs lens
+    params.delete("task"); // Clear selection on lens change
+    params.delete("flow");
     if (lens !== "jobs" && lens !== "tasks") {
       params.delete("job");
     }
@@ -77,15 +92,22 @@ export function ManagerDashboard() {
   const handleClearJob = () => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("job");
+    params.delete("task");
+    params.delete("flow");
     router.push(`/workstation?${params.toString()}`);
   };
 
-  const handleTaskSelect = (task: ActionableTask) => {
-    setSelectedTask(task);
-  };
-
-  const handleBackToFeed = () => {
-    setSelectedTask(null);
+  const handleTaskSelect = (task: ActionableTask | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (task) {
+      params.set("task", task.taskId);
+      params.set("flow", task.flowId);
+    } else {
+      params.delete("task");
+      params.delete("flow");
+    }
+    // Use replace for intra-lens task toggles to keep history clean
+    router.replace(`/workstation?${params.toString()}`, { scroll: false });
   };
 
   const tabs: { id: LensType; label: string }[] = [
@@ -136,9 +158,6 @@ export function ManagerDashboard() {
               <div className="px-3 py-1 bg-muted rounded-full text-[11px] font-bold uppercase border border-border tracking-wider text-muted-foreground">
                 Manager View
               </div>
-              <button className="text-[11px] font-medium text-muted-foreground underline decoration-muted-foreground/30 hover:text-foreground">
-                Switch to Owner
-              </button>
             </div>
           </div>
 
@@ -163,98 +182,73 @@ export function ManagerDashboard() {
 
         {/* Scrollable Dashboard Body */}
         <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar bg-background">
-          {selectedTask ? (
-            <div className="flex flex-col md:flex-row gap-6">
-              <div className="flex-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleBackToFeed}
-                  className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to {jobIdFromUrl ? "Job" : "Tasks"}
-                </Button>
-                <TaskExecution
-                  task={selectedTask}
-                  onBack={handleBackToFeed}
-                  onComplete={() => {
-                    setSelectedTask(null);
-                    // Force refresh of dashboard data could be handled by a context or just letting the hook re-run
-                  }}
+          {activeLens === "overview" && <OverviewLens />}
+          {activeLens === "calendar" && (
+            <LensPlaceholder
+              title="Calendar"
+              alerts={lensAlerts.calendar}
+            />
+          )}
+          {activeLens === "jobs" && (
+            <div className="space-y-6">
+              {lensAlerts.jobs.length > 0 && (
+                <LensPlaceholder
+                  title="Jobs"
+                  alerts={lensAlerts.jobs}
+                  hideEmptyState
                 />
-              </div>
-              <div className="w-full md:w-80 flex-shrink-0">
-                <QuickFixPanel task={selectedTask} />
-              </div>
+              )}
+              {jobIdFromUrl && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold">Job Focus</h2>
+                    <Button variant="ghost" size="xs" onClick={handleClearJob}>
+                      <X className="mr-2 h-3.5 w-3.5" />
+                      Clear Focus
+                    </Button>
+                  </div>
+                  <JobHeader flowGroupId={jobIdFromUrl} />
+                </div>
+              )}
+              <TaskFeed
+                jobId={jobIdFromUrl}
+                onSelectTask={handleTaskSelect}
+                selectedTaskId={taskIdFromUrl}
+                selectedFlowId={flowIdFromUrl}
+                assignmentFilter={assignmentFilter}
+                currentMemberId={currentMemberId}
+              />
             </div>
-          ) : (
-            <>
-              {activeLens === "overview" && <OverviewLens />}
-              {activeLens === "calendar" && (
+          )}
+          {activeLens === "tasks" && (
+            <div className="space-y-6">
+              {lensAlerts.tasks.length > 0 && (
                 <LensPlaceholder
-                  title="Calendar"
-                  alerts={lensAlerts.calendar}
+                  title="Tasks"
+                  alerts={lensAlerts.tasks}
+                  hideEmptyState
                 />
               )}
-              {activeLens === "jobs" && (
-                <div className="space-y-6">
-                  {lensAlerts.jobs.length > 0 && (
-                    <LensPlaceholder
-                      title="Jobs"
-                      alerts={lensAlerts.jobs}
-                      hideEmptyState
-                    />
-                  )}
-                  {jobIdFromUrl && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-lg font-bold">Job Focus</h2>
-                        <Button variant="ghost" size="xs" onClick={handleClearJob}>
-                          <X className="mr-2 h-3.5 w-3.5" />
-                          Clear Focus
-                        </Button>
-                      </div>
-                      <JobHeader flowGroupId={jobIdFromUrl} />
-                    </div>
-                  )}
-                  <TaskFeed
-                    jobId={jobIdFromUrl}
-                    onSelectTask={handleTaskSelect}
-                    assignmentFilter={assignmentFilter}
-                    currentMemberId={currentMemberId}
-                  />
-                </div>
-              )}
-              {activeLens === "tasks" && (
-                <div className="space-y-6">
-                  {lensAlerts.tasks.length > 0 && (
-                    <LensPlaceholder
-                      title="Tasks"
-                      alerts={lensAlerts.tasks}
-                      hideEmptyState
-                    />
-                  )}
-                  <TaskFeed
-                    onSelectTask={handleTaskSelect}
-                    assignmentFilter={assignmentFilter}
-                    currentMemberId={currentMemberId}
-                  />
-                </div>
-              )}
-              {activeLens === "crews" && (
-                <LensPlaceholder
-                  title="Crews & Employees"
-                  alerts={lensAlerts.crews}
-                />
-              )}
-              {activeLens === "analytics" && (
-                <LensPlaceholder
-                  title="Analytics"
-                  alerts={lensAlerts.analytics}
-                />
-              )}
-            </>
+              <TaskFeed
+                onSelectTask={handleTaskSelect}
+                selectedTaskId={taskIdFromUrl}
+                selectedFlowId={flowIdFromUrl}
+                assignmentFilter={assignmentFilter}
+                currentMemberId={currentMemberId}
+              />
+            </div>
+          )}
+          {activeLens === "crews" && (
+            <LensPlaceholder
+              title="Crews & Employees"
+              alerts={lensAlerts.crews}
+            />
+          )}
+          {activeLens === "analytics" && (
+            <LensPlaceholder
+              title="Analytics"
+              alerts={lensAlerts.analytics}
+            />
           )}
         </div>
       </div>

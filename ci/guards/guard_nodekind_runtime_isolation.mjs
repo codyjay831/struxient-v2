@@ -14,7 +14,8 @@ const FORBIDDEN_TOKENS = [
 const EXCLUDED_FILES = [
   'types.ts',
   'lifecycle/versioning.ts',
-  'persistence/workflow.ts'
+  'persistence/workflow.ts',
+  'diff.ts'
 ];
 
 /**

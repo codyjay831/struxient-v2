@@ -1,18 +1,11 @@
 "use client";
 
 /**
- * Task Execution Component
+ * Task Execution Content Component
  * 
- * Canon Source: 10_workstation_contract.md §4.1.4, §4.1.5, §4.1.6
- * - §4.1.4: Collect Outcome Selection
- * - §4.1.5: Submit to FlowSpec
- * - §4.1.6: Handle Rejections gracefully
- * 
- * WS-INV-006: Graceful Stale State Handling
- * WS-INV-007: Refresh After Submission (handled by parent)
- * 
- * Auto-starts task when component mounts (Canon §2.5: auto-start on Outcome recording allowed).
- * Boundary: Uses API only, no direct FlowSpec engine imports.
+ * Hollowed out version for inline expansion.
+ * NO shell, NO back buttons, NO JobHeader.
+ * ONLY instructions, evidence, and outcome recording.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -20,26 +13,23 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Send, ArrowLeft, AlertCircle, CheckCircle2, Info, Paperclip } from "lucide-react";
+import { Loader2, Send, AlertCircle, CheckCircle2, Paperclip } from "lucide-react";
 import { apiStartTask, apiRecordOutcome } from "../_lib/execution-adapter";
 import type { ActionableTask } from "./task-feed";
 import { EvidenceList } from "./evidence-list";
 import { EvidenceForm } from "./evidence-form";
-import { JobHeader } from "./job-header";
 import { DetourBanner } from "./detour-banner";
 import { OpenDetourDialog } from "./open-detour-dialog";
 import { DetourControls } from "./detour-controls";
-import { DetourDebugPanel } from "./detour-debug-panel";
 
-interface TaskExecutionProps {
+interface TaskExecutionContentProps {
   task: ActionableTask;
-  onBack: () => void;
   onComplete: () => void;
 }
 
 type SubmissionState = "idle" | "starting" | "submitting" | "success" | "error";
 
-export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) {
+export function TaskExecutionContent({ task, onComplete }: TaskExecutionContentProps) {
   const [state, setState] = useState<SubmissionState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isStarted, setIsStarted] = useState(!!task.startedAt);
@@ -58,7 +48,6 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
     setError(null);
     try {
       await apiStartTask(task.flowId, task.taskId);
-
       setIsStarted(true);
       setState("idle");
     } catch (err) {
@@ -78,10 +67,7 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
 
     try {
       await apiRecordOutcome(task.flowId, task.taskId, outcome, (task as any)._detour?.id);
-
       setState("success");
-
-      // WS-INV-007: Trigger refresh after successful submission
       setTimeout(() => {
         onComplete();
       }, 1500);
@@ -106,42 +92,26 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
     (task.evidenceRequired && evidenceCount === 0);
 
   return (
-    <div className="space-y-4 pb-20">
-      {/* Back button */}
-      <Button variant="ghost" onClick={onBack} disabled={state === "submitting"}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Task List
-      </Button>
+    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+      {task._detour && <div className="mb-4"><DetourBanner detour={task._detour} /></div>}
 
-      <JobHeader flowGroupId={task.flowGroupId} />
-
-      {task._detour && <DetourBanner detour={task._detour} />}
-
-      <Card className="shadow-lg border-2">
-        {/* Header */}
-        <CardHeader className="border-b bg-muted/30">
+      <Card className="border-2 shadow-none bg-muted/5">
+        <CardHeader className="py-4 border-b bg-muted/20">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <CardTitle className="text-2xl">{task.taskName}</CardTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-                <span>{task.workflowName}</span>
-                <span>•</span>
-                <span>{task.nodeName}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Job: {task.flowGroupId}
+              <CardTitle className="text-lg">Execution: {task.taskName}</CardTitle>
+              <p className="text-xs text-muted-foreground font-mono">
+                {task.flowId}:{task.taskId}
               </p>
             </div>
             <div className="flex flex-col gap-2 items-end">
-              <Badge variant="secondary">{task.domainHint}</Badge>
               {task.evidenceRequired && (
-                <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-[10px]">
                   Evidence Required
                 </Badge>
               )}
               
-              {/* ADMIN CONTROLS */}
-              <div className="pt-2 flex flex-col gap-2 items-end">
+              <div className="flex gap-2">
                 {!task._detour && task.latestTaskExecutionId && (
                   <OpenDetourDialog 
                     flowId={task.flowId}
@@ -166,32 +136,27 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
           </div>
         </CardHeader>
 
-        {/* Content */}
-        <CardContent className="pt-6 space-y-8">
-          {/* Starting state */}
+        <CardContent className="pt-4 space-y-6">
           {state === "starting" && (
-            <Alert>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <AlertTitle>Starting Task</AlertTitle>
-              <AlertDescription>Preparing task for work...</AlertDescription>
+            <Alert className="py-2">
+              <Loader2 className="h-3 w-3 animate-spin mr-2" />
+              <AlertDescription className="text-xs">Starting Task...</AlertDescription>
             </Alert>
           )}
 
-          {/* Instructions */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-1.5">
+            <h3 className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
               Instructions
             </h3>
-            <div className="p-4 rounded-md bg-muted/50 text-sm leading-relaxed min-h-[80px]">
+            <div className="p-3 rounded border bg-background text-sm leading-relaxed">
               {task.instructions || "No special instructions for this task."}
             </div>
           </div>
 
-          {/* Evidence Section */}
-          <div className="space-y-4 pt-4 border-t">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Paperclip className="h-5 w-5" />
-              <h3 className="text-lg font-semibold text-foreground">Evidence</h3>
+          <div className="space-y-3 pt-2 border-t">
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-bold">Evidence</h3>
             </div>
 
             <EvidenceList
@@ -210,64 +175,49 @@ export function TaskExecution({ task, onBack, onComplete }: TaskExecutionProps) 
             />
           </div>
 
-          {/* Error display (WS-INV-006) */}
           {state === "error" && error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Submission Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant="destructive" className="py-2">
+              <AlertCircle className="h-3.5 w-3.5" />
+              <AlertDescription className="text-xs">{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* Success message */}
           {state === "success" && (
-            <Alert className="border-green-500 bg-green-50">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <AlertTitle className="text-green-700">Success</AlertTitle>
-              <AlertDescription className="text-green-600">
-                Outcome recorded successfully. Refreshing work list...
+            <Alert className="py-2 border-green-500 bg-green-50">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              <AlertDescription className="text-xs text-green-700">
+                Success. Refreshing...
               </AlertDescription>
             </Alert>
           )}
         </CardContent>
 
-        {/* Outcome buttons */}
-        <CardFooter className="flex-col items-stretch gap-4 border-t bg-muted/10 p-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground text-center">
+        <CardFooter className="flex-col items-stretch gap-3 border-t bg-muted/10 p-4">
+          <h3 className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground text-center">
             Record Outcome
           </h3>
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center">
             {task.allowedOutcomes.map((outcome) => (
               <Button
                 key={outcome}
-                size="lg"
+                size="sm"
                 disabled={isOutcomeDisabled}
                 onClick={() => handleRecordOutcome(outcome)}
-                className="min-w-[140px]"
+                className="min-w-[100px] h-8 text-xs font-bold"
               >
-                {state === "submitting" ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
+                {state === "submitting" && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                {!state.includes("submitting") && <Send className="mr-2 h-3 w-3" />}
                 {outcome}
               </Button>
             ))}
           </div>
-          {!isStarted && state !== "starting" && (
-            <p className="text-sm text-muted-foreground text-center">
-              Task must be started before recording an outcome.
-            </p>
-          )}
           {task.evidenceRequired && evidenceCount === 0 && (
-            <p className="text-sm text-amber-600 font-medium text-center">
-              Evidence is required before you can record an outcome.
+            <p className="text-[10px] text-amber-600 font-bold text-center">
+              EVIDENCE REQUIRED
             </p>
           )}
         </CardFooter>
       </Card>
-
-      <DetourDebugPanel flowId={task.flowId} />
     </div>
   );
 }

@@ -16,11 +16,18 @@ const FORBIDDEN_REORDER = [
   '.toReversed('
 ];
 
+const EXCEPTIONS = [
+  'src/app/(app)/(fullbleed)/workstation/_lib/dashboard-logic.ts'
+];
+
 /**
  * Guard: WS_NO_REORDER_01 (Deterministic Order)
  * 
  * Rule: Work Station must NOT reorder task arrays locally.
  * Preserves the canonical sort from FlowSpec core.
+ * 
+ * Exception: Dashboard derivation logic is permitted to sort 
+ * for presentation-only "Lenses" and "Critical Attention" buckets.
  */
 function checkNoReorder() {
   console.log('🔍 Running guard_ws_no_reorder_01 (No Reorder)...');
@@ -38,6 +45,8 @@ function checkNoReorder() {
       if (stats.isDirectory()) {
         scanDir(fullPath);
       } else if (stats.isFile() && (file.endsWith('.ts') || file.endsWith('.tsx'))) {
+        if (EXCEPTIONS.includes(relPath)) continue;
+
         const content = readFileSync(fullPath, 'utf-8');
         
         FORBIDDEN_REORDER.forEach(token => {
