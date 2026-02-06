@@ -24,11 +24,11 @@ services:
     container_name: struxient_v2_app
     restart: always
     ports:
-      - "3001:3001"
+      - "3000:3000"
     env_file:
       - .env
     environment:
-      - PORT=3001
+      - PORT=3000
       - DATABASE_URL=postgresql://struxient:struxient_dev@db-v2:5432/struxient_v2?schema=public
     depends_on:
       db-v2:
