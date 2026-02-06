@@ -707,6 +707,7 @@ model WorkflowTemplate {
   version     Int      @default(1)
   definition  Json     // WorkflowSnapshot structure
   tags        String[] // e.g., ["Residential", "Commercial"]
+  isFixture   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

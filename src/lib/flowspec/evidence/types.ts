@@ -32,10 +32,11 @@ export type EvidenceSchema =
   | EvidenceStructuredSchema;
 
 export interface EvidenceFileData {
-  filename: string;
+  fileName: string;
   mimeType: string;
   size: number;
-  data: string; // base64 or reference
+  storageKey: string;
+  bucket: string;
 }
 
 export interface EvidenceTextData {

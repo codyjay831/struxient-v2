@@ -7,8 +7,36 @@
 import type { EvidenceSchema, EvidenceData, EvidenceStructuredSchema } from "./types";
 import { EvidenceType } from "@prisma/client";
 import Ajv from "ajv";
+import { z } from "zod";
 
 const ajv = new Ajv();
+
+/**
+ * Strict schema for FILE evidence pointers.
+ * Canon: 20_flowspec_invariants.md (Pointer-only)
+ */
+export const EvidenceFilePointerSchema = z.object({
+  storageKey: z.string().min(1),
+  fileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().nonnegative(),
+  bucket: z.string().min(1),
+}).strict();
+
+/**
+ * Validates a FILE evidence pointer against the strict schema.
+ */
+export function validateFilePointer(data: unknown): { valid: boolean; error?: string } {
+  const result = EvidenceFilePointerSchema.safeParse(data);
+  if (!result.success) {
+    const error = result.error.issues[0];
+    return {
+      valid: false,
+      error: `Invalid FILE pointer: ${error.path.join(".")} ${error.message}`,
+    };
+  }
+  return { valid: true };
+}
 
 const SUPPORTED_KEYWORDS = [
   "type",
@@ -91,10 +119,13 @@ function validateFileEvidence(
   data: any,
   schema: any // EvidenceFileSchema
 ): { valid: boolean; error?: string } {
-  if (!data || typeof data !== "object") {
-    return { valid: false, error: "Invalid file evidence data" };
+  // 1. Strict pointer validation
+  const pointerValidation = validateFilePointer(data);
+  if (!pointerValidation.valid) {
+    return pointerValidation;
   }
 
+  // 2. Task-specific constraints (if any)
   // mimeTypes check
   if (schema.mimeTypes && schema.mimeTypes.length > 0) {
     if (!schema.mimeTypes.includes(data.mimeType)) {

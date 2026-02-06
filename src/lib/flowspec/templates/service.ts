@@ -40,10 +40,22 @@ export interface TemplateListItem {
 
 /**
  * List all available templates, optionally filtered by trade.
+ * By default, excludes fixtures/demo templates.
  */
-export async function listTemplates(tradeKey?: string): Promise<TemplateListItem[]> {
+export async function listTemplates(
+  tradeKey?: string,
+  includeFixtures: boolean = false
+): Promise<TemplateListItem[]> {
+  // Security Guard: Only allow fixtures in development or when explicitly requested in dev
+  const shouldIncludeFixtures = includeFixtures && process.env.NODE_ENV === "development";
+
   const templates = await prisma.workflowTemplate.findMany({
-    where: tradeKey ? { tradeKey } : undefined,
+    where: {
+      AND: [
+        tradeKey ? { tradeKey } : {},
+        { isFixture: shouldIncludeFixtures ? undefined : false },
+      ],
+    },
     select: {
       id: true,
       tradeKey: true,

@@ -213,7 +213,7 @@ Implement the Evidence system that handles Evidence attachment to Tasks, Evidenc
   "taskId": "string",
   "flowId": "string",
   "type": "file | text | structured",
-  "data": "reference or content",
+  "data": "pointer metadata or content",
   "attachedAt": "timestamp",
   "attachedBy": "userId"
 }
@@ -260,9 +260,13 @@ POST /api/flowspec/flows/{flowId}/tasks/{taskId}/evidence
 Request:
 {
   "type": "file",
-  "data": "base64 or file reference",
-  "filename": "photo.jpg",
-  "mimeType": "image/jpeg",
+  "data": {
+    "storageKey": "company_1/evidence/flow_1/task_1/123456789.jpg",
+    "fileName": "photo.jpg",
+    "mimeType": "image/jpeg",
+    "size": 1048576,
+    "bucket": "struxient-evidence"
+  },
   "idempotencyKey": "unique-key"
 }
 

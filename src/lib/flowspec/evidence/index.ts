@@ -3,5 +3,5 @@
  */
 
 export * from "./types";
-export { validateEvidenceData } from "./schema";
+export { validateEvidenceData, validateFilePointer } from "./schema";
 export { checkEvidenceRequirements } from "./requirements";

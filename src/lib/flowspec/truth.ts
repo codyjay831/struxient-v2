@@ -28,6 +28,7 @@ import type {
   EngineError,
 } from "./types";
 import { EvidenceType } from "./types";
+import { validateFilePointer } from "./evidence/schema";
 
 // =============================================================================
 // NODE ACTIVATION (TRUTH)
@@ -335,6 +336,19 @@ export async function attachEvidence(
   }
 
   try {
+    // HARDENING: Enforce strict FILE pointer validation at the persistence boundary
+    if (type === "FILE") {
+      const validation = validateFilePointer(data);
+      if (!validation.valid) {
+        return {
+          error: {
+            code: "INVALID_FILE_POINTER",
+            message: validation.error || "Invalid FILE pointer",
+          },
+        };
+      }
+    }
+
     const evidenceAttachment = await client.evidenceAttachment.create({
       data: {
         flowId,

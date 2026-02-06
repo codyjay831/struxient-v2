@@ -1,38 +1,41 @@
 services:
-  db-v2:
+  struxient_db:
     image: postgres:16-alpine
-    container_name: struxient_v2_postgres
+    container_name: struxient_db
     restart: always
     environment:
-      POSTGRES_USER: struxient
-      POSTGRES_PASSWORD: struxient_dev
-      POSTGRES_DB: struxient_v2
+      POSTGRES_USER: ${POSTGRES_USER:-struxient}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-struxient_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-struxient_v2}
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U struxient -d struxient_v2"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-struxient} -d $${POSTGRES_DB:-struxient_v2}"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
-      - struxient_v2_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
 
-  app-v2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: struxient_v2_app
-    restart: always
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - PORT=3000
-      - DATABASE_URL=postgresql://struxient:struxient_dev@db-v2:5432/struxient_v2?schema=public
-    depends_on:
-      db-v2:
-        condition: service_healthy
+  # app service removed from local dev workflow as requested.
+  # Run app locally via `npm run dev` instead.
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: struxient_app
+  #   restart: always
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - DATABASE_URL=postgresql://${POSTGRES_USER:-struxient}:${POSTGRES_PASSWORD:-struxient_dev}@struxient_db:5432/${POSTGRES_DB:-struxient_v2}?schema=public
+  #   depends_on:
+  #     struxient_db:
+  #       condition: service_healthy
+  #   volumes:
+  #     - .:/app
 
 volumes:
-  struxient_v2_data:
+  postgres_data:

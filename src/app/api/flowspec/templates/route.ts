@@ -22,8 +22,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const tradeKey = searchParams.get("trade") || undefined;
+    const includeFixtures = searchParams.get("fixtures") === "true";
 
-    const templates = await listTemplates(tradeKey);
+    const templates = await listTemplates(tradeKey, includeFixtures);
     const trades = await getTradeKeys();
 
     return apiSuccess({ templates, trades }, 200, authority);

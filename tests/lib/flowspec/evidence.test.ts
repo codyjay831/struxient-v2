@@ -153,7 +153,19 @@ describe("EPIC-06: FlowSpec Evidence System", () => {
     expect(result2.evidenceAttachment).toBeDefined();
 
     // 3. Invalid attachment - wrong type
-    const result3 = await attachEvidence(flow.id, task.id, EvidenceType.FILE, { filename: "test.jpg", mimeType: "image/jpeg", size: 100, data: "base64" }, "test-user");
+    const result3 = await attachEvidence(
+      flow.id, 
+      task.id, 
+      EvidenceType.FILE, 
+      { 
+        storageKey: `${company.id}/evidence/${flow.id}/${task.id}/test.jpg`,
+        fileName: "test.jpg", 
+        mimeType: "image/jpeg", 
+        size: 100,
+        bucket: "test-bucket"
+      }, 
+      "test-user"
+    );
     expect(result3.error?.code).toBe("INVALID_EVIDENCE_FORMAT");
   });
 

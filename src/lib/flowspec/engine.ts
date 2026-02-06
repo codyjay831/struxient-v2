@@ -192,7 +192,7 @@ import {
   evaluateGates,
   computeValidityMap,
 } from "./derived";
-import { checkEvidenceRequirements, validateEvidenceData, type EvidenceSchema } from "./evidence";
+import { checkEvidenceRequirements, validateEvidenceData, validateFilePointer, type EvidenceSchema } from "./evidence";
 import { executeFanOut } from "./instantiation/fanout";
 import { HookContext } from "./hooks";
 import { MAX_NODE_ITERATIONS } from "./constants";
@@ -739,30 +739,19 @@ export async function attachEvidence(
   }
 
   // INVARIANT: FILE evidence must contain pointer metadata only (no binary data)
-  // Validate FILE pointer shape
   if (type === "FILE") {
-    // Basic structural validation without importing storage client
-    if (typeof data !== "object" || data === null) {
+    const validation = validateFilePointer(data);
+    if (!validation.valid) {
       return {
         error: {
           code: "INVALID_FILE_POINTER",
-          message: "FILE evidence data must be an object",
-        },
-      };
-    }
-
-    const pointer = data as Record<string, unknown>;
-    if (typeof pointer.storageKey !== "string" || !pointer.storageKey) {
-      return {
-        error: {
-          code: "INVALID_FILE_POINTER",
-          message: "storageKey is required and must be a non-empty string",
+          message: validation.error || "Invalid FILE pointer",
         },
       };
     }
 
     // Validate tenant isolation via key prefix
-    // Format: {companyId}/evidence/...
+    const pointer = data as { storageKey: string };
     if (!pointer.storageKey.startsWith(`${flow.workflow.companyId}/`)) {
       return {
         error: {

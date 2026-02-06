@@ -27,6 +27,10 @@ The collection of all available `WorkflowTemplate` versions.
 ### 2.3 Template Import
 The process of cloning a Template's definition into a tenant-owned Workflow.
 
+### 2.4 System Library vs. Fixtures
+* **System Library:** Curated, product-owned templates intended for all users. (e.g., Solar Installation, Detour Demonstration, Correction Loops).
+* **Fixtures:** Disposable demo/test data intended for development only.
+
 ---
 
 ## 3. Core Constraints
@@ -35,11 +39,14 @@ The process of cloning a Template's definition into a tenant-owned Workflow.
 1. Templates are data only. They MUST NOT contain runtime state (Flows, Executions).
 2. The FlowSpec Engine MUST NOT read from the `WorkflowTemplate` table during execution.
 3. Templates exist outside the tenant (Company) hierarchy.
+4. **Fixture Gating:** Fixtures (`isFixture: true`) MUST NOT be seeded by default and MUST NOT appear to production tenants.
 
-### 3.2 Immutability & Versioning
+### 3.2 Immutability & Governance
 1. `WorkflowTemplate` records are immutable.
 2. Updates MUST be performed by inserting a new row with an incremented `version` field.
 3. Patching existing template rows is PROHIBITED.
+4. **System Library Immutability:** Once a System Library template is released, it must be treated as append-only.
+5. **Import Rule:** Importing a template creates a tenant-owned `Workflow` and its first `DRAFT` version.
 
 ### 3.3 Import Mechanics
 1. **Source:** `WorkflowTemplate.definition` contains a `WorkflowSnapshot` JSON object.
