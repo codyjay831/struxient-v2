@@ -8,9 +8,15 @@ interface LensPlaceholderProps {
   title: string;
   alerts: LensAlert[];
   hideEmptyState?: boolean;
+  showVisualGrid?: boolean;
 }
 
-export function LensPlaceholder({ title, alerts, hideEmptyState = false }: LensPlaceholderProps) {
+export function LensPlaceholder({ 
+  title, 
+  alerts, 
+  hideEmptyState = false,
+  showVisualGrid = true 
+}: LensPlaceholderProps) {
   const hasAlerts = alerts.length > 0;
 
   if (!hasAlerts && hideEmptyState) {
@@ -85,11 +91,13 @@ export function LensPlaceholder({ title, alerts, hideEmptyState = false }: LensP
         )}
       </section>
 
-      {/* Visual Placeholder Grid */}
-      <div className="h-[400px] border border-dashed rounded-lg bg-muted/20 flex items-center justify-center text-muted-foreground flex-col gap-2">
-        <p className="text-sm font-medium">{title} Visual Grid Mock</p>
-        <p className="text-xs">Phase 3 Lens Data Placeholder</p>
-      </div>
+      {/* Visual Placeholder Grid - Phase 3 (INV-WS-03) */}
+      {showVisualGrid && (
+        <div className="h-[400px] border border-dashed rounded-lg bg-muted/20 flex items-center justify-center text-muted-foreground flex-col gap-2">
+          <p className="text-sm font-medium">{title} Visual Grid Mock</p>
+          <p className="text-xs">Phase 3 Lens Data Placeholder</p>
+        </div>
+      )}
     </div>
   );
 }

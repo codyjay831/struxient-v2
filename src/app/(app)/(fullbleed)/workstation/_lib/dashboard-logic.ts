@@ -356,5 +356,5 @@ export function useManagerDashboardData() {
     };
   }, [tasks, isLoading, error]);
 
-  return dashboardData;
+  return { ...dashboardData, refresh: fetchTasks };
 }

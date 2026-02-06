@@ -95,15 +95,34 @@ interface TaskFeedProps {
   jobId?: string | null;
   assignmentFilter?: boolean;
   currentMemberId?: string | null;
+  tasks?: ActionableTask[];
+  isLoading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void;
 }
 
-export function TaskFeed({ onSelectTask, selectedTaskId, selectedFlowId, jobId, assignmentFilter, currentMemberId }: TaskFeedProps) {
+export function TaskFeed({ 
+  onSelectTask, 
+  selectedTaskId, 
+  selectedFlowId, 
+  jobId, 
+  assignmentFilter, 
+  currentMemberId,
+  tasks: propsTasks,
+  isLoading: propsIsLoading,
+  error: propsError,
+  onRefresh
+}: TaskFeedProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tasks, setTasks] = useState<ActionableTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [internalTasks, setInternalTasks] = useState<ActionableTask[]>([]);
+  const [internalIsLoading, setInternalIsLoading] = useState(true);
+  const [internalError, setInternalError] = useState<string | null>(null);
   
+  const tasks = propsTasks ?? internalTasks;
+  const isLoading = propsIsLoading ?? internalIsLoading;
+  const error = propsError ?? internalError;
+
   // Signal filters (client-side only, no reordering)
   const [signalFilters, setSignalFilters] = useState<SignalFilters>({
     showOverdueOnly: false,
@@ -116,8 +135,12 @@ export function TaskFeed({ onSelectTask, selectedTaskId, selectedFlowId, jobId, 
   };
 
   const fetchTasks = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    setInternalIsLoading(true);
+    setInternalError(null);
     try {
       const url = jobId
         ? `/api/flowspec/flow-groups/${jobId}/actionable-tasks`
@@ -129,21 +152,27 @@ export function TaskFeed({ onSelectTask, selectedTaskId, selectedFlowId, jobId, 
         throw new Error(data.message || "Failed to fetch tasks");
       }
       const data = await response.json();
-      setTasks(data.items || []);
+      setInternalTasks(data.items || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setInternalError(err instanceof Error ? err.message : "An error occurred");
     } finally {
-      setIsLoading(false);
+      setInternalIsLoading(false);
     }
-  }, [jobId]);
+  }, [jobId, onRefresh]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if (!propsTasks) {
+      fetchTasks();
+    }
+  }, [fetchTasks, propsTasks]);
 
   const filteredTasks = useMemo(() => {
-    return applyAllFilters(tasks, !!assignmentFilter, currentMemberId || null, signalFilters);
-  }, [tasks, assignmentFilter, currentMemberId, signalFilters]);
+    let baseTasks = tasks;
+    if (jobId) {
+      baseTasks = baseTasks.filter(t => t.flowGroupId === jobId);
+    }
+    return applyAllFilters(baseTasks, !!assignmentFilter, currentMemberId || null, signalFilters);
+  }, [tasks, jobId, assignmentFilter, currentMemberId, signalFilters]);
 
   // Toggle signal filters
   const toggleOverdueFilter = () => {

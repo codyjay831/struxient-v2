@@ -34,7 +34,7 @@ export function ManagerDashboard() {
   const [activeLens, setActiveLens] = useState<LensType>(initialLens);
   const [assignmentFilter, setAssignmentFilter] = useState(false);
   const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
-  const { lensAlerts, allActionableTasks, isLoading, error } = useManagerDashboardData();
+  const { lensAlerts, allActionableTasks, isLoading, error, refresh } = useManagerDashboardData();
 
   // Selection state derived from URL
   const selectedTask = useMemo(() => {
@@ -44,6 +44,7 @@ export function ManagerDashboard() {
 
   // Edge case: Clear dead URL state if task is not found after loading
   useEffect(() => {
+    // Only clear if not loading to prevent race conditions during refresh
     if (!isLoading && taskIdFromUrl && !selectedTask) {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("task");
@@ -190,14 +191,16 @@ export function ManagerDashboard() {
             />
           )}
           {activeLens === "jobs" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {lensAlerts.jobs.length > 0 && (
                 <LensPlaceholder
                   title="Jobs"
                   alerts={lensAlerts.jobs}
                   hideEmptyState
+                  showVisualGrid={false}
                 />
               )}
+              {/* TODO: Replace suppressed grid with <JobHealthGrid /> in Phase 4 (INV-WS-07) */}
               {jobIdFromUrl && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-center justify-between">
@@ -217,16 +220,21 @@ export function ManagerDashboard() {
                 selectedFlowId={flowIdFromUrl}
                 assignmentFilter={assignmentFilter}
                 currentMemberId={currentMemberId}
+                tasks={allActionableTasks}
+                isLoading={isLoading}
+                error={error}
+                onRefresh={refresh}
               />
             </div>
           )}
           {activeLens === "tasks" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {lensAlerts.tasks.length > 0 && (
                 <LensPlaceholder
                   title="Tasks"
                   alerts={lensAlerts.tasks}
                   hideEmptyState
+                  showVisualGrid={false}
                 />
               )}
               <TaskFeed
@@ -235,6 +243,10 @@ export function ManagerDashboard() {
                 selectedFlowId={flowIdFromUrl}
                 assignmentFilter={assignmentFilter}
                 currentMemberId={currentMemberId}
+                tasks={allActionableTasks}
+                isLoading={isLoading}
+                error={error}
+                onRefresh={refresh}
               />
             </div>
           )}

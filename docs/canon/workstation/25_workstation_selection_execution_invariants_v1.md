@@ -53,8 +53,12 @@ These rules ensure that the Work Station selection state is robust, predictable,
 | Hook | Purpose |
 | :--- | :--- |
 | `ci/guards/guard_ws_taskexecution_content_only.mjs` | Ensures execution component remains "content-pure". |
-| `tests/components/workstation-manager-dashboard-phase1.test.tsx` | Verifies lens tab rendering and derived signals. |
-| `npm run typecheck` | Ensures prop-contract integrity between Dashboard and Feed. |
+| `ci/guards/guard_ws_no_reorder_01.mjs` | Enforces deterministic ordering (WS-ORD-001). |
+| `ci/guards/guard_ws_monopoly_01.mjs` | Enforces execution monopoly (WS-EXEC-001). |
+| `ci/guards/guard_ws_side_effects_01.mjs` | Restricts API access to allowlist (WS-IO-001). |
+| `ci/guards/guard_act_purity_01.mjs` | Prevents identity leakage in actionable tasks (WS-DATA-001). |
+| `ci/guards/guard_no_my_actionable_01.mjs` | Blocks identity-specific convenience routes (WS-DATA-001). |
+| `tests/lib/responsibility/workstation_determinism.test.ts` | Proves UI order matches API order. |
 
 ---
 
