@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: Props) {
   try {
     const { flowId, taskId } = await params;
     const body = await request.json();
-    const { outcome, detourId } = body;
+    const { outcome, detourId, metadata } = body;
 
     const flow = await getFlow(flowId);
     if (!flow) {
@@ -47,7 +47,8 @@ export async function POST(request: NextRequest, { params }: Props) {
       taskId,
       outcome,
       session.userId,
-      detourId
+      detourId,
+      metadata
     );
 
     if (!result.success && result.error) {

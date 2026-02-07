@@ -19,6 +19,7 @@ import {
   AlertCircleIcon,
   FileTextIcon,
   ClipboardCheckIcon,
+  Calendar,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { OutcomesEditor } from "./outcomes-editor";
@@ -53,6 +54,7 @@ interface Task {
   evidenceSchema?: any | null;
   outcomes: Outcome[];
   crossFlowDependencies: CrossFlowDependency[];
+  metadata?: any | null;
 }
 
 interface TaskDetailPanelProps {
@@ -88,6 +90,14 @@ export function TaskDetailPanel({
     task.evidenceRequired ?? false
   );
 
+  // Scheduling state
+  const [schedulingEnabled, setSchedulingEnabled] = useState(
+    task.metadata?.scheduling?.enabled ?? false
+  );
+  const [scheduleType, setScheduleType] = useState(
+    task.metadata?.scheduling?.type ?? "INSTALL_APPOINTMENT"
+  );
+
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -103,18 +113,22 @@ export function TaskDetailPanel({
     setName(task.name);
     setInstructions(task.instructions || "");
     setEvidenceRequired(task.evidenceRequired ?? false);
+    setSchedulingEnabled(task.metadata?.scheduling?.enabled ?? false);
+    setScheduleType(task.metadata?.scheduling?.type ?? "INSTALL_APPOINTMENT");
     setHasChanges(false);
     setSaveError(null);
-  }, [task.id, task.name, task.instructions, task.evidenceRequired]);
+  }, [task.id, task.name, task.instructions, task.evidenceRequired, task.metadata]);
 
   // Track changes
   useEffect(() => {
     const changed =
       name !== task.name ||
       instructions !== (task.instructions || "") ||
-      evidenceRequired !== (task.evidenceRequired ?? false);
+      evidenceRequired !== (task.evidenceRequired ?? false) ||
+      schedulingEnabled !== (task.metadata?.scheduling?.enabled ?? false) ||
+      scheduleType !== (task.metadata?.scheduling?.type ?? "INSTALL_APPOINTMENT");
     setHasChanges(changed);
-  }, [name, instructions, evidenceRequired, task.name, task.instructions, task.evidenceRequired]);
+  }, [name, instructions, evidenceRequired, schedulingEnabled, scheduleType, task.name, task.instructions, task.evidenceRequired, task.metadata]);
 
   const handleSave = async () => {
     if (!hasChanges) return;
@@ -131,6 +145,16 @@ export function TaskDetailPanel({
             name: name !== task.name ? name : undefined,
             instructions: instructions !== (task.instructions || "") ? (instructions || null) : undefined,
             evidenceRequired: evidenceRequired !== (task.evidenceRequired ?? false) ? evidenceRequired : undefined,
+            metadata: (schedulingEnabled !== (task.metadata?.scheduling?.enabled ?? false) || 
+                       scheduleType !== (task.metadata?.scheduling?.type ?? "INSTALL_APPOINTMENT")) 
+              ? { 
+                  ...task.metadata, 
+                  scheduling: { 
+                    enabled: schedulingEnabled, 
+                    type: scheduleType 
+                  } 
+                } 
+              : undefined,
           }),
         }
       );
@@ -239,6 +263,46 @@ export function TaskDetailPanel({
           <p className="text-[10px] text-muted-foreground leading-tight">
             When enabled, this task requires evidence to be attached when recording an outcome.
           </p>
+        </div>
+
+        {/* Scheduling Affordance */}
+        <div className="space-y-3 pt-2 border-t">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="scheduling-enabled"
+              checked={schedulingEnabled}
+              onChange={(e) => setSchedulingEnabled(e.target.checked)}
+              disabled={!isEditable || isSaving}
+              className="h-4 w-4 rounded border-gray-300 accent-primary"
+            />
+            <Label htmlFor="scheduling-enabled" className="flex items-center gap-1 font-bold">
+              <Calendar className="size-3 text-purple-600" />
+              Scheduling Task
+            </Label>
+          </div>
+          
+          {schedulingEnabled && (
+            <div className="pl-6 space-y-2">
+              <Label variant="metadata" htmlFor="schedule-type">
+                Schedule Type
+              </Label>
+              <select
+                id="schedule-type"
+                value={scheduleType}
+                onChange={(e) => setScheduleType(e.target.value)}
+                disabled={!isEditable || isSaving}
+                className="w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="INSTALL_APPOINTMENT">Install Appointment</option>
+                <option value="SITE_VISIT">Site Visit</option>
+                <option value="INSPECTION">Inspection</option>
+                <option value="SUBCONTRACTOR_SLOT">Subcontractor Slot</option>
+                <option value="MATERIAL_DELIVERY">Material Delivery</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Evidence Schema Editor */}

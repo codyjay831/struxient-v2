@@ -689,3 +689,120 @@ export async function commitScheduleFromDetour(
     }
   });
 }
+
+/**
+ * Commits schedule truth from a standard task outcome.
+ * Phase G - Atomic commit via Task Outcome.
+ */
+export async function commitScheduleFromOutcome(
+  flowId: string,
+  taskId: string,
+  userId: string,
+  metadata: any,
+  tx: Prisma.TransactionClient,
+  now: Date
+): Promise<void> {
+  // 1. Validation: Check if metadata contains a valid schedule window
+  // Support both legacy "metadata.schedule" (canonical) and new flattened "metadata.scheduling" (temporary)
+  const schedule = metadata?.schedule || metadata?.scheduling;
+  if (!schedule) {
+    throw new Error(JSON.stringify({ 
+      code: "SCHEDULING_DATA_MISSING", 
+      message: "This task requires a schedule window to be recorded." 
+    }));
+  }
+
+  const startAtRaw = schedule.startAt;
+  const endAtRaw = schedule.endAt;
+
+  if (!startAtRaw || !endAtRaw) {
+    throw new Error(JSON.stringify({ 
+      code: "SCHEDULING_TIMES_MISSING", 
+      message: "Both startAt and endAt are required for scheduling tasks." 
+    }));
+  }
+
+  const startAt = new Date(startAtRaw);
+  const endAt = new Date(endAtRaw);
+
+  if (isNaN(startAt.getTime()) || isNaN(endAt.getTime())) {
+    throw new Error(JSON.stringify({ 
+      code: "INVALID_DATE_FORMAT", 
+      message: "Schedule timestamps must be valid ISO dates." 
+    }));
+  }
+
+  if (endAt <= startAt) {
+    throw new Error(JSON.stringify({ 
+      code: "INVALID_TIME_RANGE", 
+      message: "End time must be after start time." 
+    }));
+  }
+
+  // 2. Fetch context (companyId, jobId)
+  const flow = await tx.flow.findUnique({
+    where: { id: flowId },
+    include: { workflow: { select: { companyId: true } } }
+  });
+
+  if (!flow) return;
+  const companyId = flow.workflow.companyId;
+
+  let jobId: string | null = null;
+  const job = await tx.job.findUnique({
+    where: { flowGroupId: flow.flowGroupId },
+    select: { id: true }
+  });
+  jobId = job?.id || null;
+
+  const resourceId = schedule.resourceId || null;
+  const resourceType = schedule.resourceType || null;
+
+  // 3. Supersede existing active committed block for the same scope
+  await tx.scheduleBlock.updateMany({
+    where: {
+      companyId,
+      taskId,
+      timeClass: "COMMITTED",
+      supersededAt: null,
+    },
+    data: {
+      supersededAt: now,
+    }
+  });
+
+  // 4. Create new COMMITTED ScheduleBlock
+  const newBlock = await tx.scheduleBlock.create({
+    data: {
+      companyId,
+      jobId,
+      flowId,
+      taskId,
+      resourceId,
+      resourceType,
+      timeClass: "COMMITTED",
+      startAt,
+      endAt,
+      createdBy: userId,
+      createdAt: now,
+      metadata: (schedule.note || schedule.metadata) ? { 
+        note: schedule.note || (schedule.metadata as any)?.note || null,
+        ...((schedule.metadata as any) || {})
+      } : null,
+    }
+  });
+
+  // 5. Update supersededBy pointer
+  await tx.scheduleBlock.updateMany({
+    where: {
+      companyId,
+      taskId,
+      timeClass: "COMMITTED",
+      supersededAt: now,
+      supersededBy: null,
+    },
+    data: {
+      supersededBy: newBlock.id,
+    }
+  });
+}

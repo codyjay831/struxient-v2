@@ -25,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   try {
     const { id: workflowId, nodeId, taskId } = await params;
     const body = await request.json();
-    const { name, instructions, evidenceRequired, evidenceSchema, displayOrder } = body;
+    const { name, instructions, evidenceRequired, evidenceSchema, displayOrder, metadata } = body;
 
     const workflow = await prisma.workflow.findUnique({ where: { id: workflowId } });
 
@@ -52,6 +52,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
     if (evidenceRequired !== undefined) updates.evidenceRequired = evidenceRequired;
     if (evidenceSchema !== undefined) updates.evidenceSchema = evidenceSchema;
     if (displayOrder !== undefined) updates.displayOrder = displayOrder;
+    if (metadata !== undefined) updates.metadata = metadata;
 
     const updatedBuffer = await updateTaskInBuffer(workflowId, companyId, nodeId, taskId, updates, userId);
     const content = updatedBuffer.content as any;

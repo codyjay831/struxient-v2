@@ -568,6 +568,7 @@ export function computeActionableTasks(
           domainHint,
           startedAt: execution?.startedAt || null,
           latestTaskExecutionId: execution?.id || null,
+          metadata: task.metadata,
         });
       }
     }

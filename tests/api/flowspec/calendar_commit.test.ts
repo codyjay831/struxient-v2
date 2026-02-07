@@ -33,10 +33,12 @@ async function cleanupTestData() {
   await prisma.scheduleBlock.deleteMany({});
   await prisma.scheduleChangeRequest.deleteMany({});
   await prisma.validityEvent.deleteMany({});
+  await prisma.evidenceAttachment.deleteMany({});
   await prisma.detourRecord.deleteMany({});
   await prisma.taskExecution.deleteMany({});
   await prisma.nodeActivation.deleteMany({});
   await prisma.flow.deleteMany({});
+  await prisma.job.deleteMany({});
   await prisma.flowGroup.deleteMany({});
   await prisma.workflowVersion.deleteMany({});
   await prisma.workflow.deleteMany({});

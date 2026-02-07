@@ -59,6 +59,14 @@ export async function GET(request: NextRequest, { params }: Props) {
     // Check if task is started
     const execution = flow.taskExecutions.find(te => te.taskId === taskId);
 
+    // TOP-TIER: Fetch "Live" metadata from Master definition to detect snapshot mismatch
+    // 1. Find the current node in the Master workflow by name
+    const masterNode = await prisma.node.findFirst({
+      where: { workflowId: flow.workflowId, name: targetNode.name },
+      include: { tasks: { where: { name: targetTask.name } } }
+    });
+    const masterTask = masterNode?.tasks[0];
+
     const taskDetail = {
       taskId: targetTask.id,
       taskName: targetTask.name,
@@ -74,6 +82,8 @@ export async function GET(request: NextRequest, { params }: Props) {
       domainHint,
       startedAt: execution?.startedAt || null,
       instructions: targetTask.instructions,
+      metadata: targetTask.metadata,
+      masterMetadata: masterTask?.metadata || null,
     };
 
     return apiSuccess({ task: taskDetail }, 200, authority);

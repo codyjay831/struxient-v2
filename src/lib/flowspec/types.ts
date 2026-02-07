@@ -136,6 +136,15 @@ export interface SnapshotTask {
   defaultSlaHours?: number | null; // Template-level default SLA (A). Policy can override (B > A > null)
   outcomes: SnapshotOutcome[];
   crossFlowDependencies?: SnapshotCrossFlowDependency[];
+  metadata?: TaskMetadata | null;
+}
+
+export interface TaskMetadata {
+  scheduling?: {
+    enabled: boolean;
+    type: "INSTALL_APPOINTMENT" | "SITE_VISIT" | "INSPECTION" | "SUBCONTRACTOR_SLOT" | "MATERIAL_DELIVERY" | "OTHER";
+    requiresResource?: boolean;
+  };
 }
 
 export interface SnapshotCrossFlowDependency {
@@ -305,6 +314,7 @@ export interface ActionableTask {
   domainHint: "execution" | "finance" | "sales";
   startedAt: Date | null;
   latestTaskExecutionId?: string | null;
+  metadata?: TaskMetadata | null;
   _detour?: {
     id: string;
     status: 'ACTIVE' | 'RESOLVED' | 'CONVERTED';

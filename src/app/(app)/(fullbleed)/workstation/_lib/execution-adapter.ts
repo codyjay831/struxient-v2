@@ -20,11 +20,11 @@ export async function apiStartTask(flowId: string, taskId: string) {
   return response.json();
 }
 
-export async function apiRecordOutcome(flowId: string, taskId: string, outcome: string, detourId?: string) {
+export async function apiRecordOutcome(flowId: string, taskId: string, outcome: string, detourId?: string, metadata?: any) {
   const response = await fetch(`/api/flowspec/flows/${flowId}/tasks/${taskId}/outcome`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ outcome, detourId }),
+    body: JSON.stringify({ outcome, detourId, metadata }),
   });
   if (!response.ok) {
     const error = await response.json();
@@ -94,4 +94,17 @@ export async function uploadFileToStorage(
   if (!response.ok) {
     throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
   }
+}
+
+export async function apiGetTaskDetail(flowId: string, taskId: string) {
+  const response = await fetch(`/api/flowspec/flows/${flowId}/tasks/${taskId}`);
+  if (!response.ok) {
+    const error = await response.json();
+    const message = error.error?.message || error.message || "Failed to fetch task detail";
+    const err = new Error(message);
+    (err as any).code = error.error?.code || error.code;
+    throw err;
+  }
+  const result = await response.json();
+  return result.task;
 }

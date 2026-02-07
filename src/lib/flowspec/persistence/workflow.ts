@@ -419,6 +419,7 @@ export async function hydrateSnapshotToWorkflow(
           evidenceSchema: sTask.evidenceSchema as Prisma.InputJsonValue,
           displayOrder: sTask.displayOrder,
           defaultSlaHours: sTask.defaultSlaHours ?? null,
+          metadata: sTask.metadata as Prisma.InputJsonValue,
         },
       });
       taskIdMap.set(sTask.id, newTask.id);

@@ -48,6 +48,13 @@ export interface ActionableTask {
   domainHint: "execution" | "finance" | "sales";
   startedAt: string | null;
   latestTaskExecutionId?: string | null;
+  metadata?: {
+    scheduling?: {
+      enabled: boolean;
+      type: "INSTALL_APPOINTMENT" | "SITE_VISIT" | "INSPECTION" | "SUBCONTRACTOR_SLOT" | "MATERIAL_DELIVERY" | "OTHER";
+      requiresResource?: boolean;
+    };
+  } | null;
   _metadata?: {
     assignments: Array<{
       slotKey: string;

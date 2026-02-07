@@ -37,6 +37,7 @@ async function createTestMember(companyId: string, userId: string) {
 async function cleanupTestData() {
   await prisma.workflowDraftBuffer.deleteMany({});
   await prisma.node.deleteMany({});
+  await prisma.workflowVersion.deleteMany({});
   await prisma.workflow.deleteMany({});
   await prisma.companyMember.deleteMany({});
   await prisma.company.deleteMany({});

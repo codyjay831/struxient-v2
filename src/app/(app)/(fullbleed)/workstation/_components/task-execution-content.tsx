@@ -13,14 +13,18 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, Send, AlertCircle, CheckCircle2, Paperclip } from "lucide-react";
-import { apiStartTask, apiRecordOutcome } from "../_lib/execution-adapter";
+import { format, addHours } from "date-fns";
+import { apiStartTask, apiRecordOutcome, apiGetTaskDetail } from "../_lib/execution-adapter";
 import type { ActionableTask } from "./task-feed";
 import { EvidenceList } from "./evidence-list";
 import { EvidenceForm } from "./evidence-form";
 import { DetourBanner } from "./detour-banner";
 import { OpenDetourDialog } from "./open-detour-dialog";
 import { DetourControls } from "./detour-controls";
+import { SchedulingPicker } from "./scheduling-picker";
 
 interface TaskExecutionContentProps {
   task: ActionableTask;
@@ -35,6 +39,67 @@ export function TaskExecutionContent({ task, onComplete }: TaskExecutionContentP
   const [isStarted, setIsStarted] = useState(!!task.startedAt);
   const [evidenceCount, setEvidenceCount] = useState(0);
   const [evidenceRefreshKey, setEvidenceRefreshKey] = useState(0);
+  const [taskDetail, setTaskDetail] = useState<any>(null);
+
+  // Scheduling State (ISO strings)
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
+  const [schedulingNote, setSchedulingNote] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+
+  const isSchedulingEnabled = !!task.metadata?.scheduling?.enabled;
+  const isMismatch = !task.metadata?.scheduling?.enabled && taskDetail?.masterMetadata?.scheduling?.enabled;
+
+  const handleRangeChange = (start: string, end: string) => {
+    setStartAt(start);
+    setEndAt(end);
+  };
+
+  const handleStartRequest = async () => {
+    if (!taskDetail?.masterMetadata?.scheduling?.type) return;
+    
+    setIsSubmittingRequest(true);
+    try {
+      const response = await fetch("/api/flowspec/calendar-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskId: task.taskId,
+          flowId: task.flowId,
+          timeClass: "COMMITTED",
+          reason: "Enabling scheduling for this task (Workflow update mismatch)",
+          metadata: {
+            requestedStartAt: new Date().toISOString(), // Placeholder, will be adjusted in detour
+            requestedEndAt: addHours(new Date(), 1).toISOString(),
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to initiate schedule change request");
+      }
+
+      alert("Reschedule request initiated. This will open a Detour flow to confirm the schedule window.");
+      onComplete(); // Refresh to show detour if it opened automatically
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start request");
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
+  // Fetch live detail to check for metadata mismatches (Top-Tier UX)
+  useEffect(() => {
+    const fetchDetail = async () => {
+      try {
+        const detail = await apiGetTaskDetail(task.flowId, task.taskId);
+        setTaskDetail(detail);
+      } catch (err) {
+        console.error("Failed to fetch task detail for live metadata check", err);
+      }
+    };
+    fetchDetail();
+  }, [task.flowId, task.taskId]);
 
   // Auto-start task when component mounts if not already started
   useEffect(() => {
@@ -65,8 +130,25 @@ export function TaskExecutionContent({ task, onComplete }: TaskExecutionContentP
     setState("submitting");
     setError(null);
 
+    // Validate scheduling if enabled
+    if (isSchedulingEnabled) {
+      if (!startAt || !endAt) {
+        setError("Please select a valid schedule window.");
+        setState("error");
+        return;
+      }
+    }
+
+    const schedulingPayload = isSchedulingEnabled ? {
+      schedule: {
+        startAt,
+        endAt,
+        metadata: schedulingNote ? { note: schedulingNote } : null
+      }
+    } : undefined;
+
     try {
-      await apiRecordOutcome(task.flowId, task.taskId, outcome, (task as any)._detour?.id);
+      await apiRecordOutcome(task.flowId, task.taskId, outcome, (task as any)._detour?.id, schedulingPayload);
       setState("success");
       setTimeout(() => {
         onComplete();
@@ -152,6 +234,48 @@ export function TaskExecutionContent({ task, onComplete }: TaskExecutionContentP
               {task.instructions || "No special instructions for this task."}
             </div>
           </div>
+
+          {isMismatch && (
+            <Alert className="py-2 border-amber-500 bg-amber-50/50">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+              <AlertDescription className="text-[11px] text-amber-800 flex items-center justify-between gap-4">
+                <span>
+                  <strong>Scheduling Available:</strong> This task was recently updated to support scheduling, but this job is using an older snapshot.
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="xs" 
+                  onClick={handleStartRequest}
+                  disabled={isSubmittingRequest}
+                  className="h-6 text-[10px] bg-white border-amber-300 hover:bg-amber-100"
+                >
+                  {isSubmittingRequest ? <Loader2 className="h-3 w-3 animate-spin" /> : "Start Reschedule Request"}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isSchedulingEnabled && (
+            <div className="space-y-4 pt-2 border-t">
+              <SchedulingPicker
+                type={task.metadata?.scheduling?.type}
+                onRangeChange={handleRangeChange}
+              />
+
+              <div className="space-y-1.5">
+                <Label htmlFor="schedulingNote" className="text-[10px] font-bold uppercase tracking-tight text-muted-foreground">
+                  Scheduling Note (Optional)
+                </Label>
+                <Input
+                  id="schedulingNote"
+                  placeholder="e.g. Confirm gate code with customer"
+                  value={schedulingNote}
+                  onChange={(e) => setSchedulingNote(e.target.value)}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3 pt-2 border-t">
             <div className="flex items-center gap-2">

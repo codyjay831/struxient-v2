@@ -346,6 +346,7 @@ model Task {
   evidenceSchema   Json?   // Schema for required evidence validation
   displayOrder     Int     @default(0)
   defaultSlaHours  Int?    // Template-level default SLA (hours). Policy can override (B > A > null)
+  metadata         Json?   // Optional task metadata (e.g. scheduling config)
 
   node                  Node                  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
   outcomes              Outcome[]

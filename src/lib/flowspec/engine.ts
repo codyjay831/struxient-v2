@@ -61,6 +61,7 @@ import {
   updateFlowStatus,
   getFlowGroupOutcomes,
   commitScheduleFromDetour,
+  commitScheduleFromOutcome,
 } from "./truth";
 
 /**
@@ -384,7 +385,8 @@ export async function recordOutcome(
   taskId: string,
   outcome: string,
   userId: string,
-  detourId?: string
+  detourId?: string,
+  metadata?: any
 ): Promise<RecordOutcomeResult> {
   // 1. Pre-transaction validation
   const flow = await getFlow(flowId);
@@ -570,6 +572,13 @@ export async function recordOutcome(
       } else {
         // b. Routing (Node Activations) - Only for standard progress
         gateResults = await processGateRouting(flow, snapshot, node, iteration, tx, now, hookCtx);
+
+        // PHASE-G: Commit schedule truth from standard outcome if task is scheduling task
+        // LOCK: Only commit if snapshot explicitly enables scheduling.
+        const taskMetadata = task.metadata as any;
+        if (taskMetadata?.scheduling?.enabled) {
+          await commitScheduleFromOutcome(flowId, taskId, userId, metadata, tx, now);
+        }
       }
 
       // c. Check if Node completed for Fan-Out intent
