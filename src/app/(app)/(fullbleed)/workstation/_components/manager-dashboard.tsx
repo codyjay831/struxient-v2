@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { OverviewLens } from "./overview-lens";
+import { CalendarLens } from "./calendar-lens";
 import { LensPlaceholder } from "./lens-placeholder";
 import { DashboardRightRail } from "./dashboard-right-rail";
 import { TaskFeed, type ActionableTask } from "./task-feed";
@@ -184,12 +185,7 @@ export function ManagerDashboard() {
         {/* Scrollable Dashboard Body */}
         <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar bg-background">
           {activeLens === "overview" && <OverviewLens />}
-          {activeLens === "calendar" && (
-            <LensPlaceholder
-              title="Calendar"
-              alerts={lensAlerts.calendar}
-            />
-          )}
+          {activeLens === "calendar" && <CalendarLens />}
           {activeLens === "jobs" && (
             <div className="space-y-4">
               {lensAlerts.jobs.length > 0 && (

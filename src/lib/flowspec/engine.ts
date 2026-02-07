@@ -60,6 +60,7 @@ import {
   getLatestNodeActivation,
   updateFlowStatus,
   getFlowGroupOutcomes,
+  commitScheduleFromDetour,
 } from "./truth";
 
 /**
@@ -550,6 +551,9 @@ export async function recordOutcome(
             resolvedBy: userId,
           },
         });
+
+        // PHASE-E2b: Commit schedule truth if linked to a ScheduleChangeRequest
+        await commitScheduleFromDetour(detourId, userId, tx, now);
 
         // d. Stable Resume: Explicitly activate resumeTargetNodeId
         const resumeResult = await activateNode(flowId, resolutionDetour.resumeTargetNodeId, undefined, tx, now, hookCtx);

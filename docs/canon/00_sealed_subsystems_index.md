@@ -125,7 +125,20 @@ Any modification requires a Seal Breach Proposal + passing `guard_ws_monopoly_01
 
 ## Subsystems Under Consideration (Not Sealed)
 
-- **Manual Progression / Admin Override Policy** (See: `docs/canon/00_open_questions.md`)
+### 5. Scheduling Foundation — v1.0
+**Status:** PROPOSED → GUARDED  
+**Date Added:** 2026-02-06  
+**Canon:** `docs/canon/scheduling/00_scheduling_foundation.md`  
+**Invariants:** `docs/canon/scheduling/01_scheduling_invariants_and_guards.canon.md`
+
+**Scope:**
+- Truth engine location (Tasks + FlowSpec)
+- Time class semantics (Committed, Planned, Requested, Suggested)
+- Calendar change path (Request → Detour → Outcome)
+- Derived conflict model and explainability
+- Bounded AI role
+- **Read-only consumption of sealed subsystems**
+- CI-enforced non-drift guards
 
 ---
 

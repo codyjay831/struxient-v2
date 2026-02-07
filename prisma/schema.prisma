@@ -35,6 +35,8 @@ model Company {
   externalParties ExternalParty[]
   draftBuffers    WorkflowDraftBuffer[]
   draftEvents     WorkflowDraftEvent[]
+  scheduleRequests ScheduleChangeRequest[]
+  scheduleBlocks   ScheduleBlock[]
 }
 
 /// Membership role within a company
@@ -105,6 +107,7 @@ model Job {
 
   // Responsibility Back-relation
   assignments JobAssignment[]
+  scheduleBlocks ScheduleBlock[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -506,6 +509,8 @@ model Flow {
   taskExecutions      TaskExecution[]
   evidenceAttachments EvidenceAttachment[]
   detours             DetourRecord[]
+  scheduleRequests    ScheduleChangeRequest[]
+  scheduleBlocks      ScheduleBlock[]
 
   @@index([flowGroupId])
   @@index([workflowId])
@@ -598,6 +603,7 @@ model DetourRecord {
 
   flow                    Flow           @relation(fields: [flowId], references: [id], onDelete: Restrict)
   checkpointTaskExecution TaskExecution? @relation("CheckpointDetours", fields: [checkpointTaskExecutionId], references: [id])
+  scheduleRequests        ScheduleChangeRequest[]
 
   @@index([flowId, status])
   @@index([flowId, checkpointNodeId])
@@ -713,4 +719,80 @@ model WorkflowTemplate {
 
   @@unique([tradeKey, name, version])
   @@index([tradeKey, category])
+}
+
+// =============================================================================
+// DOMAIN: SCHEDULING (PHASE C)
+// Canon: 00_scheduling_foundation.md, 01_scheduling_invariants_and_guards.canon.md
+// =============================================================================
+
+/// Canonical schedule time classes
+enum ScheduleTimeClass {
+  COMMITTED
+  PLANNED
+  REQUESTED
+  SUGGESTED
+}
+
+/// Request for a schedule change (e.g. from Calendar UI)
+/// Does not mutate truth directly; must be resolved via task outcome.
+model ScheduleChangeRequest {
+  id             String            @id @default(cuid())
+  companyId      String
+  flowId         String?
+  taskId         String?
+  detourRecordId String?
+  timeClass      ScheduleTimeClass @default(PLANNED)
+  status         String            @default("PENDING") // PENDING, APPROVED, REJECTED, CANCELLED
+  reason         String?           // User-provided reason for change
+  metadata       Json?             // Requested window, resource changes, etc.
+
+  // Audit
+  requestedAt DateTime @default(now())
+  requestedBy String   // ActorId
+  reviewedAt  DateTime?
+  reviewedBy  String?
+
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  flow         Flow?          @relation(fields: [flowId], references: [id], onDelete: SetNull)
+  detourRecord DetourRecord?  @relation(fields: [detourRecordId], references: [id], onDelete: SetNull)
+  blocks       ScheduleBlock[]
+
+  @@index([companyId, status])
+  @@index([flowId])
+}
+
+/// Append-only record of schedule truth
+/// Linked to tasks/flows/detours.
+model ScheduleBlock {
+  id           String            @id @default(cuid())
+  companyId    String
+  jobId        String?
+  flowId       String?
+  taskId       String?           // Canonical link to truth source
+  resourceId   String?           // Crew/Member/Equipment ID
+  resourceType String?           // "CREW", "MEMBER", "EQUIPMENT"
+  timeClass    ScheduleTimeClass
+  startAt      DateTime
+  endAt        DateTime
+  metadata     Json?             // Flexible storage for secondary attributes
+
+  // Audit & History
+  createdAt    DateTime  @default(now())
+  createdBy    String    // ActorId
+  supersededAt DateTime? // If set, this block is historical
+  supersededBy String?   // Pointer to new block ID (not FK for append-only simplicity)
+
+  changeRequestId String?   // Link to request that created this
+
+  company       Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job           Job?                   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  flow          Flow?                  @relation(fields: [flowId], references: [id], onDelete: SetNull)
+  changeRequest ScheduleChangeRequest? @relation(fields: [changeRequestId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, timeClass, supersededAt])
+  @@index([startAt, endAt])
+  @@index([resourceId, supersededAt])
+  @@index([jobId])
+  @@index([flowId, taskId])
 }

@@ -537,3 +537,155 @@ export async function getSaleDetails(flowId: string, taskId: string): Promise<{ 
   if (!evidence || !evidence.data) return null;
   return (evidence.data as any).content || null;
 }
+
+// =============================================================================
+// SCHEDULING (PHASE E2b)
+// Canon: 01_scheduling_invariants_and_guards.canon.md
+// =============================================================================
+
+/**
+ * Commits schedule truth from a resolved detour linked to a ScheduleChangeRequest.
+ * Phase E2b - Atomic commit via Task Outcome.
+ *
+ * @param detourId - The resolved detour ID
+ * @param userId - The user confirming the change
+ * @param tx - Prisma transaction client
+ * @param now - Atomic timestamp
+ */
+export async function commitScheduleFromDetour(
+  detourId: string,
+  userId: string,
+  tx: Prisma.TransactionClient,
+  now: Date
+): Promise<void> {
+  // 1. Find linked ScheduleChangeRequest
+  // We match by detourRecordId which is unique.
+  const request = await tx.scheduleChangeRequest.findFirst({
+    where: { detourRecordId: detourId },
+    include: { 
+      company: true,
+      detourRecord: {
+        include: {
+          flow: {
+            include: { workflow: true }
+          }
+        }
+      }
+    }
+  });
+
+  if (!request || request.status !== "ACCEPTED") return;
+
+  // Tenant Isolation: Ensure request company matches detour flow company
+  if (request.companyId !== request.detourRecord?.flow.workflow.companyId) {
+    // Cross-tenant mismatch detected - abort commit
+    return;
+  }
+
+  const metadata = request.metadata as any;
+  if (!metadata) return;
+
+  const startAtRaw = metadata.requestedStartAt || metadata.requestedStart;
+  const endAtRaw = metadata.requestedEndAt || metadata.requestedEnd;
+
+  if (!startAtRaw || !endAtRaw) {
+    // Required window missing - cannot commit
+    return;
+  }
+
+  const startAt = new Date(startAtRaw);
+  const endAt = new Date(endAtRaw);
+
+  // Validation: Required window integrity
+  if (isNaN(startAt.getTime()) || isNaN(endAt.getTime())) {
+    // Invalid timestamp format
+    return;
+  }
+
+  if (endAt <= startAt) {
+    // INV-040: endAt must be greater than startAt
+    return;
+  }
+
+  const resourceId = metadata.requestedResourceId || null;
+  const resourceType = metadata.requestedResourceType || null;
+
+  // 2. Fetch jobId if missing from request (available via Flow)
+  let jobId: string | null = null;
+  if (request.flowId) {
+    const flow = await tx.flow.findUnique({
+      where: { id: request.flowId },
+      select: { flowGroupId: true }
+    });
+    
+    if (flow?.flowGroupId) {
+      const job = await tx.job.findUnique({
+        where: { flowGroupId: flow.flowGroupId },
+        select: { id: true }
+      });
+      jobId = job?.id || null;
+    }
+  }
+
+  // 3. Supersede existing active committed block for the same scope
+  // Rule: v1: supersede by companyId + taskId + timeClass=COMMITTED + supersededAt=null
+  if (request.taskId) {
+    // First, mark them as superseded
+    await tx.scheduleBlock.updateMany({
+      where: {
+        companyId: request.companyId,
+        taskId: request.taskId,
+        timeClass: "COMMITTED",
+        supersededAt: null,
+      },
+      data: {
+        supersededAt: now,
+        // supersededBy will be updated after new block creation
+      }
+    });
+  }
+
+  // 4. Create new COMMITTED ScheduleBlock
+  const newBlock = await tx.scheduleBlock.create({
+    data: {
+      companyId: request.companyId,
+      jobId,
+      flowId: request.flowId,
+      taskId: request.taskId,
+      resourceId,
+      resourceType,
+      timeClass: "COMMITTED",
+      startAt: new Date(startAt),
+      endAt: new Date(endAt),
+      createdBy: userId,
+      createdAt: now,
+      changeRequestId: request.id,
+    }
+  });
+
+  // 5. Update supersededBy pointer for the historical records
+  if (request.taskId) {
+    await tx.scheduleBlock.updateMany({
+      where: {
+        companyId: request.companyId,
+        taskId: request.taskId,
+        timeClass: "COMMITTED",
+        supersededAt: now,
+        supersededBy: null,
+      },
+      data: {
+        supersededBy: newBlock.id,
+      }
+    });
+  }
+
+  // 6. Mark request as COMMITTED
+  await tx.scheduleChangeRequest.update({
+    where: { id: request.id },
+    data: {
+      status: "COMMITTED",
+      reviewedBy: userId,
+      reviewedAt: now,
+    }
+  });
+}
